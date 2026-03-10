@@ -8,6 +8,7 @@ import Tenants from './TenantsPage';
 import RentPage from './RentPage';
 import ElectricityPage from './ElectricityPage';
 import ReportsPage from './ReportsPage';
+import SettingsPage from './SettingsPage';
 
 function Dashboard() {
   const [pgOwner, setPgOwner] = useState(null);
@@ -195,6 +196,7 @@ function Dashboard() {
         {activeMenu === 'Rent' && <RentPage />}
         {activeMenu === 'Electricity' && <ElectricityPage />}
         {activeMenu === 'Reports' && <ReportsPage />}
+        {activeMenu === 'Settings' && <SettingsPage />}
 
         {/* Dashboard Home */}
         {activeMenu === 'Dashboard' && (
@@ -243,7 +245,7 @@ function Dashboard() {
         )}
 
         {/* Coming Soon */}
-        {!['Dashboard', 'Rooms', 'Tenants', 'Rent','Electricity','Reports'].includes(activeMenu) && (
+        {!['Dashboard', 'Rooms', 'Tenants', 'Rent','Electricity','Reports',"Settings"].includes(activeMenu) && (
           <div style={styles.section}>
             <div style={styles.emptyState}>
               <div style={styles.emptyIcon}>🚧</div>
