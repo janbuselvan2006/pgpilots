@@ -80,13 +80,44 @@ function Tenants() {
       monthlyRent: parseInt(form.monthlyRent) || 0,
       deposit: parseInt(form.deposit) || 0,
     };
+
     if (editId) {
+      // Get old tenant to check if room changed
+      const oldTenant = tenants.find(t => t.id === editId);
+
+      // If room changed, update both old and new room counts
+      if (oldTenant.roomNumber !== form.roomNumber) {
+        // Decrease old room occupied count
+        const oldRoom = rooms.find(r => r.roomNumber === oldTenant.roomNumber);
+        if (oldRoom) {
+          await updateDoc(doc(db, 'rooms', oldRoom.id), {
+            occupiedBeds: Math.max(0, (oldRoom.occupiedBeds || 0) - 1)
+          });
+        }
+        // Increase new room occupied count
+        const newRoom = rooms.find(r => r.roomNumber === form.roomNumber);
+        if (newRoom) {
+          await updateDoc(doc(db, 'rooms', newRoom.id), {
+            occupiedBeds: (newRoom.occupiedBeds || 0) + 1
+          });
+        }
+      }
       await updateDoc(doc(db, 'tenants', editId), data);
+
     } else {
+      // New tenant — increase room occupied count
       await addDoc(collection(db, 'tenants'), {
         ...data, ownerId: user.uid, status: 'Active', createdAt: new Date(),
       });
+      // Update room occupied beds
+      const room = rooms.find(r => r.roomNumber === form.roomNumber);
+      if (room) {
+        await updateDoc(doc(db, 'rooms', room.id), {
+          occupiedBeds: (room.occupiedBeds || 0) + 1
+        });
+      }
     }
+
     resetForm();
     setSaving(false);
     fetchData();
@@ -94,6 +125,20 @@ function Tenants() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this tenant?')) return;
+    
+    // Find tenant to get room number
+    const tenant = tenants.find(t => t.id === id);
+    
+    // Decrease room occupied count
+    if (tenant) {
+      const room = rooms.find(r => r.roomNumber === tenant.roomNumber);
+      if (room) {
+        await updateDoc(doc(db, 'rooms', room.id), {
+          occupiedBeds: Math.max(0, (room.occupiedBeds || 0) - 1)
+        });
+      }
+    }
+
     await deleteDoc(doc(db, 'tenants', id));
     fetchData();
   };

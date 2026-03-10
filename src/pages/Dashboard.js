@@ -19,47 +19,58 @@ function Dashboard() {
   });
   const navigate = useNavigate();
 
+  // Resize listener
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Fetch stats function
+  const fetchStats = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
+    const tSnap = await getDocs(tq);
+    const tenants = tSnap.docs.map(d => d.data());
+
+    const rq = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
+    const rSnap = await getDocs(rq);
+    const rooms = rSnap.docs.map(d => d.data());
+
+    const totalTenants = tenants.length;
+    const totalBeds = rooms.reduce((a, r) => a + r.totalBeds, 0);
+    const occupiedBeds = rooms.reduce((a, r) => a + (r.occupiedBeds || 0), 0);
+    const vacantBeds = totalBeds - occupiedBeds;
+    const monthlyRevenue = tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0);
+
+    setDashStats({ totalTenants, vacantBeds, monthlyRevenue, pendingRents: 0 });
+  };
+
+  // Fetch owner + stats on load
   useEffect(() => {
-    const fetchStats = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
-      const tSnap = await getDocs(tq);
-      const tenants = tSnap.docs.map(d => d.data());
-
-      const rq = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
-      const rSnap = await getDocs(rq);
-      const rooms = rSnap.docs.map(d => d.data());
-
-      const totalTenants = tenants.length;
-      const totalBeds = rooms.reduce((a, r) => a + r.totalBeds, 0);
-      const occupiedBeds = rooms.reduce((a, r) => a + (r.occupiedBeds || 0), 0);
-      const vacantBeds = totalBeds - occupiedBeds;
-      const monthlyRevenue = tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0);
-
-      console.log('Stats:', { totalTenants, vacantBeds, monthlyRevenue });
-
-      setDashStats({ totalTenants, vacantBeds, monthlyRevenue, pendingRents: 0 });
-    };
-
-    // Wait for auth then fetch
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) fetchStats();
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        // Fetch PG owner details
+        const snap = await getDoc(doc(db, 'pgOwners', user.uid));
+        if (snap.exists()) setPgOwner(snap.data());
+        // Fetch stats
+        fetchStats();
+      }
     });
-
     return () => unsubscribe();
   }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
     navigate('/login');
+  };
+
+  const handleMenuClick = (label) => {
+    setActiveMenu(label);
+    setSidebarOpen(false);
+    if (label === 'Dashboard') fetchStats();
   };
 
   const menuItems = [
@@ -89,11 +100,6 @@ function Dashboard() {
     { icon: '⚡', label: 'Electricity Bill', color: '#dc2626', menu: 'Electricity' },
   ];
 
-  const handleMenuClick = (label) => {
-    setActiveMenu(label);
-    setSidebarOpen(false);
-  };
-
   const showSidebar = !isMobile || sidebarOpen;
 
   return (
@@ -119,7 +125,6 @@ function Dashboard() {
       {showSidebar && (
         <div style={{
           ...styles.sidebar,
-          position: isMobile ? 'fixed' : 'fixed',
           transform: isMobile && !sidebarOpen ? 'translateX(-100%)' : 'translateX(0)',
         }}>
           <div style={styles.sidebarTop}>
@@ -285,7 +290,7 @@ const styles = {
   sidebar: {
     width: '260px', background: '#1e293b',
     display: 'flex', flexDirection: 'column',
-    height: '100vh', overflowY: 'auto',
+    position: 'fixed', height: '100vh', overflowY: 'auto',
     zIndex: 200, transition: 'transform 0.3s ease',
   },
   sidebarTop: {
