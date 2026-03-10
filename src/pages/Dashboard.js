@@ -5,6 +5,7 @@ import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firesto
 import { useNavigate } from 'react-router-dom';
 import Rooms from './RoomsPage';
 import Tenants from './TenantsPage';
+import RentPage from './RentPage';
 
 function Dashboard() {
   const [pgOwner, setPgOwner] = useState(null);
@@ -189,6 +190,7 @@ function Dashboard() {
         {/* Pages */}
         {activeMenu === 'Rooms' && <Rooms />}
         {activeMenu === 'Tenants' && <Tenants />}
+        {activeMenu === 'Rent' && <RentPage />}
 
         {/* Dashboard Home */}
         {activeMenu === 'Dashboard' && (
@@ -237,7 +239,7 @@ function Dashboard() {
         )}
 
         {/* Coming Soon */}
-        {!['Dashboard', 'Rooms', 'Tenants'].includes(activeMenu) && (
+        {!['Dashboard', 'Rooms', 'Tenants', 'Rent'].includes(activeMenu) && (
           <div style={styles.section}>
             <div style={styles.emptyState}>
               <div style={styles.emptyIcon}>🚧</div>
