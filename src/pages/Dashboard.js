@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import Rooms from './RoomsPage';
 import Tenants from './TenantsPage';
 import RentPage from './RentPage';
+import ElectricityPage from './ElectricityPage';
+import ReportsPage from './ReportsPage';
 
 function Dashboard() {
   const [pgOwner, setPgOwner] = useState(null);
@@ -191,6 +193,8 @@ function Dashboard() {
         {activeMenu === 'Rooms' && <Rooms />}
         {activeMenu === 'Tenants' && <Tenants />}
         {activeMenu === 'Rent' && <RentPage />}
+        {activeMenu === 'Electricity' && <ElectricityPage />}
+        {activeMenu === 'Reports' && <ReportsPage />}
 
         {/* Dashboard Home */}
         {activeMenu === 'Dashboard' && (
@@ -239,7 +243,7 @@ function Dashboard() {
         )}
 
         {/* Coming Soon */}
-        {!['Dashboard', 'Rooms', 'Tenants', 'Rent'].includes(activeMenu) && (
+        {!['Dashboard', 'Rooms', 'Tenants', 'Rent','Electricity','Reports'].includes(activeMenu) && (
           <div style={styles.section}>
             <div style={styles.emptyState}>
               <div style={styles.emptyIcon}>🚧</div>

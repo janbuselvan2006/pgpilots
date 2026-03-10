@@ -155,6 +155,8 @@ function RentPage() {
         newTotal,
         paymentMethod: form.paymentMethod,
         paymentDate: form.paymentDate,
+        paymentTime: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        recordedAt: new Date().toISOString(),
         month: new Date(form.paymentDate).toLocaleString('default', { month: 'long' }),
         year: new Date(form.paymentDate).getFullYear().toString(),
         notes: form.notes,
@@ -186,7 +188,11 @@ function RentPage() {
       (filterType === 'completed' && p.isCompleted) ||
       (filterType === 'full' && !p.isPartial);
     return matchSearch && matchMonth && matchYear && matchMethod && matchType;
-  }).sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
+  }).sort((a, b) => {
+  const aTime = a.recordedAt ? new Date(a.recordedAt) : new Date(a.paymentDate);
+  const bTime = b.recordedAt ? new Date(b.recordedAt) : new Date(b.paymentDate);
+  return bTime - aTime;
+});
 
   // Tenant Card
   const TenantRentCard = ({ tenant, status }) => {
@@ -595,7 +601,14 @@ function RentPage() {
                       )}
                     </div>
                     <div style={styles.methodTag}>{payment.paymentMethod}</div>
-                    <div style={styles.historyDate}>{payment.paymentDate}</div>
+                    <div style={styles.historyDate}>
+                      📅 {payment.paymentDate}
+                      {payment.paymentTime && (
+                       <span style={{ marginLeft: '6px', color: '#b0bec5' }}>
+                        🕐 {payment.paymentTime}
+                     </span>
+                    )}
+                </div>
                   </div>
                 </div>
               ))}
