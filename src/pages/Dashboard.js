@@ -56,16 +56,23 @@ function Dashboard() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
-        // Fetch PG owner details
         const snap = await getDoc(doc(db, 'pgOwners', user.uid));
-        if (snap.exists()) setPgOwner(snap.data());
-        // Fetch stats
+        if (snap.exists()) {
+          const data = snap.data();
+          // Check if blocked
+          if (data.isActive === false) {
+            await signOut(auth);
+            navigate('/login');
+            alert('Your account has been blocked. Please contact support.');
+            return;
+          }
+          setPgOwner(data);
+        }
         fetchStats();
       }
     });
     return () => unsubscribe();
   }, []);
-
   const handleLogout = async () => {
     await signOut(auth);
     navigate('/login');
