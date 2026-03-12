@@ -37,7 +37,8 @@ function Dashboard() {
 
     const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
     const tSnap = await getDocs(tq);
-    const tenants = tSnap.docs.map(d => d.data());
+    const allTenants = tSnap.docs.map(d => d.data());
+    const tenants = allTenants.filter(t => t.status !== 'deleted');
 
     const rq = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
     const rSnap = await getDocs(rq);

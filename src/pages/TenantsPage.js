@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import {
   collection, addDoc, getDocs,
-  deleteDoc, doc, query, where, updateDoc
+  doc, query, where, updateDoc
 } from 'firebase/firestore';
 
 function Tenants() {
@@ -25,12 +25,21 @@ function Tenants() {
 
   const fetchData = async () => {
     setLoading(true);
-    const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
-    const tSnap = await getDocs(tq);
-    setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    const rq = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
-    const rSnap = await getDocs(rq);
-    setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    try {
+      const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
+      const tSnap = await getDocs(tq);
+      const all = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Only show active tenants — hide deleted ones
+      const active = all.filter(t => t.status !== 'deleted');
+      setTenants(active);
+
+      const rq = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
+      const rSnap = await getDocs(rq);
+      setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error(err);
+    }
     setLoading(false);
   };
 
@@ -75,72 +84,94 @@ function Tenants() {
       return alert('Please fill Name, Phone and Room Number!');
     }
     setSaving(true);
-    const data = {
-      ...form,
-      monthlyRent: parseInt(form.monthlyRent) || 0,
-      deposit: parseInt(form.deposit) || 0,
-    };
+    try {
+      const data = {
+        ...form,
+        monthlyRent: parseInt(form.monthlyRent) || 0,
+        deposit: parseInt(form.deposit) || 0,
+      };
 
-    if (editId) {
-      // Get old tenant to check if room changed
-      const oldTenant = tenants.find(t => t.id === editId);
-
-      // If room changed, update both old and new room counts
-      if (oldTenant.roomNumber !== form.roomNumber) {
-        // Decrease old room occupied count
-        const oldRoom = rooms.find(r => r.roomNumber === oldTenant.roomNumber);
-        if (oldRoom) {
-          await updateDoc(doc(db, 'rooms', oldRoom.id), {
-            occupiedBeds: Math.max(0, (oldRoom.occupiedBeds || 0) - 1)
-          });
+      if (editId) {
+        const oldTenant = tenants.find(t => t.id === editId);
+        // If room changed, update both old and new room counts
+        if (oldTenant && oldTenant.roomNumber !== form.roomNumber) {
+          const oldRoom = rooms.find(r => r.roomNumber === oldTenant.roomNumber);
+          if (oldRoom) {
+            await updateDoc(doc(db, 'rooms', oldRoom.id), {
+              occupiedBeds: Math.max(0, (oldRoom.occupiedBeds || 0) - 1)
+            });
+          }
+          const newRoom = rooms.find(r => r.roomNumber === form.roomNumber);
+          if (newRoom) {
+            await updateDoc(doc(db, 'rooms', newRoom.id), {
+              occupiedBeds: (newRoom.occupiedBeds || 0) + 1
+            });
+          }
         }
-        // Increase new room occupied count
-        const newRoom = rooms.find(r => r.roomNumber === form.roomNumber);
-        if (newRoom) {
-          await updateDoc(doc(db, 'rooms', newRoom.id), {
-            occupiedBeds: (newRoom.occupiedBeds || 0) + 1
-          });
-        }
-      }
-      await updateDoc(doc(db, 'tenants', editId), data);
+        await updateDoc(doc(db, 'tenants', editId), data);
 
-    } else {
-      // New tenant — increase room occupied count
-      await addDoc(collection(db, 'tenants'), {
-        ...data, ownerId: user.uid, status: 'Active', createdAt: new Date(),
-      });
-      // Update room occupied beds
-      const room = rooms.find(r => r.roomNumber === form.roomNumber);
-      if (room) {
-        await updateDoc(doc(db, 'rooms', room.id), {
-          occupiedBeds: (room.occupiedBeds || 0) + 1
+      } else {
+        // New tenant
+        await addDoc(collection(db, 'tenants'), {
+          ...data,
+          ownerId: user.uid,
+          status: 'Active',
+          createdAt: new Date(),
         });
+        // Increase room occupied beds
+        const room = rooms.find(r => r.roomNumber === form.roomNumber);
+        if (room) {
+          await updateDoc(doc(db, 'rooms', room.id), {
+            occupiedBeds: (room.occupiedBeds || 0) + 1
+          });
+        }
       }
-    }
 
-    resetForm();
+      resetForm();
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while saving!');
+    }
     setSaving(false);
-    fetchData();
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this tenant?')) return;
-    
-    // Find tenant to get room number
-    const tenant = tenants.find(t => t.id === id);
-    
-    // Decrease room occupied count
-    if (tenant) {
-      const room = rooms.find(r => r.roomNumber === tenant.roomNumber);
-      if (room) {
-        await updateDoc(doc(db, 'rooms', room.id), {
-          occupiedBeds: Math.max(0, (room.occupiedBeds || 0) - 1)
+  // SOFT DELETE — keeps data for Reports, reduces bed count
+  const handleDelete = async (tenant) => {
+    const confirmed = window.confirm(
+      `Remove ${tenant.name} from active tenants?\n\nTheir rent history will be preserved in Reports.`
+    );
+    if (!confirmed) return;
+
+    try {
+      // Step 1: Mark as deleted (don't actually delete from Firebase)
+      await updateDoc(doc(db, 'tenants', tenant.id), {
+        status: 'deleted',
+        deletedAt: new Date().toISOString(),
+      });
+
+      // Step 2: Reduce room occupied bed count by 1
+      const roomQuery = query(
+        collection(db, 'rooms'),
+        where('ownerId', '==', user.uid),
+        where('roomNumber', '==', tenant.roomNumber)
+      );
+      const roomSnap = await getDocs(roomQuery);
+      if (!roomSnap.empty) {
+        const roomDoc = roomSnap.docs[0];
+        const currentOccupied = roomDoc.data().occupiedBeds || 0;
+        await updateDoc(doc(db, 'rooms', roomDoc.id), {
+          occupiedBeds: Math.max(0, currentOccupied - 1)
         });
       }
-    }
 
-    await deleteDoc(doc(db, 'tenants', id));
-    fetchData();
+      alert(`✅ ${tenant.name} removed. History saved in Reports.`);
+      fetchData();
+
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong!');
+    }
   };
 
   const filtered = tenants.filter(t =>
@@ -314,6 +345,7 @@ function Tenants() {
                   {tenant.status}
                 </div>
               </div>
+
               <div style={styles.tenantDetails}>
                 {[
                   ['🛏️ Room', `Room ${tenant.roomNumber}`],
@@ -329,14 +361,16 @@ function Tenants() {
                   </div>
                 ))}
               </div>
+
               {tenant.company && (
                 <div style={styles.company}>🏢 {tenant.company}</div>
               )}
+
               <div style={styles.tenantFooter}>
                 <button style={styles.editBtn} onClick={() => handleEdit(tenant)}>
                   ✏️ Edit
                 </button>
-                <button style={styles.deleteBtn} onClick={() => handleDelete(tenant.id)}>
+                <button style={styles.deleteBtn} onClick={() => handleDelete(tenant)}>
                   🗑️ Remove
                 </button>
               </div>
