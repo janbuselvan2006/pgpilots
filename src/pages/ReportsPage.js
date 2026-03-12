@@ -20,6 +20,7 @@ function ReportsPage() {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [periodMode, setPeriodMode] = useState('monthly');
+  const [stayFilter, setStayFilter] = useState('all');
 
   const user = auth.currentUser;
 
@@ -29,6 +30,7 @@ function ReportsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // Fetch ALL tenants including deleted ones for history
       const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
       const tSnap = await getDocs(tq);
       setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -49,6 +51,39 @@ function ReportsPage() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // Calculate days stayed
+  const getDaysStayed = (tenant) => {
+    const checkIn = tenant.checkIn ? new Date(tenant.checkIn) : null;
+    if (!checkIn) return 0;
+    const checkOut = tenant.status === 'deleted' && tenant.deletedAt
+      ? new Date(tenant.deletedAt)
+      : new Date();
+    const diff = Math.floor((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+    return Math.max(0, diff);
+  };
+
+  // Format days stayed label
+  const getDaysLabel = (days) => {
+    if (days === 0) return '0 days';
+    if (days < 7) return `${days} day${days > 1 ? 's' : ''}`;
+    if (days < 30) {
+      const w = Math.floor(days / 7);
+      const d = days % 7;
+      return `${w} week${w > 1 ? 's' : ''}${d > 0 ? ` ${d}d` : ''}`;
+    }
+    const m = Math.floor(days / 30);
+    const d = days % 30;
+    return `${m} month${m > 1 ? 's' : ''}${d > 0 ? ` ${d}d` : ''}`;
+  };
+
+  // Format checkout date
+  const getCheckOutDate = (tenant) => {
+    if (tenant.status === 'deleted' && tenant.deletedAt) {
+      return new Date(tenant.deletedAt).toLocaleDateString('en-IN');
+    }
+    return null;
+  };
 
   // Filter payments by period
   const getFilteredPayments = () => {
@@ -91,12 +126,15 @@ function ReportsPage() {
     return 'Custom Period';
   };
 
+  // Active tenants only
+  const activeTenants = tenants.filter(t => t.status !== 'deleted');
+
   // ─── RENT REPORT ───
   const rentPayments = getFilteredPayments();
   const totalRentCollected = rentPayments.reduce((a, p) => a + (p.amount || 0), 0);
-  const totalRentExpected = tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0);
+  const totalRentExpected = activeTenants.reduce((a, t) => a + (t.monthlyRent || 0), 0);
   const paidTenantIds = [...new Set(rentPayments.map(p => p.tenantId))];
-  const unpaidTenants = tenants.filter(t => !paidTenantIds.includes(t.id));
+  const unpaidTenants = activeTenants.filter(t => !paidTenantIds.includes(t.id));
 
   // ─── ELECTRICITY REPORT ───
   const elecBillsFiltered = getFilteredElecBills();
@@ -112,12 +150,36 @@ function ReportsPage() {
   const totalVacantBeds = rooms.reduce((a, r) =>
     a + Math.max(0, r.totalBeds - (r.occupiedBeds || 0)), 0);
 
+  // ─── TENANT HISTORY — latest first ───
+  const allTenantsSorted = [...tenants].sort((a, b) => {
+    const aDate = a.createdAt?.seconds
+      ? new Date(a.createdAt.seconds * 1000)
+      : new Date(a.checkIn || 0);
+    const bDate = b.createdAt?.seconds
+      ? new Date(b.createdAt.seconds * 1000)
+      : new Date(b.checkIn || 0);
+    return bDate - aDate;
+  });
+
+  const getStayFilteredTenants = () => {
+    return allTenantsSorted.filter(t => {
+      const days = getDaysStayed(t);
+      if (stayFilter === 'all') return true;
+      if (stayFilter === '1-3') return days >= 1 && days <= 3;
+      if (stayFilter === 'week') return days >= 4 && days <= 7;
+      if (stayFilter === 'month') return days > 7 && days <= 30;
+      if (stayFilter === 'long') return days > 30;
+      return true;
+    });
+  };
+
+  const historyTenants = getStayFilteredTenants();
+
   // ─── PDF DOWNLOAD ───
   const downloadPDF = (reportType) => {
     const pdf = new jsPDF();
     const period = getPeriodLabel();
 
-    // Header
     pdf.setFillColor(233, 69, 96);
     pdf.rect(0, 0, 210, 35, 'F');
     pdf.setTextColor(255, 255, 255);
@@ -132,201 +194,144 @@ function ReportsPage() {
     let y = 45;
 
     if (reportType === 'Rent Collection') {
-      // Summary box
       pdf.setFillColor(238, 242, 255);
       pdf.rect(14, y, 85, 30, 'F');
-      pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('Total Expected', 18, y + 10);
-      pdf.setFontSize(14);
-      pdf.setTextColor(79, 70, 229);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`Rs. ${totalRentExpected.toLocaleString()}`, 18, y + 22);
+      pdf.setFontSize(10); pdf.setTextColor(100,100,100);
+      pdf.text('Total Expected', 18, y+10);
+      pdf.setFontSize(14); pdf.setTextColor(79,70,229);
+      pdf.setFont('helvetica','bold');
+      pdf.text(`Rs. ${totalRentExpected.toLocaleString()}`, 18, y+22);
 
-      pdf.setFillColor(236, 253, 245);
+      pdf.setFillColor(236,253,245);
       pdf.rect(110, y, 85, 30, 'F');
-      pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('Total Collected', 114, y + 10);
-      pdf.setFontSize(14);
-      pdf.setTextColor(5, 150, 105);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`Rs. ${totalRentCollected.toLocaleString()}`, 114, y + 22);
-
+      pdf.setFontSize(10); pdf.setTextColor(100,100,100);
+      pdf.setFont('helvetica','normal');
+      pdf.text('Total Collected', 114, y+10);
+      pdf.setFontSize(14); pdf.setTextColor(5,150,105);
+      pdf.setFont('helvetica','bold');
+      pdf.text(`Rs. ${totalRentCollected.toLocaleString()}`, 114, y+22);
       y += 40;
 
-      // Payments table
-      pdf.setFontSize(12);
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Payment Details', 14, y);
-      y += 6;
+      pdf.setFontSize(12); pdf.setTextColor(0,0,0);
+      pdf.setFont('helvetica','bold');
+      pdf.text('Payment Details', 14, y); y += 6;
 
       autoTable(pdf, {
         startY: y,
-        head: [['Tenant', 'Room', 'Amount', 'Method', 'Date', 'Status']],
+        head: [['Tenant','Room','Amount','Method','Date','Status']],
         body: rentPayments.map(p => [
-          p.tenantName,
-          `Room ${p.roomNumber}`,
+          p.tenantName, `Room ${p.roomNumber}`,
           `Rs. ${p.amount?.toLocaleString()}`,
-          p.paymentMethod,
-          p.paymentDate,
+          p.paymentMethod, p.paymentDate,
           p.isPartial ? 'Partial' : 'Full',
         ]),
-        headStyles: { fillColor: [233, 69, 96], textColor: 255 },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
+        headStyles: { fillColor: [233,69,96], textColor: 255 },
+        alternateRowStyles: { fillColor: [248,250,252] },
         styles: { fontSize: 9 },
       });
 
-      // Unpaid tenants
       if (unpaidTenants.length > 0) {
         const finalY = pdf.lastAutoTable.finalY + 10;
-        pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(220, 38, 38);
+        pdf.setFontSize(12); pdf.setFont('helvetica','bold');
+        pdf.setTextColor(220,38,38);
         pdf.text('Pending Payments', 14, finalY);
-
         autoTable(pdf, {
           startY: finalY + 6,
-          head: [['Tenant', 'Room', 'Monthly Rent', 'Status']],
+          head: [['Tenant','Room','Monthly Rent','Status']],
           body: unpaidTenants.map(t => [
-            t.name,
-            `Room ${t.roomNumber}`,
-            `Rs. ${(t.monthlyRent || 0).toLocaleString()}`,
-            'Unpaid',
+            t.name, `Room ${t.roomNumber}`,
+            `Rs. ${(t.monthlyRent||0).toLocaleString()}`, 'Unpaid',
           ]),
-          headStyles: { fillColor: [220, 38, 38], textColor: 255 },
-          alternateRowStyles: { fillColor: [254, 242, 242] },
+          headStyles: { fillColor: [220,38,38], textColor: 255 },
+          alternateRowStyles: { fillColor: [254,242,242] },
           styles: { fontSize: 9 },
         });
       }
     }
 
-    if (reportType === 'Electricity') {
-      pdf.setFillColor(255, 251, 235);
-      pdf.rect(14, y, 85, 30, 'F');
-      pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('Total Billed', 18, y + 10);
-      pdf.setFontSize(14);
-      pdf.setTextColor(217, 119, 6);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`Rs. ${totalElecBilled.toLocaleString()}`, 18, y + 22);
-      y += 40;
+    if (reportType === 'Tenant History') {
+      pdf.setFontSize(12); pdf.setTextColor(0,0,0);
+      pdf.setFont('helvetica','bold');
+      pdf.text(`Total Records: ${historyTenants.length}`, 14, y); y += 10;
+      autoTable(pdf, {
+        startY: y,
+        head: [['Name','Room','Check-In','Check-Out','Days Stayed','Status']],
+        body: historyTenants.map(t => [
+          t.name, `Room ${t.roomNumber}`,
+          t.checkIn || '-',
+          getCheckOutDate(t) || 'Still staying',
+          getDaysLabel(getDaysStayed(t)),
+          t.status === 'deleted' ? 'Moved Out' : 'Active',
+        ]),
+        headStyles: { fillColor: [8,145,178], textColor: 255 },
+        alternateRowStyles: { fillColor: [248,250,252] },
+        styles: { fontSize: 9 },
+      });
+    }
 
-      pdf.setFontSize(12);
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Electricity Bill Details', 14, y);
-      y += 6;
+    if (reportType === 'Electricity') {
+      pdf.setFillColor(255,251,235);
+      pdf.rect(14, y, 85, 30, 'F');
+      pdf.setFontSize(10); pdf.setTextColor(100,100,100);
+      pdf.text('Total Billed', 18, y+10);
+      pdf.setFontSize(14); pdf.setTextColor(217,119,6);
+      pdf.setFont('helvetica','bold');
+      pdf.text(`Rs. ${totalElecBilled.toLocaleString()}`, 18, y+22);
+      y += 40;
 
       autoTable(pdf, {
         startY: y,
-        head: [['Room', 'Month', 'Amount', 'Tenants', 'Reading Date', 'Status']],
+        head: [['Room','Month','Amount','Tenants','Reading Date','Status']],
         body: elecBillsFiltered.map(b => [
-          `Room ${b.roomNumber}`,
-          `${b.month} ${b.year}`,
+          `Room ${b.roomNumber}`, `${b.month} ${b.year}`,
           `Rs. ${b.amount?.toLocaleString()}`,
-          b.tenantCount || 0,
-          b.readingDate,
+          b.tenantCount || 0, b.readingDate,
           b.isPaid ? 'Collected' : 'Pending',
         ]),
-        headStyles: { fillColor: [217, 119, 6], textColor: 255 },
-        alternateRowStyles: { fillColor: [255, 251, 235] },
+        headStyles: { fillColor: [217,119,6], textColor: 255 },
+        alternateRowStyles: { fillColor: [255,251,235] },
         styles: { fontSize: 9 },
       });
     }
 
     if (reportType === 'Occupancy') {
-      // Occupancy summary
-      pdf.setFillColor(238, 242, 255);
-      pdf.rect(14, y, 55, 30, 'F');
-      pdf.setFontSize(9);
-      pdf.setTextColor(100,100,100);
-      pdf.text('Total Beds', 18, y+10);
-      pdf.setFontSize(14);
-      pdf.setTextColor(79,70,229);
-      pdf.setFont('helvetica','bold');
-      pdf.text(`${totalBeds}`, 18, y+22);
-
-      pdf.setFillColor(236,253,245);
-      pdf.rect(75, y, 55, 30, 'F');
-      pdf.setFontSize(9);
-      pdf.setTextColor(100,100,100);
-      pdf.setFont('helvetica','normal');
-      pdf.text('Occupied', 79, y+10);
-      pdf.setFontSize(14);
-      pdf.setTextColor(5,150,105);
-      pdf.setFont('helvetica','bold');
-      pdf.text(`${occupiedBeds}`, 79, y+22);
-
-      pdf.setFillColor(254,242,242);
-      pdf.rect(136, y, 55, 30, 'F');
-      pdf.setFontSize(9);
-      pdf.setTextColor(100,100,100);
-      pdf.setFont('helvetica','normal');
-      pdf.text('Occupancy Rate', 140, y+10);
-      pdf.setFontSize(14);
-      pdf.setTextColor(220,38,38);
-      pdf.setFont('helvetica','bold');
-      pdf.text(`${occupancyRate}%`, 140, y+22);
-      y += 40;
-
-      pdf.setFontSize(12);
-      pdf.setTextColor(0,0,0);
-      pdf.setFont('helvetica','bold');
-      pdf.text('Tenant List', 14, y);
-      y += 6;
-
       autoTable(pdf, {
         startY: y,
-        head: [['Name', 'Room', 'Check-In', 'Monthly Rent', 'Phone']],
-        body: tenants.map(t => [
-          t.name,
-          `Room ${t.roomNumber}`,
-          t.checkIn,
-          `Rs. ${(t.monthlyRent||0).toLocaleString()}`,
-          t.phone || '-',
+        head: [['Name','Room','Check-In','Monthly Rent','Phone']],
+        body: activeTenants.map(t => [
+          t.name, `Room ${t.roomNumber}`, t.checkIn,
+          `Rs. ${(t.monthlyRent||0).toLocaleString()}`, t.phone || '-',
         ]),
-        headStyles: { fillColor: [79, 70, 229], textColor: 255 },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
+        headStyles: { fillColor: [79,70,229], textColor: 255 },
+        alternateRowStyles: { fillColor: [248,250,252] },
         styles: { fontSize: 9 },
       });
     }
 
     if (reportType === 'Vacant Rooms') {
-      y += 5;
-      pdf.setFontSize(12);
-      pdf.setTextColor(0,0,0);
+      pdf.setFontSize(12); pdf.setTextColor(0,0,0);
       pdf.setFont('helvetica','bold');
-      pdf.text(`Total Vacant Beds: ${totalVacantBeds}`, 14, y);
-      y += 10;
-
+      pdf.text(`Total Vacant Beds: ${totalVacantBeds}`, 14, y); y += 10;
       autoTable(pdf, {
         startY: y,
-        head: [['Room', 'Floor', 'Type', 'Total Beds', 'Occupied', 'Vacant', 'Rent/Bed']],
+        head: [['Room','Floor','Type','Total','Occupied','Vacant','Rent/Bed']],
         body: vacantRooms.map(r => [
-          `Room ${r.roomNumber}`,
-          r.floor || '-',
-          r.roomType || '-',
-          r.totalBeds,
-          r.occupiedBeds || 0,
+          `Room ${r.roomNumber}`, r.floor || '-', r.roomType || '-',
+          r.totalBeds, r.occupiedBeds || 0,
           r.totalBeds - (r.occupiedBeds || 0),
           `Rs. ${(r.rentPerBed||0).toLocaleString()}`,
         ]),
-        headStyles: { fillColor: [5, 150, 105], textColor: 255 },
-        alternateRowStyles: { fillColor: [236, 253, 245] },
+        headStyles: { fillColor: [5,150,105], textColor: 255 },
+        alternateRowStyles: { fillColor: [236,253,245] },
         styles: { fontSize: 9 },
       });
     }
 
-    // Footer
     const pageCount = pdf.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       pdf.setPage(i);
       pdf.setFontSize(8);
-      pdf.setTextColor(150, 150, 150);
+      pdf.setTextColor(150,150,150);
       pdf.text(
         `Generated by PG Manager • ${new Date().toLocaleDateString('en-IN')} • Page ${i} of ${pageCount}`,
         14, pdf.internal.pageSize.height - 10
@@ -341,6 +346,15 @@ function ReportsPage() {
     { id: 'electricity', label: '⚡ Electricity', color: '#d97706', bg: '#fffbeb' },
     { id: 'occupancy', label: '👥 Occupancy', color: '#059669', bg: '#ecfdf5' },
     { id: 'vacant', label: '🛏️ Vacant Rooms', color: '#dc2626', bg: '#fef2f2' },
+    { id: 'history', label: '📋 Tenant History', color: '#0891b2', bg: '#ecfeff' },
+  ];
+
+  const stayFilters = [
+    { id: 'all', label: '👥 All' },
+    { id: '1-3', label: '1–3 Days' },
+    { id: 'week', label: '4–7 Days' },
+    { id: 'month', label: '1–4 Weeks' },
+    { id: 'long', label: '1+ Month' },
   ];
 
   return (
@@ -355,16 +369,10 @@ function ReportsPage() {
       {/* Period Filter */}
       <div style={styles.periodBox}>
         <div style={styles.periodToggle}>
-          <button
-            style={{ ...styles.toggleBtn, ...(periodMode === 'monthly' ? styles.toggleActive : {}) }}
-            onClick={() => setPeriodMode('monthly')}>
-            📅 Monthly
-          </button>
-          <button
-            style={{ ...styles.toggleBtn, ...(periodMode === 'custom' ? styles.toggleActive : {}) }}
-            onClick={() => setPeriodMode('custom')}>
-            📆 Custom Range
-          </button>
+          <button style={{ ...styles.toggleBtn, ...(periodMode === 'monthly' ? styles.toggleActive : {}) }}
+            onClick={() => setPeriodMode('monthly')}>📅 Monthly</button>
+          <button style={{ ...styles.toggleBtn, ...(periodMode === 'custom' ? styles.toggleActive : {}) }}
+            onClick={() => setPeriodMode('custom')}>📆 Custom Range</button>
         </div>
 
         {periodMode === 'monthly' && (
@@ -396,7 +404,7 @@ function ReportsPage() {
         )}
       </div>
 
-      {/* Report Type Tabs */}
+      {/* Report Tabs */}
       <div style={styles.reportTabs}>
         {reportTypes.map(({ id, label, color, bg }) => (
           <button key={id}
@@ -412,11 +420,9 @@ function ReportsPage() {
         ))}
       </div>
 
-      {loading ? (
-        <div style={styles.loading}>Loading...</div>
-      ) : (
+      {loading ? <div style={styles.loading}>Loading...</div> : (
         <>
-          {/* ── RENT REPORT ── */}
+          {/* RENT */}
           {activeReport === 'rent' && (
             <div style={styles.reportCard}>
               <div style={styles.reportCardHeader}>
@@ -424,18 +430,14 @@ function ReportsPage() {
                   <h2 style={styles.reportTitle}>💰 Rent Collection Report</h2>
                   <p style={styles.reportPeriod}>{getPeriodLabel()}</p>
                 </div>
-                <button style={styles.downloadBtn}
-                  onClick={() => downloadPDF('Rent Collection')}>
-                  ⬇️ Download PDF
-                </button>
+                <button style={styles.downloadBtn} onClick={() => downloadPDF('Rent Collection')}>⬇️ Download PDF</button>
               </div>
 
-              {/* Summary */}
               <div style={styles.summaryGrid}>
                 {[
                   { label: 'Expected', value: `₹${totalRentExpected.toLocaleString()}`, color: '#4f46e5', bg: '#eef2ff' },
                   { label: 'Collected', value: `₹${totalRentCollected.toLocaleString()}`, color: '#059669', bg: '#ecfdf5' },
-                  { label: 'Pending', value: `₹${(totalRentExpected - totalRentCollected).toLocaleString()}`, color: '#dc2626', bg: '#fef2f2' },
+                  { label: 'Pending', value: `₹${(totalRentExpected-totalRentCollected).toLocaleString()}`, color: '#dc2626', bg: '#fef2f2' },
                   { label: 'Payments', value: rentPayments.length, color: '#d97706', bg: '#fffbeb' },
                 ].map(({ label, value, color, bg }) => (
                   <div key={label} style={{ ...styles.summaryCard, background: bg }}>
@@ -445,51 +447,33 @@ function ReportsPage() {
                 ))}
               </div>
 
-              {/* Payments Table */}
-<h3 style={styles.tableTitle}>✅ Payments Received ({rentPayments.length})</h3>
-{rentPayments.length === 0 ? (
-  <div style={styles.noData}>No payments found for this period</div>
-) : (
-  <div style={styles.table}>
-    <div style={styles.tableHeader}>
-      <span>Tenant</span>
-      <span>Room</span>
-      <span>Amount</span>
-      <span>Method</span>
-      <span>Date & Time</span>
-      <span>Type</span>
-    </div>
-    {rentPayments.map(p => (
-      <div key={p.id} style={styles.tableRow}>
-        <span style={styles.tableName}>{p.tenantName}</span>
-        <span>Room {p.roomNumber}</span>
-        <span style={{ color: '#059669', fontWeight: '700' }}>
-          ₹{p.amount?.toLocaleString()}
-        </span>
-        <span>{p.paymentMethod}</span>
-        <span style={{ color: '#94a3b8' }}>
-          {p.paymentDate}
-          {p.paymentTime && (
-            <span style={{ display: 'block', fontSize: '11px' }}>
-              🕐 {p.paymentTime}
-            </span>
-          )}
-        </span>
-        <span>
-          <div style={{
-            ...styles.typeTag,
-            background: p.isPartial ? '#fffbeb' : '#ecfdf5',
-            color: p.isPartial ? '#d97706' : '#059669',
-          }}>
-            {p.isPartial ? '⚠️ Partial' : '✅ Full'}
-          </div>
-        </span>
-      </div>
-    ))}
-  </div>
-)}
+              <h3 style={styles.tableTitle}>✅ Payments Received ({rentPayments.length})</h3>
+              {rentPayments.length === 0 ? <div style={styles.noData}>No payments found for this period</div> : (
+                <div style={styles.table}>
+                  <div style={styles.tableHeader}>
+                    <span>Tenant</span><span>Room</span><span>Amount</span>
+                    <span>Method</span><span>Date & Time</span><span>Type</span>
+                  </div>
+                  {rentPayments.map(p => (
+                    <div key={p.id} style={styles.tableRow}>
+                      <span style={styles.tableName}>{p.tenantName}</span>
+                      <span>Room {p.roomNumber}</span>
+                      <span style={{ color: '#059669', fontWeight: '700' }}>₹{p.amount?.toLocaleString()}</span>
+                      <span>{p.paymentMethod}</span>
+                      <span style={{ color: '#94a3b8' }}>
+                        {p.paymentDate}
+                        {p.paymentTime && <span style={{ display: 'block', fontSize: '11px' }}>🕐 {p.paymentTime}</span>}
+                      </span>
+                      <span>
+                        <div style={{ ...styles.typeTag, background: p.isPartial ? '#fffbeb' : '#ecfdf5', color: p.isPartial ? '#d97706' : '#059669' }}>
+                          {p.isPartial ? '⚠️ Partial' : '✅ Full'}
+                        </div>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              {/* Unpaid */}
               {unpaidTenants.length > 0 && (
                 <>
                   <h3 style={{ ...styles.tableTitle, color: '#dc2626', marginTop: '24px' }}>
@@ -497,26 +481,16 @@ function ReportsPage() {
                   </h3>
                   <div style={styles.table}>
                     <div style={styles.tableHeader}>
-                      <span>Tenant</span>
-                      <span>Room</span>
-                      <span>Monthly Rent</span>
-                      <span>Check-In</span>
-                      <span>Status</span>
-                      <span></span>
+                      <span>Tenant</span><span>Room</span><span>Monthly Rent</span>
+                      <span>Check-In</span><span>Status</span><span></span>
                     </div>
                     {unpaidTenants.map(t => (
                       <div key={t.id} style={{ ...styles.tableRow, background: '#fef2f2' }}>
                         <span style={styles.tableName}>{t.name}</span>
                         <span>Room {t.roomNumber}</span>
-                        <span style={{ color: '#dc2626', fontWeight: '700' }}>
-                          ₹{(t.monthlyRent || 0).toLocaleString()}
-                        </span>
+                        <span style={{ color: '#dc2626', fontWeight: '700' }}>₹{(t.monthlyRent||0).toLocaleString()}</span>
                         <span style={{ color: '#94a3b8' }}>{t.checkIn}</span>
-                        <span>
-                          <div style={{ ...styles.typeTag, background: '#fef2f2', color: '#dc2626' }}>
-                            Unpaid
-                          </div>
-                        </span>
+                        <span><div style={{ ...styles.typeTag, background: '#fef2f2', color: '#dc2626' }}>Unpaid</div></span>
                         <span></span>
                       </div>
                     ))}
@@ -526,7 +500,7 @@ function ReportsPage() {
             </div>
           )}
 
-          {/* ── ELECTRICITY REPORT ── */}
+          {/* ELECTRICITY */}
           {activeReport === 'electricity' && (
             <div style={styles.reportCard}>
               <div style={styles.reportCardHeader}>
@@ -535,9 +509,7 @@ function ReportsPage() {
                   <p style={styles.reportPeriod}>{getPeriodLabel()}</p>
                 </div>
                 <button style={{ ...styles.downloadBtn, background: 'linear-gradient(135deg, #d97706, #b45309)' }}
-                  onClick={() => downloadPDF('Electricity')}>
-                  ⬇️ Download PDF
-                </button>
+                  onClick={() => downloadPDF('Electricity')}>⬇️ Download PDF</button>
               </div>
 
               <div style={styles.summaryGrid}>
@@ -555,33 +527,21 @@ function ReportsPage() {
               </div>
 
               <h3 style={styles.tableTitle}>⚡ Bill Details</h3>
-              {elecBillsFiltered.length === 0 ? (
-                <div style={styles.noData}>No electricity bills for this period</div>
-              ) : (
+              {elecBillsFiltered.length === 0 ? <div style={styles.noData}>No electricity bills for this period</div> : (
                 <div style={styles.table}>
                   <div style={{ ...styles.tableHeader, gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr' }}>
-                    <span>Room</span>
-                    <span>Month</span>
-                    <span>Amount</span>
-                    <span>Tenants</span>
-                    <span>Reading Date</span>
-                    <span>Status</span>
+                    <span>Room</span><span>Month</span><span>Amount</span>
+                    <span>Tenants</span><span>Reading Date</span><span>Status</span>
                   </div>
                   {elecBillsFiltered.map(b => (
                     <div key={b.id} style={{ ...styles.tableRow, gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr' }}>
                       <span style={styles.tableName}>Room {b.roomNumber}</span>
                       <span>{b.month} {b.year}</span>
-                      <span style={{ color: '#d97706', fontWeight: '700' }}>
-                        ₹{b.amount?.toLocaleString()}
-                      </span>
+                      <span style={{ color: '#d97706', fontWeight: '700' }}>₹{b.amount?.toLocaleString()}</span>
                       <span>{b.tenantCount}</span>
                       <span style={{ color: '#94a3b8' }}>{b.readingDate}</span>
                       <span>
-                        <div style={{
-                          ...styles.typeTag,
-                          background: b.isPaid ? '#ecfdf5' : '#fef2f2',
-                          color: b.isPaid ? '#059669' : '#dc2626',
-                        }}>
+                        <div style={{ ...styles.typeTag, background: b.isPaid ? '#ecfdf5' : '#fef2f2', color: b.isPaid ? '#059669' : '#dc2626' }}>
                           {b.isPaid ? '✅ Done' : '⏳ Pending'}
                         </div>
                       </span>
@@ -592,7 +552,7 @@ function ReportsPage() {
             </div>
           )}
 
-          {/* ── OCCUPANCY REPORT ── */}
+          {/* OCCUPANCY */}
           {activeReport === 'occupancy' && (
             <div style={styles.reportCard}>
               <div style={styles.reportCardHeader}>
@@ -601,9 +561,7 @@ function ReportsPage() {
                   <p style={styles.reportPeriod}>Current Status</p>
                 </div>
                 <button style={{ ...styles.downloadBtn, background: 'linear-gradient(135deg, #059669, #0891b2)' }}
-                  onClick={() => downloadPDF('Occupancy')}>
-                  ⬇️ Download PDF
-                </button>
+                  onClick={() => downloadPDF('Occupancy')}>⬇️ Download PDF</button>
               </div>
 
               <div style={styles.summaryGrid}>
@@ -620,7 +578,6 @@ function ReportsPage() {
                 ))}
               </div>
 
-              {/* Occupancy bar */}
               <div style={styles.occupancyBarBox}>
                 <div style={styles.occupancyBarLabel}>
                   <span>Occupancy</span>
@@ -630,29 +587,23 @@ function ReportsPage() {
                   <div style={{
                     ...styles.occupancyBarFill,
                     width: `${occupancyRate}%`,
-                    background: occupancyRate >= 80 ? '#059669' :
-                      occupancyRate >= 50 ? '#d97706' : '#dc2626',
+                    background: occupancyRate >= 80 ? '#059669' : occupancyRate >= 50 ? '#d97706' : '#dc2626',
                   }} />
                 </div>
               </div>
 
-              <h3 style={styles.tableTitle}>👥 All Tenants ({tenants.length})</h3>
+              <h3 style={styles.tableTitle}>👥 Active Tenants ({activeTenants.length})</h3>
               <div style={styles.table}>
                 <div style={{ ...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
-                  <span>Name</span>
-                  <span>Room</span>
-                  <span>Check-In</span>
-                  <span>Monthly Rent</span>
-                  <span>Phone</span>
+                  <span>Name</span><span>Room</span><span>Check-In</span>
+                  <span>Monthly Rent</span><span>Phone</span>
                 </div>
-                {tenants.map(t => (
+                {activeTenants.map(t => (
                   <div key={t.id} style={{ ...styles.tableRow, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
                     <span style={styles.tableName}>{t.name}</span>
                     <span>Room {t.roomNumber}</span>
                     <span style={{ color: '#94a3b8' }}>{t.checkIn}</span>
-                    <span style={{ color: '#4f46e5', fontWeight: '700' }}>
-                      ₹{(t.monthlyRent || 0).toLocaleString()}
-                    </span>
+                    <span style={{ color: '#4f46e5', fontWeight: '700' }}>₹{(t.monthlyRent||0).toLocaleString()}</span>
                     <span>{t.phone || '-'}</span>
                   </div>
                 ))}
@@ -660,7 +611,7 @@ function ReportsPage() {
             </div>
           )}
 
-          {/* ── VACANT ROOMS REPORT ── */}
+          {/* VACANT */}
           {activeReport === 'vacant' && (
             <div style={styles.reportCard}>
               <div style={styles.reportCardHeader}>
@@ -669,9 +620,7 @@ function ReportsPage() {
                   <p style={styles.reportPeriod}>Current Status</p>
                 </div>
                 <button style={{ ...styles.downloadBtn, background: 'linear-gradient(135deg, #dc2626, #9f1239)' }}
-                  onClick={() => downloadPDF('Vacant Rooms')}>
-                  ⬇️ Download PDF
-                </button>
+                  onClick={() => downloadPDF('Vacant Rooms')}>⬇️ Download PDF</button>
               </div>
 
               <div style={styles.summaryGrid}>
@@ -679,7 +628,7 @@ function ReportsPage() {
                   { label: 'Total Rooms', value: rooms.length, color: '#4f46e5', bg: '#eef2ff' },
                   { label: 'Vacant Rooms', value: vacantRooms.length, color: '#dc2626', bg: '#fef2f2' },
                   { label: 'Vacant Beds', value: totalVacantBeds, color: '#d97706', bg: '#fffbeb' },
-                  { label: 'Revenue Lost', value: `₹${vacantRooms.reduce((a, r) => a + ((r.totalBeds - (r.occupiedBeds || 0)) * (r.rentPerBed || 0)), 0).toLocaleString()}`, color: '#dc2626', bg: '#fef2f2' },
+                  { label: 'Revenue Lost', value: `₹${vacantRooms.reduce((a,r) => a+((r.totalBeds-(r.occupiedBeds||0))*(r.rentPerBed||0)),0).toLocaleString()}`, color: '#dc2626', bg: '#fef2f2' },
                 ].map(({ label, value, color, bg }) => (
                   <div key={label} style={{ ...styles.summaryCard, background: bg }}>
                     <div style={{ ...styles.summaryValue, color }}>{value}</div>
@@ -690,35 +639,129 @@ function ReportsPage() {
 
               <h3 style={styles.tableTitle}>🛏️ Rooms with Vacant Beds</h3>
               {vacantRooms.length === 0 ? (
-                <div style={{ ...styles.noData, color: '#059669' }}>
-                  🎉 All beds are occupied!
-                </div>
+                <div style={{ ...styles.noData, color: '#059669' }}>🎉 All beds are occupied!</div>
               ) : (
                 <div style={styles.table}>
                   <div style={{ ...styles.tableHeader, gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr 1fr' }}>
-                    <span>Room</span>
-                    <span>Floor</span>
-                    <span>Type</span>
-                    <span>Total</span>
-                    <span>Occupied</span>
-                    <span>Vacant</span>
-                    <span>Rent/Bed</span>
+                    <span>Room</span><span>Floor</span><span>Type</span>
+                    <span>Total</span><span>Occupied</span><span>Vacant</span><span>Rent/Bed</span>
                   </div>
                   {vacantRooms.map(r => (
                     <div key={r.id} style={{ ...styles.tableRow, gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr 1fr', background: '#fef2f2' }}>
                       <span style={styles.tableName}>Room {r.roomNumber}</span>
-                      <span>{r.floor || '-'}</span>
-                      <span>{r.roomType || '-'}</span>
+                      <span>{r.floor || '-'}</span><span>{r.roomType || '-'}</span>
                       <span>{r.totalBeds}</span>
                       <span style={{ color: '#059669' }}>{r.occupiedBeds || 0}</span>
-                      <span style={{ color: '#dc2626', fontWeight: '700' }}>
-                        {r.totalBeds - (r.occupiedBeds || 0)}
-                      </span>
-                      <span style={{ color: '#4f46e5' }}>
-                        ₹{(r.rentPerBed || 0).toLocaleString()}
-                      </span>
+                      <span style={{ color: '#dc2626', fontWeight: '700' }}>{r.totalBeds-(r.occupiedBeds||0)}</span>
+                      <span style={{ color: '#4f46e5' }}>₹{(r.rentPerBed||0).toLocaleString()}</span>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TENANT HISTORY */}
+          {activeReport === 'history' && (
+            <div style={styles.reportCard}>
+              <div style={styles.reportCardHeader}>
+                <div>
+                  <h2 style={styles.reportTitle}>📋 Tenant History</h2>
+                  <p style={styles.reportPeriod}>All tenants — latest first • {historyTenants.length} records</p>
+                </div>
+                <button style={{ ...styles.downloadBtn, background: 'linear-gradient(135deg, #0891b2, #0f3460)' }}
+                  onClick={() => downloadPDF('Tenant History')}>⬇️ Download PDF</button>
+              </div>
+
+              {/* Stats */}
+              <div style={styles.summaryGrid}>
+                {[
+                  { label: 'Total Ever', value: tenants.length, color: '#4f46e5', bg: '#eef2ff' },
+                  { label: 'Currently Active', value: activeTenants.length, color: '#059669', bg: '#ecfdf5' },
+                  { label: 'Moved Out', value: tenants.filter(t => t.status === 'deleted').length, color: '#dc2626', bg: '#fef2f2' },
+                  {
+                    label: 'Avg Stay',
+                    value: (() => {
+                      const moved = tenants.filter(t => t.status === 'deleted');
+                      if (!moved.length) return '—';
+                      const avg = moved.reduce((a, t) => a + getDaysStayed(t), 0) / moved.length;
+                      return getDaysLabel(Math.round(avg));
+                    })(),
+                    color: '#d97706', bg: '#fffbeb'
+                  },
+                ].map(({ label, value, color, bg }) => (
+                  <div key={label} style={{ ...styles.summaryCard, background: bg }}>
+                    <div style={{ ...styles.summaryValue, color }}>{value}</div>
+                    <div style={styles.summaryLabel}>{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Stay Duration Filter */}
+              <div style={styles.stayFilterRow}>
+                <span style={styles.stayFilterLabel}>🔍 Filter by stay:</span>
+                <div style={styles.stayFilterBtns}>
+                  {stayFilters.map(({ id, label }) => (
+                    <button key={id}
+                      style={{
+                        ...styles.stayFilterBtn,
+                        background: stayFilter === id ? '#0891b2' : 'white',
+                        color: stayFilter === id ? 'white' : '#64748b',
+                        border: stayFilter === id ? '2px solid #0891b2' : '1.5px solid #e2e8f0',
+                      }}
+                      onClick={() => setStayFilter(id)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* History Table */}
+              {historyTenants.length === 0 ? (
+                <div style={styles.noData}>No tenants found for this filter</div>
+              ) : (
+                <div style={styles.table}>
+                  <div style={{ ...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr' }}>
+                    <span>Tenant</span><span>Room</span><span>Check-In</span>
+                    <span>Check-Out</span><span>Days Stayed</span><span>Status</span>
+                  </div>
+                  {historyTenants.map(t => {
+                    const days = getDaysStayed(t);
+                    const checkOut = getCheckOutDate(t);
+                    const isMovedOut = t.status === 'deleted';
+                    return (
+                      <div key={t.id} style={{
+                        ...styles.tableRow,
+                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr',
+                        background: isMovedOut ? '#fafafa' : '#f8fafc',
+                        opacity: isMovedOut ? 0.85 : 1,
+                      }}>
+                        <span style={styles.tableName}>
+                          {t.name}
+                          <span style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: '400' }}>
+                            📞 {t.phone || '-'}
+                          </span>
+                        </span>
+                        <span>Room {t.roomNumber}</span>
+                        <span style={{ color: '#059669', fontWeight: '600' }}>{t.checkIn || '-'}</span>
+                        <span style={{ color: isMovedOut ? '#dc2626' : '#94a3b8' }}>
+                          {checkOut || '—'}
+                        </span>
+                        <span style={{ color: '#4f46e5', fontWeight: '700' }}>
+                          {getDaysLabel(days)}
+                        </span>
+                        <span>
+                          <div style={{
+                            ...styles.typeTag,
+                            background: isMovedOut ? '#fef2f2' : '#ecfdf5',
+                            color: isMovedOut ? '#dc2626' : '#059669',
+                          }}>
+                            {isMovedOut ? '🚪 Moved Out' : '✅ Active'}
+                          </div>
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -753,6 +796,10 @@ const styles = {
   summaryCard: { borderRadius: '12px', padding: '16px', textAlign: 'center' },
   summaryValue: { fontSize: '22px', fontWeight: '800', marginBottom: '4px' },
   summaryLabel: { color: '#64748b', fontSize: '12px' },
+  stayFilterRow: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' },
+  stayFilterLabel: { fontSize: '13px', fontWeight: '600', color: '#475569', whiteSpace: 'nowrap' },
+  stayFilterBtns: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+  stayFilterBtn: { padding: '8px 16px', borderRadius: '100px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' },
   occupancyBarBox: { background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '24px' },
   occupancyBarLabel: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' },
   occupancyBarBg: { height: '12px', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' },

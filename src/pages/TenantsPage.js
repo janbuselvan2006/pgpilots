@@ -253,8 +253,8 @@ function Tenants() {
               </div>
               {[
                 { label: 'Bed Number', key: 'bedNumber', type: 'text', ph: 'Bed 1' },
-                { label: 'Monthly Rent (₹)', key: 'monthlyRent', type: 'number', ph: '5000' },
-                { label: 'Deposit (₹)', key: 'deposit', type: 'number', ph: '10000' },
+                { label: 'Monthly Rent (₹)', key: 'monthlyRent', type: 'text', ph: '5000' },
+                { label: 'Deposit (₹)', key: 'deposit', type: 'text', ph: '10000' },
                 { label: 'Check-in Date', key: 'checkIn', type: 'date', ph: '' },
               ].map(({ label, key, type, ph }) => (
                 <div key={key} style={styles.field}>
@@ -399,7 +399,7 @@ const styles = {
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px' },
   field: { display: 'flex', flexDirection: 'column' },
   label: { fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' },
-  input: { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: '#f8fafc' },
+  input: { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: '#f8fafc', MozAppearance: 'textfield', WebkitAppearance: 'none',},
   formButtons: { display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' },
   cancelBtn: { padding: '12px 24px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
   saveBtn: { padding: '12px 32px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },

@@ -35,22 +35,60 @@ function Dashboard() {
     const user = auth.currentUser;
     if (!user) return;
 
+    // Fetch tenants
     const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
     const tSnap = await getDocs(tq);
     const allTenants = tSnap.docs.map(d => d.data());
     const tenants = allTenants.filter(t => t.status !== 'deleted');
 
+    // Fetch rooms
     const rq = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
     const rSnap = await getDocs(rq);
     const rooms = rSnap.docs.map(d => d.data());
 
+    // Fetch payments
+    const pq = query(collection(db, 'payments'), where('ownerId', '==', user.uid));
+    const pSnap = await getDocs(pq);
+    const payments = pSnap.docs.map(d => d.data());
+
+    // Calculate stats
     const totalTenants = tenants.length;
-    const totalBeds = rooms.reduce((a, r) => a + r.totalBeds, 0);
+    const totalBeds = rooms.reduce((a, r) => a + (r.totalBeds || 0), 0);
     const occupiedBeds = rooms.reduce((a, r) => a + (r.occupiedBeds || 0), 0);
     const vacantBeds = totalBeds - occupiedBeds;
     const monthlyRevenue = tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0);
 
-    setDashStats({ totalTenants, vacantBeds, monthlyRevenue, pendingRents: 0 });
+    // Calculate pending rents (Overdue + Today only)
+    const thisMonth = new Date().toLocaleString('default', { month: 'long' });
+    const thisYear = new Date().getFullYear().toString();
+    const todayDate = new Date().getDate(); // today's day number
+
+    let pendingRents = 0;
+    tenants.forEach(tenant => {
+      if (!tenant.checkIn) return;
+
+      // Due day = same day as check-in every month
+      const dueDay = new Date(tenant.checkIn).getDate();
+
+      // Only count if today >= due day (overdue or today)
+      if (todayDate < dueDay) return; // upcoming → skip
+
+      // Check how much paid this month
+      const paidThisMonth = payments
+        .filter(p =>
+          p.tenantId === tenant.id ||
+          p.tenantName === tenant.name
+        )
+        .filter(p => p.month === thisMonth && p.year === thisYear)
+        .reduce((a, p) => a + (p.amount || 0), 0);
+
+      // If not fully paid → count as pending
+      if (paidThisMonth < (tenant.monthlyRent || 0)) {
+        pendingRents++;
+      }
+    });
+
+    setDashStats({ totalTenants, vacantBeds, monthlyRevenue, pendingRents });
   };
 
   // Fetch owner + stats on load
