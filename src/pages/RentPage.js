@@ -15,6 +15,13 @@ function RentPage() {
   const [filterYear, setFilterYear] = useState('');
   const [filterMethod, setFilterMethod] = useState('');
   const [filterType, setFilterType] = useState('');
+
+  // ── Penalty Settings ──
+  const [penaltyEnabled, setPenaltyEnabled] = useState(false);
+  const [penaltyAmount, setPenaltyAmount] = useState('');
+  const [gracePeriod, setGracePeriod] = useState('');
+  const [showPenaltySetup, setShowPenaltySetup] = useState(false);
+
   const [form, setForm] = useState({
     amount: '',
     paymentMethod: 'Cash',
@@ -31,7 +38,8 @@ function RentPage() {
     try {
       const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
       const tSnap = await getDocs(tq);
-      setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const allTenants = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTenants(allTenants.filter(t => t.status !== 'deleted'));
       const pq = query(collection(db, 'payments'), where('ownerId', '==', user.uid));
       const pSnap = await getDocs(pq);
       setPayments(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -41,23 +49,36 @@ function RentPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Get due date based on check-in date
   const getDueDate = (tenant) => {
     if (!tenant.checkIn) return null;
     const checkIn = new Date(tenant.checkIn);
     const dueDay = checkIn.getDate();
-    const thisMonthDue = new Date(today.getFullYear(), today.getMonth(), dueDay);
-    return thisMonthDue;
+    return new Date(today.getFullYear(), today.getMonth(), dueDay);
   };
 
-  // Get days diff from today
   const getDaysDiff = (tenant) => {
     const due = getDueDate(tenant);
     if (!due) return 999;
     return Math.floor((due - today) / (1000 * 60 * 60 * 24));
   };
 
-  // Get this month's total paid amount
+  // How many penalty days (overdue days minus grace period)
+  const getPenaltyDays = (tenant) => {
+    if (!penaltyEnabled) return 0;
+    const daysDiff = getDaysDiff(tenant);
+    if (daysDiff >= 0) return 0; // not overdue
+    const overdueDays = Math.abs(daysDiff);
+    const grace = parseInt(gracePeriod) || 0;
+    return Math.max(0, overdueDays - grace);
+  };
+
+  // Penalty amount for a tenant
+  const getPenaltyAmount = (tenant) => {
+    const penDays = getPenaltyDays(tenant);
+    if (penDays === 0) return 0;
+    return penDays * (parseInt(penaltyAmount) || 0);
+  };
+
   const getThisMonthPaid = (tenantId) => {
     const now = new Date();
     return payments
@@ -71,48 +92,26 @@ function RentPage() {
       .reduce((a, p) => a + (p.amount || 0), 0);
   };
 
-  // Get this month's balance
   const getThisMonthBalance = (tenant) => {
     const paid = getThisMonthPaid(tenant.id);
-    return Math.max(0, (tenant.monthlyRent || 0) - paid);
+    const penalty = getPenaltyAmount(tenant);
+    return Math.max(0, (tenant.monthlyRent || 0) + penalty - paid);
   };
 
-  // Check if fully paid this month
-  const isFullyPaidThisMonth = (tenant) => {
-    return getThisMonthBalance(tenant) === 0;
-  };
+  const isFullyPaidThisMonth = (tenant) => getThisMonthBalance(tenant) === 0;
 
-  // Check if partially paid this month
   const isPartiallyPaid = (tenant) => {
     const paid = getThisMonthPaid(tenant.id);
-    return paid > 0 && paid < (tenant.monthlyRent || 0);
+    return paid > 0 && paid < ((tenant.monthlyRent || 0) + getPenaltyAmount(tenant));
   };
 
-  // Categorize tenants
   const unpaidTenants = tenants.filter(t => !isFullyPaidThisMonth(t));
+  const lateTenants = unpaidTenants.filter(t => getDaysDiff(t) < 0).sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
+  const todayTenants = unpaidTenants.filter(t => getDaysDiff(t) === 0).sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
+  const upcomingTenants = unpaidTenants.filter(t => getDaysDiff(t) > 0).sort((a, b) => getDaysDiff(a) - getDaysDiff(b));
+  const paidTenants = tenants.filter(t => isFullyPaidThisMonth(t)).sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
 
-  // Late = due date passed and not fully paid
-  const lateTenants = unpaidTenants
-    .filter(t => getDaysDiff(t) < 0)
-    .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
-
-  // Today = due date is today
-  const todayTenants = unpaidTenants
-    .filter(t => getDaysDiff(t) === 0)
-    .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
-
-  // Upcoming = due date in future
-  const upcomingTenants = unpaidTenants
-    .filter(t => getDaysDiff(t) > 0)
-    .sort((a, b) => getDaysDiff(a) - getDaysDiff(b));
-
-  // Paid = fully paid this month
-  const paidTenants = tenants
-    .filter(t => isFullyPaidThisMonth(t))
-    .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
-
-  // Stats
-  const totalExpected = tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0);
+  const totalExpected = tenants.reduce((a, t) => a + (t.monthlyRent || 0) + getPenaltyAmount(t), 0);
   const totalCollected = tenants.reduce((a, t) => a + getThisMonthPaid(t.id), 0);
   const totalPending = tenants.reduce((a, t) => a + getThisMonthBalance(t), 0);
 
@@ -131,18 +130,15 @@ function RentPage() {
   const handleSavePayment = async () => {
     if (!form.amount || parseInt(form.amount) <= 0)
       return alert('Please enter a valid amount!');
-
     const balance = getThisMonthBalance(selectedTenant);
     const enteredAmount = parseInt(form.amount);
-
     if (enteredAmount > balance)
       return alert(`Amount cannot exceed balance of ₹${balance.toLocaleString()}!`);
-
     const isPartial = enteredAmount < balance;
     const previouslyPaid = getThisMonthPaid(selectedTenant.id);
     const newTotal = previouslyPaid + enteredAmount;
-    const isNowComplete = newTotal >= (selectedTenant.monthlyRent || 0);
-
+    const penalty = getPenaltyAmount(selectedTenant);
+    const isNowComplete = newTotal >= ((selectedTenant.monthlyRent || 0) + penalty);
     setSaving(true);
     try {
       await addDoc(collection(db, 'payments'), {
@@ -150,7 +146,8 @@ function RentPage() {
         tenantName: selectedTenant.name,
         roomNumber: selectedTenant.roomNumber,
         amount: enteredAmount,
-        fullAmount: selectedTenant.monthlyRent || 0,
+        fullAmount: (selectedTenant.monthlyRent || 0) + penalty,
+        penaltyAmount: penalty,
         previouslyPaid,
         newTotal,
         paymentMethod: form.paymentMethod,
@@ -189,18 +186,19 @@ function RentPage() {
       (filterType === 'full' && !p.isPartial);
     return matchSearch && matchMonth && matchYear && matchMethod && matchType;
   }).sort((a, b) => {
-  const aTime = a.recordedAt ? new Date(a.recordedAt) : new Date(a.paymentDate);
-  const bTime = b.recordedAt ? new Date(b.recordedAt) : new Date(b.paymentDate);
-  return bTime - aTime;
-});
+    const aTime = a.recordedAt ? new Date(a.recordedAt) : new Date(a.paymentDate);
+    const bTime = b.recordedAt ? new Date(b.recordedAt) : new Date(b.paymentDate);
+    return bTime - aTime;
+  });
 
-  // Tenant Card
   const TenantRentCard = ({ tenant, status }) => {
     const daysDiff = getDaysDiff(tenant);
     const dueDate = getDueDate(tenant);
     const balance = getThisMonthBalance(tenant);
     const paid = getThisMonthPaid(tenant.id);
     const isPartial = isPartiallyPaid(tenant);
+    const penalty = getPenaltyAmount(tenant);
+    const penDays = getPenaltyDays(tenant);
 
     return (
       <div style={{
@@ -226,48 +224,45 @@ function RentPage() {
             </div>
             <div>
               <div style={styles.tenantName}>{tenant.name}</div>
-              <div style={styles.tenantSub}>
-                🛏️ Room {tenant.roomNumber}
-              </div>
-              <div style={styles.tenantSub}>
-                📅 Check-in: {tenant.checkIn} | Due every {dueDate?.getDate()}th
-              </div>
+              <div style={styles.tenantSub}>🛏️ Room {tenant.roomNumber} • Bed {tenant.bedNumber || 'N/A'}</div>
+              <div style={styles.tenantSub}>📅 Check-in: {tenant.checkIn} | Due every {dueDate?.getDate()}th</div>
               {isPartial && (
                 <div style={styles.partialInfo}>
-                  ⚠️ Partially paid: ₹{paid.toLocaleString()} of ₹{(tenant.monthlyRent || 0).toLocaleString()}
+                  ⚠️ Partially paid: ₹{paid.toLocaleString()} of ₹{((tenant.monthlyRent || 0) + penalty).toLocaleString()}
+                </div>
+              )}
+              {/* Penalty breakdown */}
+              {penalty > 0 && status === 'late' && (
+                <div style={styles.penaltyInfo}>
+                  🔴 Penalty: {penDays} day{penDays !== 1 ? 's' : ''} × ₹{penaltyAmount} = ₹{penalty.toLocaleString()}
+                  {parseInt(gracePeriod) > 0 && (
+                    <span style={styles.graceNote}> (after {gracePeriod} day grace)</span>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
           <div style={styles.cardRight}>
-            {/* Status badge */}
-            {status === 'late' && (
-              <div style={styles.lateBadge}>
-                🔴 {Math.abs(daysDiff)} day{Math.abs(daysDiff) !== 1 ? 's' : ''} overdue
-              </div>
-            )}
-            {status === 'today' && (
-              <div style={styles.todayBadge}>🟡 Due Today</div>
-            )}
-            {status === 'upcoming' && (
-              <div style={styles.upcomingBadge}>
-                🟢 Due in {daysDiff} day{daysDiff !== 1 ? 's' : ''}
-              </div>
-            )}
-            {status === 'paid' && (
-              <div style={styles.paidBadge}>✅ Paid</div>
-            )}
+            {status === 'late' && <div style={styles.lateBadge}>🔴 {Math.abs(daysDiff)} day{Math.abs(daysDiff) !== 1 ? 's' : ''} overdue</div>}
+            {status === 'today' && <div style={styles.todayBadge}>🟡 Due Today</div>}
+            {status === 'upcoming' && <div style={styles.upcomingBadge}>🟢 Due in {daysDiff} day{daysDiff !== 1 ? 's' : ''}</div>}
+            {status === 'paid' && <div style={styles.paidBadge}>✅ Paid</div>}
 
-            {/* Show balance only */}
-            <div style={styles.rentAmount}>
-              ₹{(status === 'paid' ? tenant.monthlyRent : balance).toLocaleString()}
-              <span style={styles.rentSub}>
-                {status === 'paid' ? ' paid' : ' due'}
-              </span>
+            {/* Amount breakdown */}
+            <div style={{ textAlign: 'right' }}>
+              {penalty > 0 && status === 'late' && (
+                <div style={styles.rentBreakdown}>
+                  <span style={styles.baseRent}>Rent: ₹{(tenant.monthlyRent || 0).toLocaleString()}</span>
+                  <span style={styles.penaltyLine}>+ Penalty: ₹{penalty.toLocaleString()}</span>
+                </div>
+              )}
+              <div style={styles.rentAmount}>
+                ₹{(status === 'paid' ? (tenant.monthlyRent || 0) : balance).toLocaleString()}
+                <span style={styles.rentSub}>{status === 'paid' ? ' paid' : ' due'}</span>
+              </div>
             </div>
 
-            {/* Collect button */}
             {status !== 'paid' && (
               <button style={{
                 ...styles.collectBtn,
@@ -288,17 +283,89 @@ function RentPage() {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>Rent Management</h1>
           <p style={styles.subtitle}>
-            {new Date().toLocaleDateString('en-IN', {
-              day: 'numeric', month: 'long', year: 'numeric'
-            })}
+            {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
       </div>
+
+      {/* ── PENALTY TOGGLE BAR ── */}
+      <div style={styles.penaltyBar}>
+        <div style={styles.penaltyLeft}>
+          <div style={styles.penaltyTitle}>🔴 Late Penalty</div>
+          <div style={styles.penaltySubtitle}>
+            {penaltyEnabled
+              ? `₹${penaltyAmount || '0'}/day after ${gracePeriod || '0'} day grace period`
+              : 'Turn on to charge late fees automatically'}
+          </div>
+        </div>
+        <div style={styles.penaltyRight}>
+          {penaltyEnabled && (
+            <button style={styles.penaltyEditBtn}
+              onClick={() => setShowPenaltySetup(!showPenaltySetup)}>
+              ⚙️ Edit Settings
+            </button>
+          )}
+          {/* Toggle Switch */}
+          <div style={{
+            ...styles.toggle,
+            background: penaltyEnabled ? '#e94560' : '#e2e8f0',
+          }} onClick={() => {
+            if (!penaltyEnabled) {
+              setPenaltyEnabled(true);
+              setShowPenaltySetup(true);
+            } else {
+              setPenaltyEnabled(false);
+              setShowPenaltySetup(false);
+            }
+          }}>
+            <div style={{
+              ...styles.toggleKnob,
+              transform: penaltyEnabled ? 'translateX(24px)' : 'translateX(2px)',
+            }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Penalty Setup Form */}
+      {showPenaltySetup && penaltyEnabled && (
+        <div style={styles.penaltySetup}>
+          <div style={styles.penaltySetupTitle}>⚙️ Penalty Settings</div>
+          <div style={styles.penaltySetupGrid}>
+            <div style={styles.penaltyField}>
+              <label style={styles.penaltyLabel}>💰 Penalty per day (₹)</label>
+              <input style={styles.penaltyInput}
+                type="number" placeholder="e.g. 50"
+                value={penaltyAmount}
+                onChange={e => setPenaltyAmount(e.target.value)} />
+              <span style={styles.penaltyHint}>Amount charged per day after grace period</span>
+            </div>
+            <div style={styles.penaltyField}>
+              <label style={styles.penaltyLabel}>🕐 Grace Period (days)</label>
+              <input style={styles.penaltyInput}
+                type="number" placeholder="e.g. 3 (0 = no grace)"
+                value={gracePeriod}
+                onChange={e => setGracePeriod(e.target.value)} />
+              <span style={styles.penaltyHint}>Free days before penalty starts (0 = immediate)</span>
+            </div>
+            <div style={styles.penaltyPreview}>
+              <div style={styles.penaltyPreviewTitle}>📊 Example Preview</div>
+              <div style={styles.penaltyPreviewText}>
+                Rent: ₹5,000 | Overdue: 7 days | Grace: {gracePeriod || 0} days<br/>
+                Penalty days: {Math.max(0, 7 - (parseInt(gracePeriod) || 0))} × ₹{penaltyAmount || 0} = ₹{Math.max(0, 7 - (parseInt(gracePeriod) || 0)) * (parseInt(penaltyAmount) || 0)}<br/>
+                <strong>Total Due: ₹{(5000 + Math.max(0, 7 - (parseInt(gracePeriod) || 0)) * (parseInt(penaltyAmount) || 0)).toLocaleString()}</strong>
+              </div>
+            </div>
+          </div>
+          <button style={styles.penaltySaveBtn}
+            onClick={() => setShowPenaltySetup(false)}>
+            ✅ Save & Apply
+          </button>
+        </div>
+      )}
 
       {/* Stats */}
       <div style={styles.statsRow}>
@@ -316,7 +383,6 @@ function RentPage() {
         ))}
       </div>
 
-      {/* Tabs */}
       <div style={styles.tabs}>
         {[
           { id: 'overview', label: '📊 Overview' },
@@ -335,82 +401,78 @@ function RentPage() {
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>💰 Collect Rent</h3>
-              <button style={styles.closeBtn}
-                onClick={() => setShowPaymentForm(false)}>✕</button>
+              <button style={styles.closeBtn} onClick={() => setShowPaymentForm(false)}>✕</button>
             </div>
-
             <div style={styles.tenantInfoBox}>
-              <div style={styles.tiAvatar}>
-                {selectedTenant.name?.charAt(0).toUpperCase()}
-              </div>
+              <div style={styles.tiAvatar}>{selectedTenant.name?.charAt(0).toUpperCase()}</div>
               <div>
                 <div style={styles.tiName}>{selectedTenant.name}</div>
-                <div style={styles.tiSub}>
-                  Room {selectedTenant.roomNumber} •
-                  Monthly: ₹{selectedTenant.monthlyRent?.toLocaleString()}
-                </div>
+                <div style={styles.tiSub}>Room {selectedTenant.roomNumber} • Monthly: ₹{selectedTenant.monthlyRent?.toLocaleString()}</div>
+                {getPenaltyAmount(selectedTenant) > 0 && (
+                  <div style={styles.tiPenalty}>
+                    🔴 Penalty: ₹{getPenaltyAmount(selectedTenant).toLocaleString()} ({getPenaltyDays(selectedTenant)} days × ₹{penaltyAmount})
+                  </div>
+                )}
                 {isPartiallyPaid(selectedTenant) && (
                   <div style={styles.tiPartial}>
-                    Already paid: ₹{getThisMonthPaid(selectedTenant.id).toLocaleString()} •
-                    Balance: ₹{getThisMonthBalance(selectedTenant).toLocaleString()}
+                    Already paid: ₹{getThisMonthPaid(selectedTenant.id).toLocaleString()} • Balance: ₹{getThisMonthBalance(selectedTenant).toLocaleString()}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Partial warning */}
-            {form.amount &&
-              parseInt(form.amount) < getThisMonthBalance(selectedTenant) &&
-              parseInt(form.amount) > 0 && (
+            {/* Total breakdown */}
+            {getPenaltyAmount(selectedTenant) > 0 && (
+              <div style={styles.breakdownBox}>
+                <div style={styles.breakdownRow}>
+                  <span>Monthly Rent</span>
+                  <span>₹{(selectedTenant.monthlyRent || 0).toLocaleString()}</span>
+                </div>
+                <div style={styles.breakdownRow}>
+                  <span>🔴 Late Penalty ({getPenaltyDays(selectedTenant)} days)</span>
+                  <span style={{ color: '#dc2626' }}>+ ₹{getPenaltyAmount(selectedTenant).toLocaleString()}</span>
+                </div>
+                <div style={{ ...styles.breakdownRow, ...styles.breakdownTotal }}>
+                  <span>Total Due</span>
+                  <span>₹{getThisMonthBalance(selectedTenant).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+
+            {form.amount && parseInt(form.amount) < getThisMonthBalance(selectedTenant) && parseInt(form.amount) > 0 && (
               <div style={styles.partialWarning}>
-                ⚠️ Partial payment! Balance after this:
-                ₹{(getThisMonthBalance(selectedTenant) - parseInt(form.amount)).toLocaleString()}
+                ⚠️ Partial payment! Balance after this: ₹{(getThisMonthBalance(selectedTenant) - parseInt(form.amount)).toLocaleString()}
               </div>
             )}
 
             <div style={styles.formGrid}>
               <div style={styles.field}>
-                <label style={styles.label}>
-                  Amount (₹) — Balance: ₹{getThisMonthBalance(selectedTenant).toLocaleString()}
-                </label>
-                <input style={{
-                  ...styles.input,
-                  borderColor: form.amount &&
-                    parseInt(form.amount) < getThisMonthBalance(selectedTenant)
-                    ? '#d97706' : '#e2e8f0'
-                }} type="number" placeholder="Enter amount"
-                  value={form.amount}
-                  onChange={e => setForm({ ...form, amount: e.target.value })} />
+                <label style={styles.label}>Amount (₹) — Balance: ₹{getThisMonthBalance(selectedTenant).toLocaleString()}</label>
+                <input style={{ ...styles.input, borderColor: form.amount && parseInt(form.amount) < getThisMonthBalance(selectedTenant) ? '#d97706' : '#e2e8f0' }}
+                  type="number" placeholder="Enter amount"
+                  value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
               </div>
               <div style={styles.field}>
                 <label style={styles.label}>Payment Date</label>
-                <input style={styles.input} type="date"
-                  value={form.paymentDate}
+                <input style={styles.input} type="date" value={form.paymentDate}
                   onChange={e => setForm({ ...form, paymentDate: e.target.value })} />
               </div>
               <div style={styles.field}>
                 <label style={styles.label}>Payment Method</label>
                 <select style={styles.input} value={form.paymentMethod}
                   onChange={e => setForm({ ...form, paymentMethod: e.target.value })}>
-                  {['Cash', 'UPI', 'Bank Transfer', 'Card'].map(m => (
-                    <option key={m}>{m}</option>
-                  ))}
+                  {['Cash', 'UPI', 'Bank Transfer', 'Card'].map(m => <option key={m}>{m}</option>)}
                 </select>
               </div>
               <div style={styles.field}>
                 <label style={styles.label}>Notes</label>
-                <input style={styles.input} type="text"
-                  placeholder="e.g. Paid via GPay"
-                  value={form.notes}
-                  onChange={e => setForm({ ...form, notes: e.target.value })} />
+                <input style={styles.input} type="text" placeholder="e.g. Paid via GPay"
+                  value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
               </div>
             </div>
-
             <div style={styles.modalFooter}>
-              <button style={styles.cancelBtn}
-                onClick={() => setShowPaymentForm(false)}>Cancel</button>
-              <button style={styles.saveBtn}
-                onClick={handleSavePayment} disabled={saving}>
+              <button style={styles.cancelBtn} onClick={() => setShowPaymentForm(false)}>Cancel</button>
+              <button style={styles.saveBtn} onClick={handleSavePayment} disabled={saving}>
                 {saving ? 'Saving...' : '💾 Save Payment'}
               </button>
             </div>
@@ -431,51 +493,28 @@ function RentPage() {
             </div>
           ) : (
             <>
-              {/* Today */}
               {todayTenants.length > 0 && (
                 <div style={styles.section}>
-                  <h2 style={{ ...styles.sectionTitle, color: '#d97706' }}>
-                    🟡 Due Today ({todayTenants.length})
-                  </h2>
-                  {todayTenants.map(t => (
-                    <TenantRentCard key={t.id} tenant={t} status="today" />
-                  ))}
+                  <h2 style={{ ...styles.sectionTitle, color: '#d97706' }}>🟡 Due Today ({todayTenants.length})</h2>
+                  {todayTenants.map(t => <TenantRentCard key={t.id} tenant={t} status="today" />)}
                 </div>
               )}
-
-              {/* Late */}
               {lateTenants.length > 0 && (
                 <div style={styles.section}>
-                  <h2 style={{ ...styles.sectionTitle, color: '#dc2626' }}>
-                    🔴 Overdue ({lateTenants.length})
-                  </h2>
-                  {lateTenants.map(t => (
-                    <TenantRentCard key={t.id} tenant={t} status="late" />
-                  ))}
+                  <h2 style={{ ...styles.sectionTitle, color: '#dc2626' }}>🔴 Overdue ({lateTenants.length})</h2>
+                  {lateTenants.map(t => <TenantRentCard key={t.id} tenant={t} status="late" />)}
                 </div>
               )}
-
-              {/* Upcoming */}
               {upcomingTenants.length > 0 && (
                 <div style={styles.section}>
-                  <h2 style={{ ...styles.sectionTitle, color: '#4f46e5' }}>
-                    🟢 Upcoming ({upcomingTenants.length})
-                  </h2>
-                  {upcomingTenants.map(t => (
-                    <TenantRentCard key={t.id} tenant={t} status="upcoming" />
-                  ))}
+                  <h2 style={{ ...styles.sectionTitle, color: '#4f46e5' }}>🟢 Upcoming ({upcomingTenants.length})</h2>
+                  {upcomingTenants.map(t => <TenantRentCard key={t.id} tenant={t} status="upcoming" />)}
                 </div>
               )}
-
-              {/* Paid */}
               {paidTenants.length > 0 && (
                 <div style={styles.section}>
-                  <h2 style={{ ...styles.sectionTitle, color: '#059669' }}>
-                    ✅ Paid This Month ({paidTenants.length})
-                  </h2>
-                  {paidTenants.map(t => (
-                    <TenantRentCard key={t.id} tenant={t} status="paid" />
-                  ))}
+                  <h2 style={{ ...styles.sectionTitle, color: '#059669' }}>✅ Paid This Month ({paidTenants.length})</h2>
+                  {paidTenants.map(t => <TenantRentCard key={t.id} tenant={t} status="paid" />)}
                 </div>
               )}
             </>
@@ -487,31 +526,23 @@ function RentPage() {
       {activeTab === 'history' && (
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>📋 Payment History</h2>
-
-          {/* Filters */}
           <div style={styles.filterRow}>
             <input style={styles.searchInput} type="text"
               placeholder="🔍 Search by name or room..."
               value={search} onChange={e => setSearch(e.target.value)} />
-            <select style={styles.filterSelect} value={filterMonth}
-              onChange={e => setFilterMonth(e.target.value)}>
+            <select style={styles.filterSelect} value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
               <option value="">All Months</option>
               {months.map(m => <option key={m}>{m}</option>)}
             </select>
-            <select style={styles.filterSelect} value={filterYear}
-              onChange={e => setFilterYear(e.target.value)}>
+            <select style={styles.filterSelect} value={filterYear} onChange={e => setFilterYear(e.target.value)}>
               <option value="">All Years</option>
               {['2024','2025','2026','2027'].map(y => <option key={y}>{y}</option>)}
             </select>
-            <select style={styles.filterSelect} value={filterMethod}
-              onChange={e => setFilterMethod(e.target.value)}>
+            <select style={styles.filterSelect} value={filterMethod} onChange={e => setFilterMethod(e.target.value)}>
               <option value="">All Methods</option>
-              {['Cash','UPI','Bank Transfer','Card'].map(m => (
-                <option key={m}>{m}</option>
-              ))}
+              {['Cash','UPI','Bank Transfer','Card'].map(m => <option key={m}>{m}</option>)}
             </select>
-            <select style={styles.filterSelect} value={filterType}
-              onChange={e => setFilterType(e.target.value)}>
+            <select style={styles.filterSelect} value={filterType} onChange={e => setFilterType(e.target.value)}>
               <option value="">All Types</option>
               <option value="full">Full Payment</option>
               <option value="partial">Partial Payment</option>
@@ -519,22 +550,16 @@ function RentPage() {
             </select>
             {(search || filterMonth || filterYear || filterMethod || filterType) && (
               <button style={styles.clearBtn} onClick={() => {
-                setSearch(''); setFilterMonth('');
-                setFilterYear(''); setFilterMethod(''); setFilterType('');
+                setSearch(''); setFilterMonth(''); setFilterYear(''); setFilterMethod(''); setFilterType('');
               }}>✕ Clear</button>
             )}
           </div>
-
-          {/* Result count */}
           <div style={styles.resultCount}>
             Showing {filteredPayments.length} of {payments.length} payments
             {filteredPayments.filter(p => p.isPartial).length > 0 && (
-              <span style={styles.partialCount}>
-                • {filteredPayments.filter(p => p.isPartial).length} partial
-              </span>
+              <span style={styles.partialCount}> • {filteredPayments.filter(p => p.isPartial).length} partial</span>
             )}
           </div>
-
           {filteredPayments.length === 0 ? (
             <div style={styles.empty}>
               <div style={styles.emptyIcon}>📋</div>
@@ -545,10 +570,8 @@ function RentPage() {
               {filteredPayments.map(payment => (
                 <div key={payment.id} style={{
                   ...styles.historyCard,
-                  background: payment.isCompleted ? '#f0fdf4' :
-                    payment.isPartial ? '#fffbeb' : '#f8fafc',
-                  border: payment.isCompleted ? '1px solid #bbf7d0' :
-                    payment.isPartial ? '1px solid #fde68a' : '1px solid #e2e8f0',
+                  background: payment.isCompleted ? '#f0fdf4' : payment.isPartial ? '#fffbeb' : '#f8fafc',
+                  border: payment.isCompleted ? '1px solid #bbf7d0' : payment.isPartial ? '1px solid #fde68a' : '1px solid #e2e8f0',
                 }}>
                   <div style={styles.historyLeft}>
                     <div style={{
@@ -564,51 +587,32 @@ function RentPage() {
                     <div>
                       <div style={styles.historyName}>
                         {payment.tenantName}
-                        {payment.isCompleted && (
-                          <span style={styles.completedTag}>✅ Month Complete</span>
-                        )}
-                        {payment.isPartial && !payment.isCompleted && (
-                          <span style={styles.partialTag}>⚠️ Partial</span>
-                        )}
+                        {payment.isCompleted && <span style={styles.completedTag}>✅ Month Complete</span>}
+                        {payment.isPartial && !payment.isCompleted && <span style={styles.partialTag}>⚠️ Partial</span>}
+                        {payment.penaltyAmount > 0 && <span style={styles.penaltyTag}>🔴 Penalty Included</span>}
                       </div>
-                      <div style={styles.historySub}>
-                        Room {payment.roomNumber} • {payment.month} {payment.year}
-                      </div>
-                      {/* Show payment progress */}
+                      <div style={styles.historySub}>Room {payment.roomNumber} • {payment.month} {payment.year}</div>
+                      {payment.penaltyAmount > 0 && (
+                        <div style={styles.historyPenalty}>Penalty: ₹{payment.penaltyAmount?.toLocaleString()}</div>
+                      )}
                       {payment.isPartial && (
-                        <div style={styles.progressInfo}>
-                          Paid: ₹{payment.newTotal?.toLocaleString()} of ₹{payment.fullAmount?.toLocaleString()}
-                        </div>
+                        <div style={styles.progressInfo}>Paid: ₹{payment.newTotal?.toLocaleString()} of ₹{payment.fullAmount?.toLocaleString()}</div>
                       )}
-                      {payment.notes && (
-                        <div style={styles.historyNotes}>📝 {payment.notes}</div>
-                      )}
+                      {payment.notes && <div style={styles.historyNotes}>📝 {payment.notes}</div>}
                     </div>
                   </div>
                   <div style={styles.historyRight}>
                     <div>
-                      <div style={{
-                        ...styles.historyAmount,
-                        color: payment.isCompleted ? '#059669' :
-                          payment.isPartial ? '#d97706' : '#4f46e5'
-                      }}>
+                      <div style={{ ...styles.historyAmount, color: payment.isCompleted ? '#059669' : payment.isPartial ? '#d97706' : '#4f46e5' }}>
                         ₹{payment.amount?.toLocaleString()}
                       </div>
-                      {payment.isPartial && (
-                        <div style={styles.fullAmountSub}>
-                          of ₹{payment.fullAmount?.toLocaleString()}
-                        </div>
-                      )}
+                      {payment.isPartial && <div style={styles.fullAmountSub}>of ₹{payment.fullAmount?.toLocaleString()}</div>}
                     </div>
                     <div style={styles.methodTag}>{payment.paymentMethod}</div>
                     <div style={styles.historyDate}>
                       📅 {payment.paymentDate}
-                      {payment.paymentTime && (
-                       <span style={{ marginLeft: '6px', color: '#b0bec5' }}>
-                        🕐 {payment.paymentTime}
-                     </span>
-                    )}
-                </div>
+                      {payment.paymentTime && <span style={{ marginLeft: '6px', color: '#b0bec5' }}>🕐 {payment.paymentTime}</span>}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -625,6 +629,42 @@ const styles = {
   header: { marginBottom: '24px' },
   title: { fontSize: '24px', fontWeight: '800', color: '#1e293b', margin: 0 },
   subtitle: { color: '#94a3b8', fontSize: '13px', marginTop: '4px' },
+
+  // Penalty Bar
+  penaltyBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', borderRadius: '14px', padding: '16px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' },
+  penaltyLeft: {},
+  penaltyTitle: { fontSize: '15px', fontWeight: '700', color: '#1e293b' },
+  penaltySubtitle: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
+  penaltyRight: { display: 'flex', alignItems: 'center', gap: '12px' },
+  penaltyEditBtn: { padding: '6px 14px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
+  toggle: { width: '52px', height: '28px', borderRadius: '99px', cursor: 'pointer', position: 'relative', transition: 'background 0.3s', flexShrink: 0 },
+  toggleKnob: { position: 'absolute', top: '3px', width: '22px', height: '22px', background: 'white', borderRadius: '50%', transition: 'transform 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
+
+  // Penalty Setup
+  penaltySetup: { background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '14px', padding: '20px', marginBottom: '16px' },
+  penaltySetupTitle: { fontSize: '15px', fontWeight: '700', color: '#dc2626', marginBottom: '16px' },
+  penaltySetupGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' },
+  penaltyField: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  penaltyLabel: { fontSize: '13px', fontWeight: '600', color: '#475569' },
+  penaltyInput: { padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #fecaca', fontSize: '14px', outline: 'none', background: 'white' },
+  penaltyHint: { fontSize: '11px', color: '#94a3b8' },
+  penaltyPreview: { background: 'white', borderRadius: '10px', padding: '14px', border: '1px solid #fecaca' },
+  penaltyPreviewTitle: { fontSize: '12px', fontWeight: '700', color: '#dc2626', marginBottom: '8px' },
+  penaltyPreviewText: { fontSize: '13px', color: '#475569', lineHeight: '1.8' },
+  penaltySaveBtn: { padding: '10px 24px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
+
+  // Penalty on card
+  penaltyInfo: { fontSize: '12px', color: '#dc2626', fontWeight: '600', marginTop: '4px', background: '#fef2f2', padding: '4px 8px', borderRadius: '6px', display: 'inline-block' },
+  graceNote: { color: '#94a3b8', fontWeight: '400' },
+  rentBreakdown: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: '4px' },
+  baseRent: { fontSize: '12px', color: '#64748b' },
+  penaltyLine: { fontSize: '12px', color: '#dc2626', fontWeight: '600' },
+
+  // Breakdown in modal
+  breakdownBox: { background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0' },
+  breakdownRow: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' },
+  breakdownTotal: { borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px', fontWeight: '700', color: '#1e293b', fontSize: '15px' },
+
   statsRow: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '24px' },
   statCard: { borderRadius: '14px', padding: '20px', textAlign: 'center' },
   statIcon: { fontSize: '28px', marginBottom: '8px' },
@@ -651,15 +691,16 @@ const styles = {
   rentSub: { fontSize: '12px', color: '#94a3b8', fontWeight: '400' },
   collectBtn: { padding: '8px 16px', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' },
-  modal: { background: 'white', borderRadius: '20px', padding: '28px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' },
+  modal: { background: 'white', borderRadius: '20px', padding: '28px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
   modalTitle: { fontSize: '18px', fontWeight: '700', color: '#1e293b', margin: 0 },
   closeBtn: { background: '#f1f5f9', border: 'none', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px' },
   tenantInfoBox: { display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '12px', marginBottom: '20px' },
-  tiAvatar: { width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #0891b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '18px' },
+  tiAvatar: { width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #0891b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '18px', flexShrink: 0 },
   tiName: { fontSize: '15px', fontWeight: '700', color: '#1e293b' },
   tiSub: { fontSize: '13px', color: '#94a3b8' },
   tiPartial: { fontSize: '12px', color: '#d97706', fontWeight: '600', marginTop: '4px' },
+  tiPenalty: { fontSize: '12px', color: '#dc2626', fontWeight: '600', marginTop: '4px' },
   partialWarning: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '12px 16px', fontSize: '13px', color: '#d97706', fontWeight: '600', marginBottom: '16px' },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
   field: { display: 'flex', flexDirection: 'column' },
@@ -686,7 +727,9 @@ const styles = {
   historyName: { fontSize: '14px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
   completedTag: { fontSize: '11px', background: '#dcfce7', color: '#059669', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' },
   partialTag: { fontSize: '11px', background: '#fffbeb', color: '#d97706', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' },
+  penaltyTag: { fontSize: '11px', background: '#fef2f2', color: '#dc2626', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' },
   historySub: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
+  historyPenalty: { fontSize: '12px', color: '#dc2626', fontWeight: '600', marginTop: '2px' },
   progressInfo: { fontSize: '12px', color: '#d97706', fontWeight: '600', marginTop: '2px' },
   historyNotes: { fontSize: '12px', color: '#64748b', marginTop: '4px', fontStyle: 'italic' },
   historyRight: { display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 },
