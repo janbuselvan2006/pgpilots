@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 function RentPage() {
   const [tenants, setTenants] = useState([]);
@@ -16,7 +16,7 @@ function RentPage() {
   const [filterMethod, setFilterMethod] = useState('');
   const [filterType, setFilterType] = useState('');
 
-  // ── Penalty Settings ──
+  // ── Penalty Settings (saved to Firestore) ──
   const [penaltyEnabled, setPenaltyEnabled] = useState(false);
   const [penaltyAmount, setPenaltyAmount] = useState('');
   const [gracePeriod, setGracePeriod] = useState('');
@@ -43,6 +43,14 @@ function RentPage() {
       const pq = query(collection(db, 'payments'), where('ownerId', '==', user.uid));
       const pSnap = await getDocs(pq);
       setPayments(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // Load penalty settings from Firestore
+      const ownerDoc = await getDoc(doc(db, 'pgOwners', user.uid));
+      if (ownerDoc.exists()) {
+        const data = ownerDoc.data();
+        if (data.penaltyEnabled !== undefined) setPenaltyEnabled(data.penaltyEnabled);
+        if (data.penaltyAmount !== undefined) setPenaltyAmount(data.penaltyAmount.toString());
+        if (data.gracePeriod !== undefined) setGracePeriod(data.gracePeriod.toString());
+      }
     } catch (err) { console.error(err); }
     setLoading(false);
   };
@@ -340,7 +348,7 @@ function RentPage() {
               <input style={styles.penaltyInput}
                 type="number" placeholder="e.g. 50"
                 value={penaltyAmount}
-                onChange={e => setPenaltyAmount(e.target.value)} />
+                onChange={e => { setPenaltyAmount(e.target.value); }} />
               <span style={styles.penaltyHint}>Amount charged per day after grace period</span>
             </div>
             <div style={styles.penaltyField}>
@@ -348,7 +356,7 @@ function RentPage() {
               <input style={styles.penaltyInput}
                 type="number" placeholder="e.g. 3 (0 = no grace)"
                 value={gracePeriod}
-                onChange={e => setGracePeriod(e.target.value)} />
+                onChange={e => { setGracePeriod(e.target.value); }} />
               <span style={styles.penaltyHint}>Free days before penalty starts (0 = immediate)</span>
             </div>
             <div style={styles.penaltyPreview}>
@@ -361,7 +369,14 @@ function RentPage() {
             </div>
           </div>
           <button style={styles.penaltySaveBtn}
-            onClick={() => setShowPenaltySetup(false)}>
+            onClick={async () => {
+              await updateDoc(doc(db, 'pgOwners', user.uid), {
+                penaltyEnabled: true,
+                penaltyAmount: parseInt(penaltyAmount) || 0,
+                gracePeriod: parseInt(gracePeriod) || 0,
+              });
+              setShowPenaltySetup(false);
+            }}>
             ✅ Save & Apply
           </button>
         </div>
