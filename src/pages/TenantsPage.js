@@ -29,8 +29,6 @@ function Tenants() {
       const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
       const tSnap = await getDocs(tq);
       const all = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      // Only show active tenants — hide deleted ones
       const active = all.filter(t => t.status !== 'deleted');
       setTenants(active);
 
@@ -44,6 +42,30 @@ function Tenants() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // Get vacant beds for selected room
+  const getVacantBeds = (roomNumber) => {
+    if (!roomNumber) return [];
+    const room = rooms.find(r => r.roomNumber === roomNumber);
+    if (!room) return [];
+
+    const totalBeds = room.totalBeds || 0;
+
+    // Get occupied bed numbers in this room (excluding current tenant being edited)
+    const occupiedBedNumbers = tenants
+      .filter(t => t.roomNumber === roomNumber && t.id !== editId)
+      .map(t => parseInt(t.bedNumber))
+      .filter(n => !isNaN(n));
+
+    // Return only vacant bed numbers
+    const vacant = [];
+    for (let i = 1; i <= totalBeds; i++) {
+      if (!occupiedBedNumbers.includes(i)) {
+        vacant.push(i);
+      }
+    }
+    return vacant;
+  };
 
   const resetForm = () => {
     setForm({
@@ -83,6 +105,9 @@ function Tenants() {
     if (!form.name || !form.phone || !form.roomNumber) {
       return alert('Please fill Name, Phone and Room Number!');
     }
+    if (!form.bedNumber) {
+      return alert('Please select a Bed Number!');
+    }
     setSaving(true);
     try {
       const data = {
@@ -93,7 +118,6 @@ function Tenants() {
 
       if (editId) {
         const oldTenant = tenants.find(t => t.id === editId);
-        // If room changed, update both old and new room counts
         if (oldTenant && oldTenant.roomNumber !== form.roomNumber) {
           const oldRoom = rooms.find(r => r.roomNumber === oldTenant.roomNumber);
           if (oldRoom) {
@@ -111,14 +135,12 @@ function Tenants() {
         await updateDoc(doc(db, 'tenants', editId), data);
 
       } else {
-        // New tenant
         await addDoc(collection(db, 'tenants'), {
           ...data,
           ownerId: user.uid,
           status: 'Active',
           createdAt: new Date(),
         });
-        // Increase room occupied beds
         const room = rooms.find(r => r.roomNumber === form.roomNumber);
         if (room) {
           await updateDoc(doc(db, 'rooms', room.id), {
@@ -136,7 +158,6 @@ function Tenants() {
     setSaving(false);
   };
 
-  // SOFT DELETE — keeps data for Reports, reduces bed count
   const handleDelete = async (tenant) => {
     const confirmed = window.confirm(
       `Remove ${tenant.name} from active tenants?\n\nTheir rent history will be preserved in Reports.`
@@ -144,13 +165,11 @@ function Tenants() {
     if (!confirmed) return;
 
     try {
-      // Step 1: Mark as deleted (don't actually delete from Firebase)
       await updateDoc(doc(db, 'tenants', tenant.id), {
         status: 'deleted',
         deletedAt: new Date().toISOString(),
       });
 
-      // Step 2: Reduce room occupied bed count by 1
       const roomQuery = query(
         collection(db, 'rooms'),
         where('ownerId', '==', user.uid),
@@ -167,7 +186,6 @@ function Tenants() {
 
       alert(`✅ ${tenant.name} removed. History saved in Reports.`);
       fetchData();
-
     } catch (err) {
       console.error(err);
       alert('Something went wrong!');
@@ -179,6 +197,9 @@ function Tenants() {
     t.phone?.includes(search) ||
     t.roomNumber?.includes(search)
   );
+
+  const vacantBeds = getVacantBeds(form.roomNumber);
+  const selectedRoom = rooms.find(r => r.roomNumber === form.roomNumber);
 
   return (
     <div style={styles.container}>
@@ -239,20 +260,62 @@ function Tenants() {
           <div style={styles.formSection}>
             <div style={styles.formSectionTitle}>🛏️ Room Details</div>
             <div style={styles.formGrid}>
+
+              {/* Room selector */}
               <div style={styles.field}>
                 <label style={styles.label}>Room Number *</label>
                 <select style={styles.input} value={form.roomNumber}
-                  onChange={e => setForm({ ...form, roomNumber: e.target.value })}>
+                  onChange={e => setForm({ ...form, roomNumber: e.target.value, bedNumber: '' })}>
                   <option value="">Select Room</option>
-                  {rooms.map(r => (
-                    <option key={r.id} value={r.roomNumber}>
-                      Room {r.roomNumber} ({r.roomType})
-                    </option>
-                  ))}
+                  {rooms.map(r => {
+                    const vacant = r.totalBeds - (r.occupiedBeds || 0);
+                    return (
+                      <option key={r.id} value={r.roomNumber} disabled={vacant === 0 && r.roomNumber !== form.roomNumber}>
+                        Room {r.roomNumber} ({r.roomType}) — {vacant} vacant
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
+
+              {/* Bed Number dropdown — only vacant beds */}
+              <div style={styles.field}>
+                <label style={styles.label}>Bed Number *</label>
+                {!form.roomNumber ? (
+                  <div style={styles.noBedMsg}>← Select a room first</div>
+                ) : vacantBeds.length > 0 ? (
+                  <select style={styles.input} value={form.bedNumber}
+                    onChange={e => setForm({ ...form, bedNumber: e.target.value })}>
+                    <option value="">Select Bed</option>
+                    {vacantBeds.map(bed => (
+                      <option key={bed} value={bed}>🟢 Bed {bed} — Vacant</option>
+                    ))}
+                    {/* Show current bed when editing */}
+                    {editId && form.bedNumber && !vacantBeds.includes(parseInt(form.bedNumber)) && (
+                      <option value={form.bedNumber}>🔴 Bed {form.bedNumber} — Current</option>
+                    )}
+                  </select>
+                ) : (
+                  <div style={{ ...styles.noBedMsg, background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca' }}>
+                    ❌ No vacant beds in this room!
+                  </div>
+                )}
+              </div>
+
+              {/* Room info preview */}
+              {selectedRoom && (
+                <div style={styles.roomPreview}>
+                  <div style={styles.roomPreviewTitle}>📋 Room Info</div>
+                  <div style={styles.roomPreviewDetails}>
+                    <span>🛏️ {selectedRoom.totalBeds} total beds</span>
+                    <span style={{ color: '#059669' }}>🟢 {selectedRoom.totalBeds - (selectedRoom.occupiedBeds || 0)} vacant</span>
+                    <span style={{ color: '#dc2626' }}>🔴 {selectedRoom.occupiedBeds || 0} occupied</span>
+                    <span>💰 ₹{selectedRoom.rentPerBed?.toLocaleString()}/bed</span>
+                  </div>
+                </div>
+              )}
+
               {[
-                { label: 'Bed Number', key: 'bedNumber', type: 'text', ph: 'Bed 1' },
                 { label: 'Monthly Rent (₹)', key: 'monthlyRent', type: 'text', ph: '5000' },
                 { label: 'Deposit (₹)', key: 'deposit', type: 'text', ph: '10000' },
                 { label: 'Check-in Date', key: 'checkIn', type: 'date', ph: '' },
@@ -349,7 +412,7 @@ function Tenants() {
               <div style={styles.tenantDetails}>
                 {[
                   ['🛏️ Room', `Room ${tenant.roomNumber}`],
-                  ['🪑 Bed', tenant.bedNumber || 'N/A'],
+                  ['🪑 Bed', `Bed ${tenant.bedNumber || 'N/A'}`],
                   ['💰 Rent', `₹${(tenant.monthlyRent || 0).toLocaleString()}/mo`],
                   ['💵 Deposit', `₹${(tenant.deposit || 0).toLocaleString()}`],
                   ['📅 Check-in', tenant.checkIn || 'N/A'],
@@ -367,12 +430,8 @@ function Tenants() {
               )}
 
               <div style={styles.tenantFooter}>
-                <button style={styles.editBtn} onClick={() => handleEdit(tenant)}>
-                  ✏️ Edit
-                </button>
-                <button style={styles.deleteBtn} onClick={() => handleDelete(tenant)}>
-                  🗑️ Remove
-                </button>
+                <button style={styles.editBtn} onClick={() => handleEdit(tenant)}>✏️ Edit</button>
+                <button style={styles.deleteBtn} onClick={() => handleDelete(tenant)}>🗑️ Remove</button>
               </div>
             </div>
           ))}
@@ -399,7 +458,11 @@ const styles = {
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px' },
   field: { display: 'flex', flexDirection: 'column' },
   label: { fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' },
-  input: { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: '#f8fafc', MozAppearance: 'textfield', WebkitAppearance: 'none',},
+  input: { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: '#f8fafc', MozAppearance: 'textfield', WebkitAppearance: 'none' },
+  noBedMsg: { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #fde68a', fontSize: '13px', background: '#fef9ec', color: '#d97706', fontWeight: '600' },
+  roomPreview: { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px' },
+  roomPreviewTitle: { fontSize: '11px', fontWeight: '700', color: '#059669', marginBottom: '8px', textTransform: 'uppercase' },
+  roomPreviewDetails: { display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#166534', fontWeight: '600' },
   formButtons: { display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' },
   cancelBtn: { padding: '12px 24px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
   saveBtn: { padding: '12px 32px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },

@@ -7,6 +7,7 @@ import {
 
 function Rooms() {
   const [rooms, setRooms] = useState([]);
+  const [tenants, setTenants] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -17,38 +18,61 @@ function Rooms() {
 
   const user = auth.currentUser;
 
-  const fetchRooms = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const q = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
-    const snap = await getDocs(q);
-    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    setRooms(data);
+    try {
+      // Fetch rooms
+      const rq = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
+      const rSnap = await getDocs(rq);
+      setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // Fetch active tenants to know which bed numbers are occupied
+      const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
+      const tSnap = await getDocs(tq);
+      const allTenants = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTenants(allTenants.filter(t => t.status !== 'deleted'));
+    } catch (err) {
+      console.error(err);
+    }
     setLoading(false);
   };
 
-  useEffect(() => { fetchRooms(); }, [user.uid]);
+  useEffect(() => { fetchData(); }, [user.uid]);
 
   const handleAdd = async () => {
     if (!form.roomNumber || !form.rentPerBed) return alert('Please fill all required fields!');
     setSaving(true);
-    await addDoc(collection(db, 'rooms'), {
-      ...form,
-      totalBeds: parseInt(form.totalBeds),
-      rentPerBed: parseInt(form.rentPerBed),
-      occupiedBeds: 0,
-      ownerId: user.uid,
-      createdAt: new Date(),
-    });
-    setForm({ roomNumber: '', floor: '', roomType: 'Single', totalBeds: '1', rentPerBed: '', bathType: 'Shared', acType: 'Non-AC' });
-    setShowForm(false);
+    try {
+      await addDoc(collection(db, 'rooms'), {
+        ...form,
+        totalBeds: parseInt(form.totalBeds),
+        rentPerBed: parseInt(form.rentPerBed),
+        occupiedBeds: 0,
+        ownerId: user.uid,
+        createdAt: new Date(),
+      });
+      setForm({ roomNumber: '', floor: '', roomType: 'Single', totalBeds: '1', rentPerBed: '', bathType: 'Shared', acType: 'Non-AC' });
+      setShowForm(false);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong!');
+    }
     setSaving(false);
-    fetchRooms();
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this room?')) return;
     await deleteDoc(doc(db, 'rooms', id));
-    fetchRooms();
+    fetchData();
+  };
+
+  // Get occupied bed numbers for a room
+  const getOccupiedBeds = (roomNumber) => {
+    return tenants
+      .filter(t => t.roomNumber === roomNumber)
+      .map(t => parseInt(t.bedNumber))
+      .filter(n => !isNaN(n));
   };
 
   const totalBeds = rooms.reduce((a, r) => a + r.totalBeds, 0);
@@ -91,7 +115,7 @@ function Rooms() {
             {[
               { label: 'Room Number *', key: 'roomNumber', type: 'text', ph: 'e.g. 101' },
               { label: 'Floor', key: 'floor', type: 'text', ph: 'e.g. Ground, 1st' },
-              { label: 'Rent per Bed (₹) *', key: 'rentPerBed', type: 'number', ph: 'e.g. 5000' },
+              { label: 'Rent per Bed (₹) *', key: 'rentPerBed', type: 'text', ph: 'e.g. 5000' },
               { label: 'Total Beds', key: 'totalBeds', type: 'number', ph: '1' },
             ].map(({ label, key, type, ph }) => (
               <div key={key} style={styles.field}>
@@ -134,14 +158,23 @@ function Rooms() {
           {rooms.map(room => {
             const vacant = room.totalBeds - (room.occupiedBeds || 0);
             const occupancyPct = Math.round(((room.occupiedBeds || 0) / room.totalBeds) * 100);
+            const occupiedBedNumbers = getOccupiedBeds(room.roomNumber);
+
             return (
               <div key={room.id} style={styles.roomCard}>
+                {/* Room Header */}
                 <div style={styles.roomHeader}>
                   <div style={styles.roomNumber}>Room {room.roomNumber}</div>
-                  <div style={{ ...styles.badge, background: vacant > 0 ? '#ecfdf5' : '#fef2f2', color: vacant > 0 ? '#059669' : '#dc2626' }}>
+                  <div style={{
+                    ...styles.badge,
+                    background: vacant > 0 ? '#ecfdf5' : '#fef2f2',
+                    color: vacant > 0 ? '#059669' : '#dc2626'
+                  }}>
                     {vacant > 0 ? `${vacant} Vacant` : 'Full'}
                   </div>
                 </div>
+
+                {/* Room Details */}
                 <div style={styles.roomDetails}>
                   {[
                     ['Floor', room.floor || 'N/A'],
@@ -155,18 +188,73 @@ function Rooms() {
                     </div>
                   ))}
                 </div>
+
+                {/* ── VISUAL BED GRID ── */}
+                <div style={styles.bedGridSection}>
+                  <div style={styles.bedGridTitle}>🛏️ Bed Status</div>
+                  <div style={styles.bedGrid}>
+                    {Array.from({ length: room.totalBeds }, (_, i) => {
+                      const bedNum = i + 1;
+                      const isOccupied = occupiedBedNumbers.includes(bedNum);
+                      // Find tenant in this bed
+                      const tenant = tenants.find(
+                        t => t.roomNumber === room.roomNumber &&
+                        parseInt(t.bedNumber) === bedNum
+                      );
+                      return (
+                        <div key={bedNum}
+                          title={isOccupied ? `Bed ${bedNum}: ${tenant?.name || 'Occupied'}` : `Bed ${bedNum}: Vacant`}
+                          style={{
+                            ...styles.bedDot,
+                            background: isOccupied ? '#dc2626' : '#059669',
+                            boxShadow: isOccupied
+                              ? '0 0 8px rgba(220,38,38,0.4)'
+                              : '0 0 8px rgba(5,150,105,0.4)',
+                          }}>
+                          <span style={styles.bedDotNum}>{bedNum}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Legend */}
+                  <div style={styles.bedLegend}>
+                    <div style={styles.legendItem}>
+                      <div style={{ ...styles.legendDot, background: '#059669' }} />
+                      <span>Vacant</span>
+                    </div>
+                    <div style={styles.legendItem}>
+                      <div style={{ ...styles.legendDot, background: '#dc2626' }} />
+                      <span>Occupied</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Occupancy Bar */}
                 <div style={styles.bedBar}>
                   <div style={styles.bedBarInfo}>
-                    <span style={styles.bedText}>🛏️ {room.occupiedBeds || 0}/{room.totalBeds} beds</span>
+                    <span style={styles.bedText}>
+                      {room.occupiedBeds || 0} occupied / {vacant} vacant
+                    </span>
                     <span style={styles.bedPct}>{occupancyPct}%</span>
                   </div>
                   <div style={styles.barBg}>
-                    <div style={{ ...styles.barFill, width: `${occupancyPct}%`, background: occupancyPct === 100 ? '#dc2626' : '#4f46e5' }} />
+                    <div style={{
+                      ...styles.barFill,
+                      width: `${occupancyPct}%`,
+                      background: occupancyPct === 100 ? '#dc2626' : '#4f46e5'
+                    }} />
                   </div>
                 </div>
+
+                {/* Room Footer */}
                 <div style={styles.roomFooter}>
-                  <div style={styles.rent}>₹{room.rentPerBed.toLocaleString()}<span style={styles.rentSub}>/bed/month</span></div>
-                  <button style={styles.deleteBtn} onClick={() => handleDelete(room.id)}>🗑️ Delete</button>
+                  <div style={styles.rent}>
+                    ₹{room.rentPerBed.toLocaleString()}
+                    <span style={styles.rentSub}>/bed/month</span>
+                  </div>
+                  <button style={styles.deleteBtn} onClick={() => handleDelete(room.id)}>
+                    🗑️ Delete
+                  </button>
                 </div>
               </div>
             );
@@ -208,6 +296,23 @@ const styles = {
   detail: { display: 'flex', flexDirection: 'column' },
   detailKey: { fontSize: '11px', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' },
   detailVal: { fontSize: '13px', color: '#1e293b', fontWeight: '600', marginTop: '2px' },
+
+  // Bed Grid styles
+  bedGridSection: { marginBottom: '16px', padding: '14px', background: '#f8fafc', borderRadius: '12px' },
+  bedGridTitle: { fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '12px' },
+  bedGrid: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' },
+  bedDot: {
+    width: '36px', height: '36px',
+    borderRadius: '8px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'default',
+    transition: 'transform 0.2s',
+  },
+  bedDotNum: { fontSize: '13px', fontWeight: '800', color: 'white' },
+  bedLegend: { display: 'flex', gap: '16px' },
+  legendItem: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#64748b' },
+  legendDot: { width: '10px', height: '10px', borderRadius: '3px' },
+
   bedBar: { marginBottom: '16px' },
   bedBarInfo: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' },
   bedText: { fontSize: '13px', color: '#64748b' },
