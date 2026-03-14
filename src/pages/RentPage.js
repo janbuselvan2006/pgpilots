@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, getDocs, query, where, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 function RentPage() {
   const [tenants, setTenants] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [elecBills, setElecBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -16,7 +17,7 @@ function RentPage() {
   const [filterMethod, setFilterMethod] = useState('');
   const [filterType, setFilterType] = useState('');
 
-  // ── Penalty Settings (saved to Firestore) ──
+  // ── Penalty Settings ──
   const [penaltyEnabled, setPenaltyEnabled] = useState(false);
   const [penaltyAmount, setPenaltyAmount] = useState('');
   const [gracePeriod, setGracePeriod] = useState('');
@@ -33,21 +34,36 @@ function RentPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const thisMonth = new Date().toLocaleString('default', { month: 'long' });
+  const thisYear = new Date().getFullYear().toString();
+
+  // ── FETCH ALL DATA ──
   const fetchData = async () => {
     setLoading(true);
     try {
       const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
       const tSnap = await getDocs(tq);
-      const allTenants = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setTenants(allTenants.filter(t => t.status !== 'deleted'));
+      setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted'));
+
       const pq = query(collection(db, 'payments'), where('ownerId', '==', user.uid));
       const pSnap = await getDocs(pq);
       setPayments(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      // Load penalty settings from Firestore
+
+      // Fetch this month's electricity bills
+      const eq = query(collection(db, 'electricityBills'),
+        where('ownerId', '==', user.uid),
+        where('month', '==', thisMonth),
+        where('year', '==', thisYear)
+      );
+      const eSnap = await getDocs(eq);
+      setElecBills(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // Load penalty settings
       const ownerDoc = await getDoc(doc(db, 'pgOwners', user.uid));
       if (ownerDoc.exists()) {
         const data = ownerDoc.data();
-        if (data.penaltyEnabled !== undefined) setPenaltyEnabled(data.penaltyEnabled);
+        // ✅ FIX: strictly load boolean — false stays false
+        setPenaltyEnabled(data.penaltyEnabled === true);
         if (data.penaltyAmount !== undefined) setPenaltyAmount(data.penaltyAmount.toString());
         if (data.gracePeriod !== undefined) setGracePeriod(data.gracePeriod.toString());
       }
@@ -57,6 +73,20 @@ function RentPage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // ── ELECTRICITY SHARE PER TENANT ──
+  // Equal split among all tenants in that room
+  const getElecShareForTenant = (tenant) => {
+    const roomBill = elecBills.find(b => b.roomNumber === tenant.roomNumber);
+    if (!roomBill) return 0;
+    const count = roomBill.tenantCount || 1;
+    return Math.round((roomBill.amount || 0) / count);
+  };
+
+  const hasElecBill = (tenant) => {
+    return elecBills.some(b => b.roomNumber === tenant.roomNumber);
+  };
+
+  // ── DUE DATE ──
   const getDueDate = (tenant) => {
     if (!tenant.checkIn) return null;
     const checkIn = new Date(tenant.checkIn);
@@ -70,62 +100,90 @@ function RentPage() {
     return Math.floor((due - today) / (1000 * 60 * 60 * 24));
   };
 
-  // How many penalty days (overdue days minus grace period)
-  const getPenaltyDays = (tenant) => {
+  // ── PENALTY — based on PAYMENT DATE, not today ──
+  // When collecting, penalty = based on how late the payment date is vs due date
+  // For display on cards (before payment), use today as reference
+  const getPenaltyDaysForDate = (tenant, paymentDate) => {
+    if (!penaltyEnabled) return 0;
+    if (!tenant.checkIn) return 0;
+    const checkIn = new Date(tenant.checkIn);
+    const dueDay = checkIn.getDate();
+    const pd = new Date(paymentDate);
+    const dueThisMonth = new Date(pd.getFullYear(), pd.getMonth(), dueDay);
+    const diffMs = pd - dueThisMonth;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays <= 0) return 0; // paid on or before due date → no penalty
+    const grace = parseInt(gracePeriod) || 0;
+    return Math.max(0, diffDays - grace);
+  };
+
+  // For DISPLAY on card (before payment entered) — use today
+  const getPenaltyDaysDisplay = (tenant) => {
     if (!penaltyEnabled) return 0;
     const daysDiff = getDaysDiff(tenant);
-    if (daysDiff >= 0) return 0; // not overdue
+    if (daysDiff >= 0) return 0;
     const overdueDays = Math.abs(daysDiff);
     const grace = parseInt(gracePeriod) || 0;
     return Math.max(0, overdueDays - grace);
   };
 
-  // Penalty amount for a tenant
-  const getPenaltyAmount = (tenant) => {
-    const penDays = getPenaltyDays(tenant);
-    if (penDays === 0) return 0;
-    return penDays * (parseInt(penaltyAmount) || 0);
+  const getPenaltyAmountDisplay = (tenant) => {
+    return getPenaltyDaysDisplay(tenant) * (parseInt(penaltyAmount) || 0);
   };
 
+  // Penalty based on ACTUAL payment date entered in form
+  const getPenaltyAmountForDate = (tenant, paymentDate) => {
+    return getPenaltyDaysForDate(tenant, paymentDate) * (parseInt(penaltyAmount) || 0);
+  };
+
+  // ── THIS MONTH PAID ──
   const getThisMonthPaid = (tenantId) => {
-    const now = new Date();
     return payments
       .filter(p => {
         const pd = new Date(p.paymentDate);
         return p.tenantId === tenantId &&
-          pd.getMonth() === now.getMonth() &&
-          pd.getFullYear() === now.getFullYear() &&
-          p.type === 'Rent';
+          pd.getMonth() === today.getMonth() &&
+          pd.getFullYear() === today.getFullYear();
       })
       .reduce((a, p) => a + (p.amount || 0), 0);
   };
 
+  // ── TOTAL DUE = Rent + Electricity + Penalty (display, using today) ──
+  const getTotalDueDisplay = (tenant) => {
+    const elec = getElecShareForTenant(tenant);
+    const penalty = getPenaltyAmountDisplay(tenant);
+    return (tenant.monthlyRent || 0) + elec + penalty;
+  };
+
+  // ── BALANCE ──
   const getThisMonthBalance = (tenant) => {
     const paid = getThisMonthPaid(tenant.id);
-    const penalty = getPenaltyAmount(tenant);
-    return Math.max(0, (tenant.monthlyRent || 0) + penalty - paid);
+    return Math.max(0, getTotalDueDisplay(tenant) - paid);
   };
 
   const isFullyPaidThisMonth = (tenant) => getThisMonthBalance(tenant) === 0;
 
   const isPartiallyPaid = (tenant) => {
     const paid = getThisMonthPaid(tenant.id);
-    return paid > 0 && paid < ((tenant.monthlyRent || 0) + getPenaltyAmount(tenant));
+    return paid > 0 && paid < getTotalDueDisplay(tenant);
   };
 
+  // ── SECTIONS ──
   const unpaidTenants = tenants.filter(t => !isFullyPaidThisMonth(t));
   const lateTenants = unpaidTenants.filter(t => getDaysDiff(t) < 0).sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
   const todayTenants = unpaidTenants.filter(t => getDaysDiff(t) === 0).sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
   const upcomingTenants = unpaidTenants.filter(t => getDaysDiff(t) > 0).sort((a, b) => getDaysDiff(a) - getDaysDiff(b));
   const paidTenants = tenants.filter(t => isFullyPaidThisMonth(t)).sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
 
-  const totalExpected = tenants.reduce((a, t) => a + (t.monthlyRent || 0) + getPenaltyAmount(t), 0);
+  // ── STATS ──
+  const totalExpected = tenants.reduce((a, t) => a + getTotalDueDisplay(t), 0);
   const totalCollected = tenants.reduce((a, t) => a + getThisMonthPaid(t.id), 0);
-  const totalPending = tenants.reduce((a, t) => a + getThisMonthBalance(t), 0);
+  const totalPending = Math.max(0, totalExpected - totalCollected);
 
+  // ── OPEN PAYMENT FORM ──
   const handleRecordPayment = (tenant) => {
-    const balance = getThisMonthBalance(tenant);
     setSelectedTenant(tenant);
+    const balance = getThisMonthBalance(tenant);
     setForm({
       amount: balance.toString(),
       paymentMethod: 'Cash',
@@ -135,18 +193,44 @@ function RentPage() {
     setShowPaymentForm(true);
   };
 
+  // Penalty recalculated live as payment date changes
+  const getLivePenalty = () => {
+    if (!selectedTenant) return 0;
+    return getPenaltyAmountForDate(selectedTenant, form.paymentDate);
+  };
+
+  const getLiveElec = () => {
+    if (!selectedTenant) return 0;
+    return getElecShareForTenant(selectedTenant);
+  };
+
+  const getLiveTotalDue = () => {
+    if (!selectedTenant) return 0;
+    const paid = getThisMonthPaid(selectedTenant.id);
+    const penalty = getLivePenalty();
+    const elec = getLiveElec();
+    return Math.max(0, (selectedTenant.monthlyRent || 0) + elec + penalty - paid);
+  };
+
+  // ── SAVE PAYMENT ──
   const handleSavePayment = async () => {
     if (!form.amount || parseInt(form.amount) <= 0)
       return alert('Please enter a valid amount!');
-    const balance = getThisMonthBalance(selectedTenant);
+
+    const liveTotalDue = getLiveTotalDue();
     const enteredAmount = parseInt(form.amount);
-    if (enteredAmount > balance)
-      return alert(`Amount cannot exceed balance of ₹${balance.toLocaleString()}!`);
-    const isPartial = enteredAmount < balance;
+
+    if (enteredAmount > liveTotalDue)
+      return alert(`Amount cannot exceed balance of ₹${liveTotalDue.toLocaleString()}!`);
+
+    const penalty = getLivePenalty();
+    const elec = getLiveElec();
+    const isPartial = enteredAmount < liveTotalDue;
     const previouslyPaid = getThisMonthPaid(selectedTenant.id);
     const newTotal = previouslyPaid + enteredAmount;
-    const penalty = getPenaltyAmount(selectedTenant);
-    const isNowComplete = newTotal >= ((selectedTenant.monthlyRent || 0) + penalty);
+    const fullAmount = (selectedTenant.monthlyRent || 0) + elec + penalty;
+    const isNowComplete = newTotal >= fullAmount;
+
     setSaving(true);
     try {
       await addDoc(collection(db, 'payments'), {
@@ -154,8 +238,10 @@ function RentPage() {
         tenantName: selectedTenant.name,
         roomNumber: selectedTenant.roomNumber,
         amount: enteredAmount,
-        fullAmount: (selectedTenant.monthlyRent || 0) + penalty,
+        rentAmount: selectedTenant.monthlyRent || 0,
+        electricityShare: elec,
         penaltyAmount: penalty,
+        fullAmount,
         previouslyPaid,
         newTotal,
         paymentMethod: form.paymentMethod,
@@ -199,14 +285,17 @@ function RentPage() {
     return bTime - aTime;
   });
 
+  // ── TENANT CARD ──
   const TenantRentCard = ({ tenant, status }) => {
     const daysDiff = getDaysDiff(tenant);
     const dueDate = getDueDate(tenant);
     const balance = getThisMonthBalance(tenant);
     const paid = getThisMonthPaid(tenant.id);
     const isPartial = isPartiallyPaid(tenant);
-    const penalty = getPenaltyAmount(tenant);
-    const penDays = getPenaltyDays(tenant);
+    const penalty = getPenaltyAmountDisplay(tenant);
+    const penDays = getPenaltyDaysDisplay(tenant);
+    const elec = getElecShareForTenant(tenant);
+    const elecMissing = !hasElecBill(tenant);
 
     return (
       <div style={{
@@ -234,12 +323,22 @@ function RentPage() {
               <div style={styles.tenantName}>{tenant.name}</div>
               <div style={styles.tenantSub}>🛏️ Room {tenant.roomNumber} • Bed {tenant.bedNumber || 'N/A'}</div>
               <div style={styles.tenantSub}>📅 Check-in: {tenant.checkIn} | Due every {dueDate?.getDate()}th</div>
+
+              {/* Electricity share info */}
+              {elecMissing ? (
+                <div style={styles.elecWarning}>⚠️ Electricity bill not added yet</div>
+              ) : elec > 0 ? (
+                <div style={styles.elecInfo}>⚡ Electricity share: ₹{elec.toLocaleString()}</div>
+              ) : null}
+
+              {/* Partial info */}
               {isPartial && (
                 <div style={styles.partialInfo}>
-                  ⚠️ Partially paid: ₹{paid.toLocaleString()} of ₹{((tenant.monthlyRent || 0) + penalty).toLocaleString()}
+                  ⚠️ Partially paid: ₹{paid.toLocaleString()} of ₹{getTotalDueDisplay(tenant).toLocaleString()}
                 </div>
               )}
-              {/* Penalty breakdown */}
+
+              {/* Penalty info */}
               {penalty > 0 && status === 'late' && (
                 <div style={styles.penaltyInfo}>
                   🔴 Penalty: {penDays} day{penDays !== 1 ? 's' : ''} × ₹{penaltyAmount} = ₹{penalty.toLocaleString()}
@@ -259,14 +358,13 @@ function RentPage() {
 
             {/* Amount breakdown */}
             <div style={{ textAlign: 'right' }}>
-              {penalty > 0 && status === 'late' && (
-                <div style={styles.rentBreakdown}>
-                  <span style={styles.baseRent}>Rent: ₹{(tenant.monthlyRent || 0).toLocaleString()}</span>
-                  <span style={styles.penaltyLine}>+ Penalty: ₹{penalty.toLocaleString()}</span>
-                </div>
-              )}
+              <div style={styles.rentBreakdown}>
+                <span style={styles.baseRent}>Rent: ₹{(tenant.monthlyRent || 0).toLocaleString()}</span>
+                {elec > 0 && <span style={styles.elecLine}>+ Elec: ₹{elec.toLocaleString()}</span>}
+                {penalty > 0 && <span style={styles.penaltyLine}>+ Penalty: ₹{penalty.toLocaleString()}</span>}
+              </div>
               <div style={styles.rentAmount}>
-                ₹{(status === 'paid' ? (tenant.monthlyRent || 0) : balance).toLocaleString()}
+                ₹{(status === 'paid' ? getTotalDueDisplay(tenant) : balance).toLocaleString()}
                 <span style={styles.rentSub}>{status === 'paid' ? ' paid' : ' due'}</span>
               </div>
             </div>
@@ -289,6 +387,12 @@ function RentPage() {
     );
   };
 
+  // Live values for modal (recalculate when paymentDate changes)
+  const liveElec = selectedTenant ? getLiveElec() : 0;
+  const livePenalty = selectedTenant ? getLivePenalty() : 0;
+  const liveTotalDue = selectedTenant ? getLiveTotalDue() : 0;
+  const livePenaltyDays = selectedTenant ? getPenaltyDaysForDate(selectedTenant, form.paymentDate) : 0;
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -306,7 +410,7 @@ function RentPage() {
           <div style={styles.penaltyTitle}>🔴 Late Penalty</div>
           <div style={styles.penaltySubtitle}>
             {penaltyEnabled
-              ? `₹${penaltyAmount || '0'}/day after ${gracePeriod || '0'} day grace period`
+              ? `₹${penaltyAmount || '0'}/day after ${gracePeriod || '0'} day grace • Based on payment date`
               : 'Turn on to charge late fees automatically'}
           </div>
         </div>
@@ -317,18 +421,18 @@ function RentPage() {
               ⚙️ Edit Settings
             </button>
           )}
-          {/* Toggle Switch */}
           <div style={{
             ...styles.toggle,
             background: penaltyEnabled ? '#e94560' : '#e2e8f0',
-          }} onClick={() => {
-            if (!penaltyEnabled) {
-              setPenaltyEnabled(true);
-              setShowPenaltySetup(true);
-            } else {
-              setPenaltyEnabled(false);
-              setShowPenaltySetup(false);
-            }
+          }} onClick={async () => {
+            const newVal = !penaltyEnabled;
+            setPenaltyEnabled(newVal);
+            if (!newVal) setShowPenaltySetup(false);
+            else setShowPenaltySetup(true);
+            // ✅ FIX: always save to Firestore immediately
+            try {
+              await updateDoc(doc(db, 'pgOwners', user.uid), { penaltyEnabled: newVal });
+            } catch(e) { console.error(e); }
           }}>
             <div style={{
               ...styles.toggleKnob,
@@ -338,47 +442,40 @@ function RentPage() {
         </div>
       </div>
 
-      {/* Penalty Setup Form */}
+      {/* Penalty Setup */}
       {showPenaltySetup && penaltyEnabled && (
         <div style={styles.penaltySetup}>
           <div style={styles.penaltySetupTitle}>⚙️ Penalty Settings</div>
           <div style={styles.penaltySetupGrid}>
             <div style={styles.penaltyField}>
               <label style={styles.penaltyLabel}>💰 Penalty per day (₹)</label>
-              <input style={styles.penaltyInput}
-                type="number" placeholder="e.g. 50"
-                value={penaltyAmount}
-                onChange={e => { setPenaltyAmount(e.target.value); }} />
-              <span style={styles.penaltyHint}>Amount charged per day after grace period</span>
+              <input style={styles.penaltyInput} type="number" placeholder="e.g. 50"
+                value={penaltyAmount} onChange={e => setPenaltyAmount(e.target.value)} />
+              <span style={styles.penaltyHint}>Charged per day AFTER grace period</span>
             </div>
             <div style={styles.penaltyField}>
               <label style={styles.penaltyLabel}>🕐 Grace Period (days)</label>
-              <input style={styles.penaltyInput}
-                type="number" placeholder="e.g. 3 (0 = no grace)"
-                value={gracePeriod}
-                onChange={e => { setGracePeriod(e.target.value); }} />
-              <span style={styles.penaltyHint}>Free days before penalty starts (0 = immediate)</span>
+              <input style={styles.penaltyInput} type="number" placeholder="e.g. 3"
+                value={gracePeriod} onChange={e => setGracePeriod(e.target.value)} />
+              <span style={styles.penaltyHint}>Free days before penalty starts</span>
             </div>
             <div style={styles.penaltyPreview}>
               <div style={styles.penaltyPreviewTitle}>📊 Example Preview</div>
               <div style={styles.penaltyPreviewText}>
-                Rent: ₹5,000 | Overdue: 7 days | Grace: {gracePeriod || 0} days<br/>
+                Due: 1st | Paid: 8th | Grace: {gracePeriod || 0} days<br/>
                 Penalty days: {Math.max(0, 7 - (parseInt(gracePeriod) || 0))} × ₹{penaltyAmount || 0} = ₹{Math.max(0, 7 - (parseInt(gracePeriod) || 0)) * (parseInt(penaltyAmount) || 0)}<br/>
-                <strong>Total Due: ₹{(5000 + Math.max(0, 7 - (parseInt(gracePeriod) || 0)) * (parseInt(penaltyAmount) || 0)).toLocaleString()}</strong>
+                <strong>Penalty = 0 if paid on or before due date ✅</strong>
               </div>
             </div>
           </div>
-          <button style={styles.penaltySaveBtn}
-            onClick={async () => {
-              await updateDoc(doc(db, 'pgOwners', user.uid), {
-                penaltyEnabled: true,
-                penaltyAmount: parseInt(penaltyAmount) || 0,
-                gracePeriod: parseInt(gracePeriod) || 0,
-              });
-              setShowPenaltySetup(false);
-            }}>
-            ✅ Save & Apply
-          </button>
+          <button style={styles.penaltySaveBtn} onClick={async () => {
+            await updateDoc(doc(db, 'pgOwners', user.uid), {
+              penaltyEnabled: true,
+              penaltyAmount: parseInt(penaltyAmount) || 0,
+              gracePeriod: parseInt(gracePeriod) || 0,
+            });
+            setShowPenaltySetup(false);
+          }}>✅ Save & Apply</button>
         </div>
       )}
 
@@ -410,7 +507,7 @@ function RentPage() {
         ))}
       </div>
 
-      {/* Payment Modal */}
+      {/* ── PAYMENT MODAL ── */}
       {showPaymentForm && selectedTenant && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
@@ -418,59 +515,80 @@ function RentPage() {
               <h3 style={styles.modalTitle}>💰 Collect Rent</h3>
               <button style={styles.closeBtn} onClick={() => setShowPaymentForm(false)}>✕</button>
             </div>
+
             <div style={styles.tenantInfoBox}>
               <div style={styles.tiAvatar}>{selectedTenant.name?.charAt(0).toUpperCase()}</div>
               <div>
                 <div style={styles.tiName}>{selectedTenant.name}</div>
-                <div style={styles.tiSub}>Room {selectedTenant.roomNumber} • Monthly: ₹{selectedTenant.monthlyRent?.toLocaleString()}</div>
-                {getPenaltyAmount(selectedTenant) > 0 && (
-                  <div style={styles.tiPenalty}>
-                    🔴 Penalty: ₹{getPenaltyAmount(selectedTenant).toLocaleString()} ({getPenaltyDays(selectedTenant)} days × ₹{penaltyAmount})
-                  </div>
-                )}
+                <div style={styles.tiSub}>Room {selectedTenant.roomNumber} • Rent: ₹{selectedTenant.monthlyRent?.toLocaleString()}</div>
                 {isPartiallyPaid(selectedTenant) && (
                   <div style={styles.tiPartial}>
-                    Already paid: ₹{getThisMonthPaid(selectedTenant.id).toLocaleString()} • Balance: ₹{getThisMonthBalance(selectedTenant).toLocaleString()}
+                    Already paid: ₹{getThisMonthPaid(selectedTenant.id).toLocaleString()} • Balance: ₹{liveTotalDue.toLocaleString()}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Total breakdown */}
-            {getPenaltyAmount(selectedTenant) > 0 && (
-              <div style={styles.breakdownBox}>
-                <div style={styles.breakdownRow}>
-                  <span>Monthly Rent</span>
-                  <span>₹{(selectedTenant.monthlyRent || 0).toLocaleString()}</span>
-                </div>
-                <div style={styles.breakdownRow}>
-                  <span>🔴 Late Penalty ({getPenaltyDays(selectedTenant)} days)</span>
-                  <span style={{ color: '#dc2626' }}>+ ₹{getPenaltyAmount(selectedTenant).toLocaleString()}</span>
-                </div>
-                <div style={{ ...styles.breakdownRow, ...styles.breakdownTotal }}>
-                  <span>Total Due</span>
-                  <span>₹{getThisMonthBalance(selectedTenant).toLocaleString()}</span>
-                </div>
+            {/* ✅ Live breakdown — updates when payment date changes */}
+            <div style={styles.breakdownBox}>
+              <div style={styles.breakdownRow}>
+                <span>🏠 Monthly Rent</span>
+                <span>₹{(selectedTenant.monthlyRent || 0).toLocaleString()}</span>
               </div>
-            )}
+              <div style={styles.breakdownRow}>
+                <span>⚡ Electricity Share</span>
+                <span style={{ color: liveElec > 0 ? '#d97706' : '#94a3b8' }}>
+                  {liveElec > 0 ? `+ ₹${liveElec.toLocaleString()}` : '⚠️ Bill not added'}
+                </span>
+              </div>
+              <div style={styles.breakdownRow}>
+                <span>🔴 Late Penalty
+                  {livePenaltyDays > 0 && <span style={{ color: '#94a3b8', fontSize: '11px' }}> ({livePenaltyDays} days × ₹{penaltyAmount})</span>}
+                </span>
+                <span style={{ color: livePenalty > 0 ? '#dc2626' : '#94a3b8' }}>
+                  {livePenalty > 0 ? `+ ₹${livePenalty.toLocaleString()}` : penaltyEnabled ? '✅ No penalty' : '—'}
+                </span>
+              </div>
+              {getThisMonthPaid(selectedTenant.id) > 0 && (
+                <div style={styles.breakdownRow}>
+                  <span>Already Paid</span>
+                  <span style={{ color: '#059669' }}>- ₹{getThisMonthPaid(selectedTenant.id).toLocaleString()}</span>
+                </div>
+              )}
+              <div style={{ ...styles.breakdownRow, ...styles.breakdownTotal }}>
+                <span>Balance Due</span>
+                <span>₹{liveTotalDue.toLocaleString()}</span>
+              </div>
+            </div>
 
-            {form.amount && parseInt(form.amount) < getThisMonthBalance(selectedTenant) && parseInt(form.amount) > 0 && (
+            {form.amount && parseInt(form.amount) < liveTotalDue && parseInt(form.amount) > 0 && (
               <div style={styles.partialWarning}>
-                ⚠️ Partial payment! Balance after this: ₹{(getThisMonthBalance(selectedTenant) - parseInt(form.amount)).toLocaleString()}
+                ⚠️ Partial payment! Remaining after this: ₹{(liveTotalDue - parseInt(form.amount)).toLocaleString()}
               </div>
             )}
 
             <div style={styles.formGrid}>
               <div style={styles.field}>
-                <label style={styles.label}>Amount (₹) — Balance: ₹{getThisMonthBalance(selectedTenant).toLocaleString()}</label>
-                <input style={{ ...styles.input, borderColor: form.amount && parseInt(form.amount) < getThisMonthBalance(selectedTenant) ? '#d97706' : '#e2e8f0' }}
+                <label style={styles.label}>Amount (₹) — Due: ₹{liveTotalDue.toLocaleString()}</label>
+                <input style={{ ...styles.input, borderColor: form.amount && parseInt(form.amount) < liveTotalDue ? '#d97706' : '#e2e8f0' }}
                   type="number" placeholder="Enter amount"
                   value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
               </div>
               <div style={styles.field}>
-                <label style={styles.label}>Payment Date</label>
+                {/* ✅ Payment date drives penalty calculation */}
+                <label style={styles.label}>Payment Date <span style={{ color: '#e94560', fontSize: '11px' }}>(affects penalty)</span></label>
                 <input style={styles.input} type="date" value={form.paymentDate}
-                  onChange={e => setForm({ ...form, paymentDate: e.target.value })} />
+                  onChange={e => {
+                    const newDate = e.target.value;
+                    setForm(prev => {
+                      // Recalculate balance with new penalty
+                      const newPenalty = getPenaltyAmountForDate(selectedTenant, newDate);
+                      const newElec = getElecShareForTenant(selectedTenant);
+                      const paid = getThisMonthPaid(selectedTenant.id);
+                      const newBalance = Math.max(0, (selectedTenant.monthlyRent || 0) + newElec + newPenalty - paid);
+                      return { ...prev, paymentDate: newDate, amount: newBalance.toString() };
+                    });
+                  }} />
               </div>
               <div style={styles.field}>
                 <label style={styles.label}>Payment Method</label>
@@ -495,7 +613,7 @@ function RentPage() {
         </div>
       )}
 
-      {/* Overview Tab */}
+      {/* ── OVERVIEW TAB ── */}
       {activeTab === 'overview' && (
         <div>
           {loading ? (
@@ -537,13 +655,12 @@ function RentPage() {
         </div>
       )}
 
-      {/* History Tab */}
+      {/* ── HISTORY TAB ── */}
       {activeTab === 'history' && (
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>📋 Payment History</h2>
           <div style={styles.filterRow}>
-            <input style={styles.searchInput} type="text"
-              placeholder="🔍 Search by name or room..."
+            <input style={styles.searchInput} type="text" placeholder="🔍 Search by name or room..."
               value={search} onChange={e => setSearch(e.target.value)} />
             <select style={styles.filterSelect} value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
               <option value="">All Months</option>
@@ -604,12 +721,16 @@ function RentPage() {
                         {payment.tenantName}
                         {payment.isCompleted && <span style={styles.completedTag}>✅ Month Complete</span>}
                         {payment.isPartial && !payment.isCompleted && <span style={styles.partialTag}>⚠️ Partial</span>}
-                        {payment.penaltyAmount > 0 && <span style={styles.penaltyTag}>🔴 Penalty Included</span>}
+                        {payment.penaltyAmount > 0 && <span style={styles.penaltyTag}>🔴 Penalty</span>}
+                        {payment.electricityShare > 0 && <span style={styles.elecTag}>⚡ Elec Included</span>}
                       </div>
                       <div style={styles.historySub}>Room {payment.roomNumber} • {payment.month} {payment.year}</div>
-                      {payment.penaltyAmount > 0 && (
-                        <div style={styles.historyPenalty}>Penalty: ₹{payment.penaltyAmount?.toLocaleString()}</div>
-                      )}
+                      {/* Breakdown line */}
+                      <div style={styles.historyBreakdown}>
+                        Rent ₹{(payment.rentAmount || payment.fullAmount || 0).toLocaleString()}
+                        {payment.electricityShare > 0 && ` + Elec ₹${payment.electricityShare.toLocaleString()}`}
+                        {payment.penaltyAmount > 0 && ` + Penalty ₹${payment.penaltyAmount.toLocaleString()}`}
+                      </div>
                       {payment.isPartial && (
                         <div style={styles.progressInfo}>Paid: ₹{payment.newTotal?.toLocaleString()} of ₹{payment.fullAmount?.toLocaleString()}</div>
                       )}
@@ -644,8 +765,6 @@ const styles = {
   header: { marginBottom: '24px' },
   title: { fontSize: '24px', fontWeight: '800', color: '#1e293b', margin: 0 },
   subtitle: { color: '#94a3b8', fontSize: '13px', marginTop: '4px' },
-
-  // Penalty Bar
   penaltyBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', borderRadius: '14px', padding: '16px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' },
   penaltyLeft: {},
   penaltyTitle: { fontSize: '15px', fontWeight: '700', color: '#1e293b' },
@@ -654,8 +773,6 @@ const styles = {
   penaltyEditBtn: { padding: '6px 14px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
   toggle: { width: '52px', height: '28px', borderRadius: '99px', cursor: 'pointer', position: 'relative', transition: 'background 0.3s', flexShrink: 0 },
   toggleKnob: { position: 'absolute', top: '3px', width: '22px', height: '22px', background: 'white', borderRadius: '50%', transition: 'transform 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
-
-  // Penalty Setup
   penaltySetup: { background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '14px', padding: '20px', marginBottom: '16px' },
   penaltySetupTitle: { fontSize: '15px', fontWeight: '700', color: '#dc2626', marginBottom: '16px' },
   penaltySetupGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' },
@@ -667,19 +784,6 @@ const styles = {
   penaltyPreviewTitle: { fontSize: '12px', fontWeight: '700', color: '#dc2626', marginBottom: '8px' },
   penaltyPreviewText: { fontSize: '13px', color: '#475569', lineHeight: '1.8' },
   penaltySaveBtn: { padding: '10px 24px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
-
-  // Penalty on card
-  penaltyInfo: { fontSize: '12px', color: '#dc2626', fontWeight: '600', marginTop: '4px', background: '#fef2f2', padding: '4px 8px', borderRadius: '6px', display: 'inline-block' },
-  graceNote: { color: '#94a3b8', fontWeight: '400' },
-  rentBreakdown: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: '4px' },
-  baseRent: { fontSize: '12px', color: '#64748b' },
-  penaltyLine: { fontSize: '12px', color: '#dc2626', fontWeight: '600' },
-
-  // Breakdown in modal
-  breakdownBox: { background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0' },
-  breakdownRow: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' },
-  breakdownTotal: { borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px', fontWeight: '700', color: '#1e293b', fontSize: '15px' },
-
   statsRow: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '24px' },
   statCard: { borderRadius: '14px', padding: '20px', textAlign: 'center' },
   statIcon: { fontSize: '28px', marginBottom: '8px' },
@@ -696,26 +800,36 @@ const styles = {
   avatar: { width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '20px', flexShrink: 0 },
   tenantName: { fontSize: '15px', fontWeight: '700', color: '#1e293b' },
   tenantSub: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
+  elecWarning: { fontSize: '12px', color: '#d97706', fontWeight: '600', marginTop: '4px', background: '#fffbeb', padding: '3px 8px', borderRadius: '6px', display: 'inline-block' },
+  elecInfo: { fontSize: '12px', color: '#0891b2', fontWeight: '600', marginTop: '4px' },
   partialInfo: { fontSize: '12px', color: '#d97706', fontWeight: '600', marginTop: '4px' },
+  penaltyInfo: { fontSize: '12px', color: '#dc2626', fontWeight: '600', marginTop: '4px', background: '#fef2f2', padding: '4px 8px', borderRadius: '6px', display: 'inline-block' },
+  graceNote: { color: '#94a3b8', fontWeight: '400' },
   cardRight: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' },
   lateBadge: { padding: '4px 12px', borderRadius: '20px', background: '#fef2f2', color: '#dc2626', fontSize: '12px', fontWeight: '700' },
   todayBadge: { padding: '4px 12px', borderRadius: '20px', background: '#fffbeb', color: '#d97706', fontSize: '12px', fontWeight: '700' },
   upcomingBadge: { padding: '4px 12px', borderRadius: '20px', background: '#ecfdf5', color: '#059669', fontSize: '12px', fontWeight: '700' },
   paidBadge: { padding: '4px 12px', borderRadius: '20px', background: '#ecfdf5', color: '#059669', fontSize: '12px', fontWeight: '700' },
+  rentBreakdown: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: '4px' },
+  baseRent: { fontSize: '12px', color: '#64748b' },
+  elecLine: { fontSize: '12px', color: '#0891b2', fontWeight: '600' },
+  penaltyLine: { fontSize: '12px', color: '#dc2626', fontWeight: '600' },
   rentAmount: { fontSize: '20px', fontWeight: '800', color: '#1e293b' },
   rentSub: { fontSize: '12px', color: '#94a3b8', fontWeight: '400' },
   collectBtn: { padding: '8px 16px', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' },
-  modal: { background: 'white', borderRadius: '20px', padding: '28px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' },
+  modal: { background: 'white', borderRadius: '20px', padding: '28px', width: '100%', maxWidth: '500px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
   modalTitle: { fontSize: '18px', fontWeight: '700', color: '#1e293b', margin: 0 },
   closeBtn: { background: '#f1f5f9', border: 'none', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px' },
-  tenantInfoBox: { display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '12px', marginBottom: '20px' },
+  tenantInfoBox: { display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '12px', marginBottom: '16px' },
   tiAvatar: { width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #0891b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '18px', flexShrink: 0 },
   tiName: { fontSize: '15px', fontWeight: '700', color: '#1e293b' },
   tiSub: { fontSize: '13px', color: '#94a3b8' },
   tiPartial: { fontSize: '12px', color: '#d97706', fontWeight: '600', marginTop: '4px' },
-  tiPenalty: { fontSize: '12px', color: '#dc2626', fontWeight: '600', marginTop: '4px' },
+  breakdownBox: { background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0' },
+  breakdownRow: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' },
+  breakdownTotal: { borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px', fontWeight: '700', color: '#1e293b', fontSize: '15px' },
   partialWarning: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '12px 16px', fontSize: '13px', color: '#d97706', fontWeight: '600', marginBottom: '16px' },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
   field: { display: 'flex', flexDirection: 'column' },
@@ -743,8 +857,9 @@ const styles = {
   completedTag: { fontSize: '11px', background: '#dcfce7', color: '#059669', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' },
   partialTag: { fontSize: '11px', background: '#fffbeb', color: '#d97706', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' },
   penaltyTag: { fontSize: '11px', background: '#fef2f2', color: '#dc2626', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' },
+  elecTag: { fontSize: '11px', background: '#ecfeff', color: '#0891b2', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' },
   historySub: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
-  historyPenalty: { fontSize: '12px', color: '#dc2626', fontWeight: '600', marginTop: '2px' },
+  historyBreakdown: { fontSize: '11px', color: '#64748b', marginTop: '2px' },
   progressInfo: { fontSize: '12px', color: '#d97706', fontWeight: '600', marginTop: '2px' },
   historyNotes: { fontSize: '12px', color: '#64748b', marginTop: '4px', fontStyle: 'italic' },
   historyRight: { display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 },
