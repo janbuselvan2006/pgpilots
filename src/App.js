@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from './firebase';
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -27,8 +28,14 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+        {/* Landing page — home route */}
+        <Route path="/"        element={<LandingPage />} />
+
+        {/* Auth routes */}
+        <Route path="/login"   element={<Login />} />
+        <Route path="/signup"  element={<Signup />} />
+
+        {/* Protected routes */}
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard />
@@ -39,7 +46,9 @@ function App() {
             <AdminPanel />
           </AdminRoute>
         } />
-        <Route path="*" element={<Navigate to="/login" />} />
+
+        {/* Catch all → landing page */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );
