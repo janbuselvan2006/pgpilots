@@ -4,6 +4,7 @@ import {
   collection, addDoc, getDocs,
   doc, query, where, updateDoc
 } from 'firebase/firestore';
+import { useLimitCheck } from '../hooks/useLimitCheck';
 
 function Tenants() {
   const [tenants, setTenants] = useState([]);
@@ -22,6 +23,9 @@ function Tenants() {
   });
 
   const user = auth.currentUser;
+
+  // ── Limit hook — only gets limits from Firestore
+  const { limits } = useLimitCheck();
 
   const fetchData = async () => {
     setLoading(true);
@@ -43,26 +47,26 @@ function Tenants() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Get vacant beds for selected room
+  // ── Limit logic — AFTER tenants state, uses local state (always accurate)
+  const tenantCount = tenants.length;
+  const maxTenants  = limits?.maxTenants ?? 50;
+  const tenantPct   = maxTenants > 0 ? (tenantCount / maxTenants) * 100 : 0;
+  const isNearLimit = tenantPct >= 90 && tenantPct < 100;
+  const isAtLimit   = tenantCount >= maxTenants;
+
+  // ── Get vacant beds for selected room
   const getVacantBeds = (roomNumber) => {
     if (!roomNumber) return [];
     const room = rooms.find(r => r.roomNumber === roomNumber);
     if (!room) return [];
-
     const totalBeds = room.totalBeds || 0;
-
-    // Get occupied bed numbers in this room (excluding current tenant being edited)
     const occupiedBedNumbers = tenants
       .filter(t => t.roomNumber === roomNumber && t.id !== editId)
       .map(t => parseInt(t.bedNumber))
       .filter(n => !isNaN(n));
-
-    // Return only vacant bed numbers
     const vacant = [];
     for (let i = 1; i <= totalBeds; i++) {
-      if (!occupiedBedNumbers.includes(i)) {
-        vacant.push(i);
-      }
+      if (!occupiedBedNumbers.includes(i)) vacant.push(i);
     }
     return vacant;
   };
@@ -102,6 +106,10 @@ function Tenants() {
   };
 
   const handleSave = async () => {
+    // ── HARD BLOCK — new tenants only, editing always allowed
+    if (!editId && isAtLimit) {
+      return alert(`🚫 Tenant limit reached! (${tenantCount}/${maxTenants})\nContact your admin to increase the limit.`);
+    }
     if (!form.name || !form.phone || !form.roomNumber) {
       return alert('Please fill Name, Phone and Room Number!');
     }
@@ -133,7 +141,6 @@ function Tenants() {
           }
         }
         await updateDoc(doc(db, 'tenants', editId), data);
-
       } else {
         await addDoc(collection(db, 'tenants'), {
           ...data,
@@ -163,13 +170,11 @@ function Tenants() {
       `Remove ${tenant.name} from active tenants?\n\nTheir rent history will be preserved in Reports.`
     );
     if (!confirmed) return;
-
     try {
       await updateDoc(doc(db, 'tenants', tenant.id), {
         status: 'deleted',
         deletedAt: new Date().toISOString(),
       });
-
       const roomQuery = query(
         collection(db, 'rooms'),
         where('ownerId', '==', user.uid),
@@ -183,7 +188,6 @@ function Tenants() {
           occupiedBeds: Math.max(0, currentOccupied - 1)
         });
       }
-
       alert(`✅ ${tenant.name} removed. History saved in Reports.`);
       fetchData();
     } catch (err) {
@@ -198,28 +202,90 @@ function Tenants() {
     t.roomNumber?.includes(search)
   );
 
-  const vacantBeds = getVacantBeds(form.roomNumber);
+  const vacantBeds  = getVacantBeds(form.roomNumber);
   const selectedRoom = rooms.find(r => r.roomNumber === form.roomNumber);
 
   return (
     <div style={styles.container}>
+
       {/* Header */}
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>Tenant Management</h1>
           <p style={styles.subtitle}>Manage all your tenants in one place</p>
         </div>
-        <button style={styles.addBtn} onClick={() => { resetForm(); setShowForm(!showForm); }}>
-          {showForm ? '✕ Cancel' : '➕ Add Tenant'}
+
+        {/* Add Tenant Button — auto disabled at limit */}
+        <button
+          style={{
+            ...styles.addBtn,
+            opacity: isAtLimit ? 0.5 : 1,
+            cursor: isAtLimit ? 'not-allowed' : 'pointer',
+            background: isAtLimit
+              ? '#94a3b8'
+              : 'linear-gradient(135deg, #e94560, #0f3460)',
+          }}
+          disabled={isAtLimit}
+          onClick={() => {
+            if (isAtLimit) return;
+            resetForm();
+            setShowForm(!showForm);
+          }}>
+          {showForm ? '✕ Cancel' : isAtLimit ? '🚫 Limit Reached' : '➕ Add Tenant'}
         </button>
       </div>
+
+      {/* ── LIMIT REACHED BANNER */}
+      {isAtLimit && (
+        <div style={{
+          background: '#fef2f2', border: '1.5px solid #fecaca',
+          borderRadius: '12px', padding: '14px 18px',
+          marginBottom: '16px', display: 'flex',
+          alignItems: 'center', gap: '12px',
+        }}>
+          <span style={{ fontSize: '20px' }}>🚫</span>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#dc2626' }}>
+              Tenant Limit Reached ({tenantCount}/{maxTenants})
+            </div>
+            <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '2px' }}>
+              You cannot add more tenants. Contact your admin to increase the limit.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── NEAR LIMIT WARNING BANNER */}
+      {isNearLimit && (
+        <div style={{
+          background: '#fffbeb', border: '1.5px solid #fde68a',
+          borderRadius: '12px', padding: '14px 18px',
+          marginBottom: '16px', display: 'flex',
+          alignItems: 'center', gap: '12px',
+        }}>
+          <span style={{ fontSize: '20px' }}>⚠️</span>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#d97706' }}>
+              Approaching Tenant Limit ({tenantCount}/{maxTenants})
+            </div>
+            <div style={{ fontSize: '12px', color: '#f59e0b', marginTop: '2px' }}>
+              You are close to your limit. Contact your admin to increase it soon.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div style={styles.statsRow}>
         {[
-          { label: 'Total Tenants', value: tenants.length, color: '#4f46e5', bg: '#eef2ff' },
-          { label: 'Active Tenants', value: tenants.filter(t => t.status === 'Active').length, color: '#059669', bg: '#ecfdf5' },
-          { label: 'Total Deposit', value: `₹${tenants.reduce((a, t) => a + (t.deposit || 0), 0).toLocaleString()}`, color: '#d97706', bg: '#fffbeb' },
+          {
+            label: `Tenants (${tenantCount}/${maxTenants})`,
+            value: tenantCount,
+            color: isAtLimit ? '#dc2626' : isNearLimit ? '#d97706' : '#4f46e5',
+            bg:    isAtLimit ? '#fef2f2' : isNearLimit ? '#fffbeb' : '#eef2ff',
+          },
+          { label: 'Active Tenants',  value: tenants.filter(t => t.status === 'Active').length, color: '#059669', bg: '#ecfdf5' },
+          { label: 'Total Deposit',   value: `₹${tenants.reduce((a, t) => a + (t.deposit || 0), 0).toLocaleString()}`, color: '#d97706', bg: '#fffbeb' },
           { label: 'Monthly Revenue', value: `₹${tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0).toLocaleString()}`, color: '#0891b2', bg: '#ecfeff' },
         ].map(({ label, value, color, bg }) => (
           <div key={label} style={{ ...styles.statCard, background: bg }}>
@@ -241,11 +307,11 @@ function Tenants() {
             <div style={styles.formSectionTitle}>👤 Personal Details</div>
             <div style={styles.formGrid}>
               {[
-                { label: 'Full Name *', key: 'name', type: 'text', ph: 'John Doe' },
-                { label: 'Phone Number *', key: 'phone', type: 'tel', ph: '9876543210' },
-                { label: 'Email', key: 'email', type: 'email', ph: 'john@email.com' },
-                { label: 'Company / College', key: 'company', type: 'text', ph: 'ABC Company' },
-                { label: 'Address', key: 'address', type: 'text', ph: 'Home address' },
+                { label: 'Full Name *',       key: 'name',    type: 'text',  ph: 'John Doe'      },
+                { label: 'Phone Number *',    key: 'phone',   type: 'tel',   ph: '9876543210'    },
+                { label: 'Email',             key: 'email',   type: 'email', ph: 'john@email.com'},
+                { label: 'Company / College', key: 'company', type: 'text',  ph: 'ABC Company'   },
+                { label: 'Address',           key: 'address', type: 'text',  ph: 'Home address'  },
               ].map(({ label, key, type, ph }) => (
                 <div key={key} style={styles.field}>
                   <label style={styles.label}>{label}</label>
@@ -260,8 +326,6 @@ function Tenants() {
           <div style={styles.formSection}>
             <div style={styles.formSectionTitle}>🛏️ Room Details</div>
             <div style={styles.formGrid}>
-
-              {/* Room selector */}
               <div style={styles.field}>
                 <label style={styles.label}>Room Number *</label>
                 <select style={styles.input} value={form.roomNumber}
@@ -270,7 +334,8 @@ function Tenants() {
                   {rooms.map(r => {
                     const vacant = r.totalBeds - (r.occupiedBeds || 0);
                     return (
-                      <option key={r.id} value={r.roomNumber} disabled={vacant === 0 && r.roomNumber !== form.roomNumber}>
+                      <option key={r.id} value={r.roomNumber}
+                        disabled={vacant === 0 && r.roomNumber !== form.roomNumber}>
                         Room {r.roomNumber} ({r.roomType}) — {vacant} vacant
                       </option>
                     );
@@ -278,7 +343,6 @@ function Tenants() {
                 </select>
               </div>
 
-              {/* Bed Number dropdown — only vacant beds */}
               <div style={styles.field}>
                 <label style={styles.label}>Bed Number *</label>
                 {!form.roomNumber ? (
@@ -290,7 +354,6 @@ function Tenants() {
                     {vacantBeds.map(bed => (
                       <option key={bed} value={bed}>🟢 Bed {bed} — Vacant</option>
                     ))}
-                    {/* Show current bed when editing */}
                     {editId && form.bedNumber && !vacantBeds.includes(parseInt(form.bedNumber)) && (
                       <option value={form.bedNumber}>🔴 Bed {form.bedNumber} — Current</option>
                     )}
@@ -302,7 +365,6 @@ function Tenants() {
                 )}
               </div>
 
-              {/* Room info preview */}
               {selectedRoom && (
                 <div style={styles.roomPreview}>
                   <div style={styles.roomPreviewTitle}>📋 Room Info</div>
@@ -316,9 +378,9 @@ function Tenants() {
               )}
 
               {[
-                { label: 'Monthly Rent (₹)', key: 'monthlyRent', type: 'text', ph: '5000' },
-                { label: 'Deposit (₹)', key: 'deposit', type: 'text', ph: '10000' },
-                { label: 'Check-in Date', key: 'checkIn', type: 'date', ph: '' },
+                { label: 'Monthly Rent (₹)', key: 'monthlyRent', type: 'text', ph: '5000'  },
+                { label: 'Deposit (₹)',       key: 'deposit',     type: 'text', ph: '10000' },
+                { label: 'Check-in Date',     key: 'checkIn',     type: 'date', ph: ''      },
               ].map(({ label, key, type, ph }) => (
                 <div key={key} style={styles.field}>
                   <label style={styles.label}>{label}</label>
@@ -355,8 +417,8 @@ function Tenants() {
             <div style={styles.formSectionTitle}>🆘 Emergency Contact</div>
             <div style={styles.formGrid}>
               {[
-                { label: 'Contact Name', key: 'emergencyContact', type: 'text', ph: 'Parent / Spouse' },
-                { label: 'Contact Phone', key: 'emergencyPhone', type: 'tel', ph: '9876543210' },
+                { label: 'Contact Name',  key: 'emergencyContact', type: 'text', ph: 'Parent / Spouse' },
+                { label: 'Contact Phone', key: 'emergencyPhone',   type: 'tel',  ph: '9876543210'      },
               ].map(({ label, key, type, ph }) => (
                 <div key={key} style={styles.field}>
                   <label style={styles.label}>{label}</label>
@@ -369,7 +431,14 @@ function Tenants() {
 
           <div style={styles.formButtons}>
             <button style={styles.cancelBtn} onClick={resetForm}>Cancel</button>
-            <button style={styles.saveBtn} onClick={handleSave} disabled={saving}>
+            <button
+              style={{
+                ...styles.saveBtn,
+                opacity: (saving || (isAtLimit && !editId)) ? 0.5 : 1,
+                cursor:  (saving || (isAtLimit && !editId)) ? 'not-allowed' : 'pointer',
+              }}
+              onClick={handleSave}
+              disabled={saving || (isAtLimit && !editId)}>
               {saving ? 'Saving...' : editId ? '✏️ Update Tenant' : '💾 Save Tenant'}
             </button>
           </div>
@@ -411,12 +480,12 @@ function Tenants() {
 
               <div style={styles.tenantDetails}>
                 {[
-                  ['🛏️ Room', `Room ${tenant.roomNumber}`],
-                  ['🪑 Bed', `Bed ${tenant.bedNumber || 'N/A'}`],
-                  ['💰 Rent', `₹${(tenant.monthlyRent || 0).toLocaleString()}/mo`],
+                  ['🛏️ Room',    `Room ${tenant.roomNumber}`],
+                  ['🪑 Bed',     `Bed ${tenant.bedNumber || 'N/A'}`],
+                  ['💰 Rent',    `₹${(tenant.monthlyRent || 0).toLocaleString()}/mo`],
                   ['💵 Deposit', `₹${(tenant.deposit || 0).toLocaleString()}`],
                   ['📅 Check-in', tenant.checkIn || 'N/A'],
-                  ['🪪 ID', tenant.idType],
+                  ['🪪 ID',      tenant.idType],
                 ].map(([k, v]) => (
                   <div key={k} style={styles.detail}>
                     <span style={styles.detailKey}>{k}</span>
@@ -430,7 +499,7 @@ function Tenants() {
               )}
 
               <div style={styles.tenantFooter}>
-                <button style={styles.editBtn} onClick={() => handleEdit(tenant)}>✏️ Edit</button>
+                <button style={styles.editBtn}   onClick={() => handleEdit(tenant)}>✏️ Edit</button>
                 <button style={styles.deleteBtn} onClick={() => handleDelete(tenant)}>🗑️ Remove</button>
               </div>
             </div>
@@ -442,53 +511,53 @@ function Tenants() {
 }
 
 const styles = {
-  container: { padding: '0' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' },
-  title: { fontSize: '24px', fontWeight: '800', color: '#1e293b', margin: 0 },
-  subtitle: { color: '#94a3b8', fontSize: '13px', marginTop: '4px' },
-  addBtn: { padding: '12px 24px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
-  statsRow: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '24px' },
-  statCard: { borderRadius: '14px', padding: '20px', textAlign: 'center' },
-  statValue: { fontSize: '28px', fontWeight: '800' },
-  statLabel: { color: '#64748b', fontSize: '13px', marginTop: '4px' },
-  formCard: { background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
-  formTitle: { fontSize: '18px', fontWeight: '700', color: '#1e293b', marginTop: 0, marginBottom: '24px' },
-  formSection: { marginBottom: '24px' },
-  formSectionTitle: { fontSize: '14px', fontWeight: '700', color: '#4f46e5', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px' },
-  field: { display: 'flex', flexDirection: 'column' },
-  label: { fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' },
-  input: { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: '#f8fafc', MozAppearance: 'textfield', WebkitAppearance: 'none' },
-  noBedMsg: { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #fde68a', fontSize: '13px', background: '#fef9ec', color: '#d97706', fontWeight: '600' },
-  roomPreview: { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px' },
-  roomPreviewTitle: { fontSize: '11px', fontWeight: '700', color: '#059669', marginBottom: '8px', textTransform: 'uppercase' },
+  container:          { padding: '0' },
+  header:             { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' },
+  title:              { fontSize: '24px', fontWeight: '800', color: '#1e293b', margin: 0 },
+  subtitle:           { color: '#94a3b8', fontSize: '13px', marginTop: '4px' },
+  addBtn:             { padding: '12px 24px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
+  statsRow:           { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '24px' },
+  statCard:           { borderRadius: '14px', padding: '20px', textAlign: 'center' },
+  statValue:          { fontSize: '28px', fontWeight: '800' },
+  statLabel:          { color: '#64748b', fontSize: '13px', marginTop: '4px' },
+  formCard:           { background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
+  formTitle:          { fontSize: '18px', fontWeight: '700', color: '#1e293b', marginTop: 0, marginBottom: '24px' },
+  formSection:        { marginBottom: '24px' },
+  formSectionTitle:   { fontSize: '14px', fontWeight: '700', color: '#4f46e5', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' },
+  formGrid:           { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px' },
+  field:              { display: 'flex', flexDirection: 'column' },
+  label:              { fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' },
+  input:              { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: '#f8fafc', MozAppearance: 'textfield', WebkitAppearance: 'none' },
+  noBedMsg:           { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #fde68a', fontSize: '13px', background: '#fef9ec', color: '#d97706', fontWeight: '600' },
+  roomPreview:        { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px' },
+  roomPreviewTitle:   { fontSize: '11px', fontWeight: '700', color: '#059669', marginBottom: '8px', textTransform: 'uppercase' },
   roomPreviewDetails: { display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#166534', fontWeight: '600' },
-  formButtons: { display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' },
-  cancelBtn: { padding: '12px 24px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-  saveBtn: { padding: '12px 32px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
-  searchBox: { marginBottom: '20px' },
-  searchInput: { width: '100%', padding: '13px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: 'white', boxSizing: 'border-box' },
-  loading: { textAlign: 'center', padding: '60px', color: '#94a3b8' },
-  empty: { textAlign: 'center', padding: '60px', background: 'white', borderRadius: '16px' },
-  emptyIcon: { fontSize: '48px', marginBottom: '12px' },
-  emptyText: { fontSize: '16px', fontWeight: '600', color: '#1e293b', margin: '0 0 8px' },
-  emptySub: { color: '#94a3b8', fontSize: '14px', margin: 0 },
-  tenantsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '20px' },
-  tenantCard: { background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
-  tenantHeader: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' },
-  tenantAvatar: { width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #0891b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '18px', flexShrink: 0 },
-  tenantInfo: { flex: 1 },
-  tenantName: { fontSize: '15px', fontWeight: '700', color: '#1e293b' },
-  tenantPhone: { fontSize: '13px', color: '#64748b', marginTop: '2px' },
-  statusBadge: { padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' },
-  tenantDetails: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' },
-  detail: { display: 'flex', flexDirection: 'column' },
-  detailKey: { fontSize: '11px', color: '#94a3b8', fontWeight: '600' },
-  detailVal: { fontSize: '13px', color: '#1e293b', fontWeight: '600', marginTop: '2px' },
-  company: { fontSize: '13px', color: '#64748b', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', marginBottom: '12px' },
-  tenantFooter: { display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' },
-  editBtn: { padding: '8px 14px', background: '#eef2ff', color: '#4f46e5', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
-  deleteBtn: { padding: '8px 14px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
+  formButtons:        { display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' },
+  cancelBtn:          { padding: '12px 24px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
+  saveBtn:            { padding: '12px 32px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
+  searchBox:          { marginBottom: '20px' },
+  searchInput:        { width: '100%', padding: '13px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: 'white', boxSizing: 'border-box' },
+  loading:            { textAlign: 'center', padding: '60px', color: '#94a3b8' },
+  empty:              { textAlign: 'center', padding: '60px', background: 'white', borderRadius: '16px' },
+  emptyIcon:          { fontSize: '48px', marginBottom: '12px' },
+  emptyText:          { fontSize: '16px', fontWeight: '600', color: '#1e293b', margin: '0 0 8px' },
+  emptySub:           { color: '#94a3b8', fontSize: '14px', margin: 0 },
+  tenantsGrid:        { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '20px' },
+  tenantCard:         { background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
+  tenantHeader:       { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' },
+  tenantAvatar:       { width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #0891b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '18px', flexShrink: 0 },
+  tenantInfo:         { flex: 1 },
+  tenantName:         { fontSize: '15px', fontWeight: '700', color: '#1e293b' },
+  tenantPhone:        { fontSize: '13px', color: '#64748b', marginTop: '2px' },
+  statusBadge:        { padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' },
+  tenantDetails:      { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' },
+  detail:             { display: 'flex', flexDirection: 'column' },
+  detailKey:          { fontSize: '11px', color: '#94a3b8', fontWeight: '600' },
+  detailVal:          { fontSize: '13px', color: '#1e293b', fontWeight: '600', marginTop: '2px' },
+  company:            { fontSize: '13px', color: '#64748b', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', marginBottom: '12px' },
+  tenantFooter:       { display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' },
+  editBtn:            { padding: '8px 14px', background: '#eef2ff', color: '#4f46e5', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
+  deleteBtn:          { padding: '8px 14px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
 };
 
 export default Tenants;
