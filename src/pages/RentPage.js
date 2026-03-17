@@ -241,11 +241,16 @@ const css = `
     gap: 8px;
     overflow-x: auto;
     padding-bottom: 4px;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
   .rent-filter-scroll::-webkit-scrollbar { display: none; }
+  .rent-filter-label {
+    font-size: 10px; font-weight: 800;
+    color: #94a3b8; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 6px;
+  }
   .rent-filter-chip {
     white-space: nowrap;
     padding: 7px 14px;
@@ -258,6 +263,7 @@ const css = `
     font-family: inherit;
     -webkit-tap-highlight-color: transparent;
     flex-shrink: 0;
+    transition: all 0.15s;
   }
   .rent-filter-chip.active {
     background: #1a1a2e;
@@ -266,7 +272,7 @@ const css = `
   }
   .rent-search {
     width: 100%;
-    padding: 12px 16px;
+    padding: 13px 16px;
     border: 1.5px solid #e2e8f0;
     border-radius: 12px;
     font-size: 14px; font-family: inherit;
@@ -275,6 +281,7 @@ const css = `
     box-sizing: border-box;
     margin-bottom: 12px;
     -webkit-appearance: none;
+    transition: border-color 0.2s;
   }
   .rent-search:focus { border-color: #e94560; }
 
@@ -282,6 +289,47 @@ const css = `
     font-size: 12px; color: #94a3b8;
     margin-bottom: 12px; font-weight: 500;
   }
+
+  /* ── History payment cards (mobile-first) ── */
+  .hc {
+    background: white; border-radius: 16px;
+    padding: 14px; margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .hc-top {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; margin-bottom: 10px;
+  }
+  .hc-left { display: flex; align-items: center; gap: 10px; }
+  .hc-avatar {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 800; font-size: 16px; flex-shrink: 0;
+  }
+  .hc-name { font-size: 14px; font-weight: 800; color: #1e293b; }
+  .hc-sub  { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .hc-right { text-align: right; flex-shrink: 0; }
+  .hc-amount { font-size: 18px; font-weight: 800; }
+  .hc-method {
+    font-size: 10px; font-weight: 700;
+    padding: 3px 8px; border-radius: 20px;
+    background: #eef2ff; color: #4f46e5;
+    display: inline-block; margin-top: 3px;
+  }
+  .hc-tags {
+    display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px;
+  }
+  .hc-tag {
+    font-size: 10px; font-weight: 700;
+    padding: 3px 8px; border-radius: 20px;
+  }
+  .hc-breakdown {
+    font-size: 11px; color: #94a3b8;
+    padding: 8px 10px; background: #f8fafc;
+    border-radius: 8px; line-height: 1.6;
+  }
+  .hc-date { font-size: 11px; color: #b0bec5; margin-top: 5px; }
+  .hc-notes { font-size: 11px; color: #94a3b8; margin-top: 4px; font-style: italic; }
 
   /* ── History card ── */
   .hc {
@@ -890,43 +938,66 @@ export default function RentPage() {
           {/* History */}
           {activeTab==='history' && (
             <div>
-              <input className="rent-search" type="text" placeholder="🔍 Search by name or room…"
+              {/* Search */}
+              <input className="rent-search" type="text"
+                placeholder="🔍 Search by name or room…"
                 value={search} onChange={e=>setSearch(e.target.value)} />
 
-              {/* Filter chips */}
+              {/* Month filter chips */}
+              <div className="rent-filter-label">Month</div>
               <div className="rent-filter-scroll">
-                <button className={`rent-filter-chip${!filterMonth?' active':''}`} onClick={()=>setFilterMonth('')}>All Months</button>
+                <button className={`rent-filter-chip${!filterMonth?' active':''}`}
+                  onClick={()=>setFilterMonth('')}>All</button>
                 {months.map(m=>(
-                  <button key={m} className={`rent-filter-chip${filterMonth===m?' active':''}`}
-                    onClick={()=>setFilterMonth(filterMonth===m?'':m)}>{m}</button>
-                ))}
-              </div>
-              <div className="rent-filter-scroll">
-                <button className={`rent-filter-chip${!filterMethod?' active':''}`} onClick={()=>setFilterMethod('')}>All Methods</button>
-                {['Cash','UPI','Bank Transfer','Card'].map(m=>(
-                  <button key={m} className={`rent-filter-chip${filterMethod===m?' active':''}`}
-                    onClick={()=>setFilterMethod(filterMethod===m?'':m)}>{m}</button>
+                  <button key={m}
+                    className={`rent-filter-chip${filterMonth===m?' active':''}`}
+                    onClick={()=>setFilterMonth(filterMonth===m?'':m)}>
+                    {m.slice(0,3)}
+                  </button>
                 ))}
               </div>
 
-              <div className="rent-result-count">{filteredPayments.length} payments</div>
+              {/* Method filter chips */}
+              <div className="rent-filter-label">Method</div>
+              <div className="rent-filter-scroll">
+                <button className={`rent-filter-chip${!filterMethod?' active':''}`}
+                  onClick={()=>setFilterMethod('')}>All</button>
+                {['Cash','UPI','Bank Transfer','Card'].map(m=>(
+                  <button key={m}
+                    className={`rent-filter-chip${filterMethod===m?' active':''}`}
+                    onClick={()=>setFilterMethod(filterMethod===m?'':m)}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+
+              <div className="rent-result-count" style={{marginTop:'10px'}}>
+                {filteredPayments.length} payment{filteredPayments.length!==1?'s':''}
+                {filteredPayments.filter(p=>p.isPartial&&!p.isCompleted).length>0 &&
+                  <span style={{color:'#d97706',fontWeight:'600'}}> · {filteredPayments.filter(p=>p.isPartial&&!p.isCompleted).length} partial</span>}
+              </div>
 
               {filteredPayments.length===0 ? (
                 <div className="rent-empty">
                   <div className="rent-empty-icon">📋</div>
                   <p className="rent-empty-title">No payments found</p>
+                  <p className="rent-empty-sub">Try clearing filters</p>
                 </div>
               ) : (
                 filteredPayments.map(p=>(
                   <div key={p.id} className="hc" style={{
-                    background: p.isCompleted ? '#f0fdf4' : p.isPartial ? '#fffbeb' : 'white',
+                    background:   p.isCompleted ? '#f0fdf4' : p.isPartial ? '#fffbeb' : 'white',
+                    borderLeft: `4px solid ${p.isCompleted?'#059669':p.isPartial?'#d97706':'#4f46e5'}`,
                   }}>
+                    {/* Top row: avatar + name + amount */}
                     <div className="hc-top">
                       <div className="hc-left">
                         <div className="hc-avatar" style={{
-                          background: p.isCompleted ? 'linear-gradient(135deg,#059669,#0891b2)'
-                            : p.isPartial ? 'linear-gradient(135deg,#d97706,#b45309)'
-                            : 'linear-gradient(135deg,#4f46e5,#0891b2)'
+                          background: p.isCompleted
+                            ? 'linear-gradient(135deg,#059669,#0891b2)'
+                            : p.isPartial
+                            ? 'linear-gradient(135deg,#d97706,#b45309)'
+                            : 'linear-gradient(135deg,#4f46e5,#0891b2)',
                         }}>
                           {p.tenantName?.charAt(0).toUpperCase()}
                         </div>
@@ -937,25 +1008,40 @@ export default function RentPage() {
                       </div>
                       <div className="hc-right">
                         <div className="hc-amount" style={{
-                          color: p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#4f46e5'
-                        }}>₹{p.amount?.toLocaleString()}</div>
+                          color: p.isCompleted?'#059669': p.isPartial?'#d97706':'#4f46e5'
+                        }}>
+                          ₹{p.amount?.toLocaleString()}
+                        </div>
                         <div className="hc-method">{p.paymentMethod}</div>
                       </div>
                     </div>
+
+                    {/* Tags */}
                     <div className="hc-tags">
                       {p.isCompleted && <span className="hc-tag" style={{background:'#dcfce7',color:'#059669'}}>✅ Complete</span>}
                       {p.isPartial && !p.isCompleted && <span className="hc-tag" style={{background:'#fffbeb',color:'#d97706'}}>⚠️ Partial</span>}
                       {p.penaltyAmount>0 && <span className="hc-tag" style={{background:'#fef2f2',color:'#dc2626'}}>🔴 Penalty</span>}
                       {p.electricityShare>0 && <span className="hc-tag" style={{background:'#ecfeff',color:'#0891b2'}}>⚡ Elec</span>}
                     </div>
+
+                    {/* Breakdown pill */}
                     <div className="hc-breakdown">
-                      Rent ₹{(p.rentAmount||0).toLocaleString()}
-                      {p.electricityShare>0 && ` · Elec ₹${p.electricityShare.toLocaleString()}`}
-                      {p.penaltyAmount>0 && ` · Penalty ₹${p.penaltyAmount.toLocaleString()}`}
-                      {p.isPartial && ` · Paid ₹${p.newTotal?.toLocaleString()} of ₹${p.fullAmount?.toLocaleString()}`}
+                      🏠 Rent ₹{(p.rentAmount||0).toLocaleString()}
+                      {p.electricityShare>0 && <span style={{color:'#0891b2'}}> · ⚡ ₹{p.electricityShare.toLocaleString()}</span>}
+                      {p.penaltyAmount>0 && <span style={{color:'#dc2626'}}> · 🔴 ₹{p.penaltyAmount.toLocaleString()}</span>}
+                      {p.isPartial && (
+                        <span style={{color:'#d97706',display:'block',marginTop:'3px'}}>
+                          Paid ₹{p.newTotal?.toLocaleString()} of ₹{p.fullAmount?.toLocaleString()}
+                        </span>
+                      )}
                     </div>
-                    <div className="hc-date">📅 {p.paymentDate}{p.paymentTime && ` · 🕐 ${p.paymentTime}`}</div>
-                    {p.notes && <div className="hc-date">📝 {p.notes}</div>}
+
+                    {/* Date + time */}
+                    <div className="hc-date">
+                      📅 {p.paymentDate}
+                      {p.paymentTime && <span> · 🕐 {p.paymentTime}</span>}
+                    </div>
+                    {p.notes && <div className="hc-notes">📝 {p.notes}</div>}
                   </div>
                 ))
               )}
