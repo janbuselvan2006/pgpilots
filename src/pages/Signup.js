@@ -556,37 +556,61 @@ export default function Signup() {
   };
 
   const handleCreateAccount = async () => {
-    setError('');
-    if (!password)                return setError('Please enter a password.');
-    if (password.length < 6)      return setError('Password must be at least 6 characters.');
-    if (password !== confirmPass)  return setError('Passwords do not match!');
-    setLoading(true);
-    try {
-      const user  = auth.currentUser;
-      const code  = await createUniquePGCode(pgName);
-      const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 14);
+  setError('');
+  if (!password)                return setError('Please enter a password.');
+  if (password.length < 6)      return setError('Password must be at least 6 characters.');
+  if (password !== confirmPass)  return setError('Passwords do not match!');
 
-      await setDoc(doc(db, 'pgOwners', user.uid), {
-        ownerName, pgName, city, state: pgState,
-        email: email || '', phone, pgCode: code,
-        plan: 'trial', isActive: true,
-        trialEnd: trialEnd.toISOString().split('T')[0],
-        createdAt: new Date(),
-        features: { electricity: true, payments: true, rooms: true, tenants: true, reports: true },
-        limits: { maxTenants: 50, maxRooms: 20, maxReportsPerMonth: 5 },
-      });
+  setLoading(true);
+  try {
+    const user      = auth.currentUser;
+    const code      = await createUniquePGCode(pgName);
+    const trialEnd  = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 14);
 
-      const { updatePassword } = await import('firebase/auth');
-      await updatePassword(user, password);
-      setPgCode(code);
-      setStep(5);
-    } catch (err) {
-      console.error(err);
-      setError('Something went wrong. Please try again.');
-    }
-    setLoading(false);
-  };
+    // Use real email if provided, else generate one from phone
+    const userEmail = email.trim() || `${phone}@pgmanager.app`;
+
+    // Save to Firestore
+    await setDoc(doc(db, 'pgOwners', user.uid), {
+      ownerName,
+      pgName,
+      city,
+      state:    pgState,
+      email:    userEmail,
+      phone,
+      pgCode:   code,
+      plan:     'trial',
+      isActive: true,
+      trialEnd: trialEnd.toISOString().split('T')[0],
+      createdAt: new Date(),
+      features: {
+        electricity: true,
+        payments:    true,
+        rooms:       true,
+        tenants:     true,
+        reports:     true,
+      },
+      limits: {
+        maxTenants:         50,
+        maxRooms:           20,
+        maxReportsPerMonth: 5,
+      },
+    });
+
+    // Link email+password credential to phone auth user
+    const { EmailAuthProvider, linkWithCredential } = await import('firebase/auth');
+    const credential = EmailAuthProvider.credential(userEmail, password);
+    await linkWithCredential(user, credential);
+
+    setPgCode(code);
+    setStep(5);
+  } catch (err) {
+    console.error(err);
+    setError('Something went wrong. Please try again.');
+  }
+  setLoading(false);
+};
 
   const copyCode = () => {
     navigator.clipboard.writeText(pgCode);
@@ -609,7 +633,7 @@ export default function Signup() {
         {/* ── Hero ── */}
         <div className="pg-hero">
           <div className="pg-hero-inner">
-            <div className="pg-hero-brand">🏠 PG Manager</div>
+            <div className="pg-hero-brand">🏠 PGpilots</div>
             <h1 className="pg-hero-title">Start managing<br />smarter today</h1>
             {/* desktop only sub */}
             <p className="pg-hero-sub" style={{ display: 'none' }}>

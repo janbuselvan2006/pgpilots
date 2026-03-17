@@ -80,20 +80,26 @@ function Login() {
   };
 
   const handlePGCodeLogin = async () => {
-    if (!pgCode.trim()) return showErr('Enter your PG Code.');
-    if (!password)      return showErr('Enter your password.');
-    setLoading(true);
-    try {
-      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-      const snap = await getDocs(query(collection(db,'pgOwners'), where('pgCode','==',pgCode.toUpperCase().trim())));
-      if (snap.empty) { setLoading(false); return showErr('❌ PG Code not found.'); }
-      const email = snap.docs[0].data().email;
-      if (!email) { setLoading(false); return showErr('No email linked to this PG Code.'); }
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate('/dashboard');
-    } catch (err) { showErr('❌ Invalid PG Code or password.'); }
-    setLoading(false);
-  };
+  if (!pgCode.trim()) return showErr('Enter your PG Code.');
+  if (!password)      return showErr('Enter your password.');
+  setLoading(true);
+  try {
+    await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+    const snap = await getDocs(query(collection(db,'pgOwners'), where('pgCode','==',pgCode.toUpperCase().trim())));
+    if (snap.empty) { setLoading(false); return showErr('❌ PG Code not found.'); }
+    
+    const data = snap.docs[0].data();
+    const userEmail = data.email; // this is now phone@pgmanager.app or real email
+    if (!userEmail) { setLoading(false); return showErr('❌ No email linked to this PG Code.'); }
+    
+    await signInWithEmailAndPassword(auth, userEmail, password);
+    navigate('/dashboard');
+  } catch (err) {
+    console.error(err);
+    showErr('❌ Invalid PG Code or password.');
+  }
+  setLoading(false);
+};
 
   const handleSendOTP = async () => {
     if (!mobile || mobile.length < 10) return showErr('Enter a valid 10-digit number.');
@@ -149,10 +155,10 @@ function Login() {
     <div className="login-page">
       <div id="recaptcha-container" />
       <div className="login-left">
-        <div><div style={s.brand}>🏠 PG Manager</div><h1 style={s.heroTitle}>Reset your<br/>password</h1><p style={s.heroSub}>We'll send a reset link to your email.</p></div>
+        <div><div style={s.brand}>🏠 PGpilots</div><h1 style={s.heroTitle}>Reset your<br/>password</h1><p style={s.heroSub}>We'll send a reset link to your email.</p></div>
       </div>
       <div className="login-right">
-        <div className="login-mobile-brand"><div style={s.mobileBrandText}>🏠 PG Manager</div></div>
+        <div className="login-mobile-brand"><div style={s.mobileBrandText}>🏠 PGpilots</div></div>
         <div className="login-box">
           <h2 style={s.formTitle}>Forgot Password?</h2>
           <p style={s.formSub}>Enter your email or PG Code</p>
@@ -189,7 +195,7 @@ function Login() {
 
       <div className="login-left">
         <div style={s.leftContent}>
-          <div style={s.brand}>🏠 PG Manager</div>
+          <div style={s.brand}>🏠 PGpilots</div>
           <h1 style={s.heroTitle}>Manage your PG<br/>like a Pro</h1>
           <p style={s.heroSub}>All-in-one platform for PG owners to manage tenants, rooms, rent and more.</p>
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
@@ -203,7 +209,7 @@ function Login() {
       <div className="login-right">
         {/* Mobile brand — shown only on mobile via CSS */}
         <div className="login-mobile-brand">
-          <div style={s.mobileBrandText}>🏠 PG Manager</div>
+          <div style={s.mobileBrandText}>🏠 PGpilots</div>
           <div style={s.mobileBrandSub}>Manage your PG smarter</div>
         </div>
 

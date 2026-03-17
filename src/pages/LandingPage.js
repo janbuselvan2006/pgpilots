@@ -266,7 +266,7 @@ function LandingPage() {
         {/* NAV */}
         <nav className="lp-nav">
           <div className="lp-nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            🏠 PG<span>Manager</span>
+            🏠 PG<span>pilots</span>
           </div>
           <ul className="lp-nav-links">
             <li><a href="#pain">Problems</a></li>
@@ -421,7 +421,7 @@ function LandingPage() {
             <p className="section-sub">Real feedback from real owners across Tamil Nadu.</p>
             <div className="testi-grid reveal">
               {[
-                ['R','Ravi Kumar','Sri Sai PG, Chennai — 18 tenants','Before PG Manager, I used to forget who paid. Now I open the app and I know exactly who\'s late, who paid today and who\'s coming up. It\'s like having an accountant in my pocket.'],
+                ['R','Ravi Kumar','Sri Sai PG, Chennai — 18 tenants','Before PGpilots, I used to forget who paid. Now I open the app and I know exactly who\'s late, who paid today and who\'s coming up. It\'s like having an accountant in my pocket.'],
                 ['S','Suresh Babu','Lakshmi PG, Coimbatore — 32 tenants','The WhatsApp reminder feature is gold. I don\'t have to call tenants anymore. I just click and they get a professional message. My collection improved 40% in first month.'],
                 ['M','Meena Devi','Royal Ladies PG, Madurai — 24 tenants','₹499 for all this? I was paying ₹2,800/month for another software that was 10x more complicated. This is simple, works on my phone and does everything I need.'],
               ].map(([initial, name, loc, text]) => (
@@ -444,7 +444,7 @@ function LandingPage() {
         {/* CTA */}
         <section className="cta-wrapper">
           <h2>Ready to never lose<br />rent money again?</h2>
-          <p>Join 500+ PG owners who manage smarter with PG Manager.<br />Free for 14 days. No card needed.</p>
+          <p>Join 500+ PG owners who manage smarter with PGpilots.<br />Free for 14 days. No card needed.</p>
           <div className="cta-btns">
             <button className="btn-primary" onClick={goSignup}>🚀 Start Free Trial — It's Free</button>
             <a href="https://wa.me/919876543210" target="_blank" rel="noreferrer" className="btn-secondary">📞 Talk to Us on WhatsApp</a>
@@ -453,14 +453,14 @@ function LandingPage() {
 
         {/* FOOTER */}
         <footer className="lp-footer">
-          <div className="footer-logo">🏠 PGManager</div>
+          <div className="footer-logo">🏠 PGpilots</div>
           <div className="footer-links">
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
             <a href="#privacy">Privacy Policy</a>
             <a href="#contact">Contact</a>
           </div>
-          <div className="footer-copy">© 2026 PG Manager. Built with ❤️ for Indian PG Owners.</div>
+          <div className="footer-copy">© 2026 PGpilots. Built with ❤️ for Indian PG Owners.</div>
         </footer>
       </div>
     </>
