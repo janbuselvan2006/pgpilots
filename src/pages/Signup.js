@@ -457,6 +457,20 @@ const css = `
   }
 `;
 
+// Check if phone already exists in pgOwners
+const isPhoneAlreadyRegistered = async (phone) => {
+  const q = query(collection(db, 'pgOwners'), where('phone', '==', phone));
+  const snap = await getDocs(q);
+  return !snap.empty;
+};
+
+// Check if email already exists in pgOwners
+const isEmailAlreadyRegistered = async (email) => {
+  const q = query(collection(db, 'pgOwners'), where('email', '==', email));
+  const snap = await getDocs(q);
+  return !snap.empty;
+};
+
 export default function Signup() {
   const [step, setStep]           = useState(1);
   const [phone, setPhone]         = useState('');
@@ -499,24 +513,33 @@ export default function Signup() {
   };
 
   const handleSendOTP = async () => {
-    setError('');
-    if (!phone || phone.length < 10) return setError('Enter a valid 10-digit mobile number.');
-    setLoading(true);
-    try {
-      setupRecaptcha();
-      const formatted = `+91${phone.replace(/\D/g, '')}`;
-      const result    = await signInWithPhoneNumber(auth, formatted, window.recaptchaVerifier);
-      setConfirmResult(result);
-      setStep(2);
-      setResendTimer(30);
-      setSuccess('OTP sent to +91 ' + phone);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to send OTP. Check number and try again.');
-      if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; }
-    }
+  setError('');
+  if (!phone || phone.length < 10) return setError('Enter a valid 10-digit mobile number.');
+  
+  setLoading(true);
+
+  // ✅ Check if phone already registered
+  const phoneExists = await isPhoneAlreadyRegistered(phone);
+  if (phoneExists) {
     setLoading(false);
-  };
+    return setError('⚠️ This mobile number is already registered. Please login instead.');
+  }
+
+  try {
+    setupRecaptcha();
+    const formatted = `+91${phone.replace(/\D/g, '')}`;
+    const result    = await signInWithPhoneNumber(auth, formatted, window.recaptchaVerifier);
+    setConfirmResult(result);
+    setStep(2);
+    setResendTimer(30);
+    setSuccess('OTP sent to +91 ' + phone);
+  } catch (err) {
+    console.error(err);
+    setError('Failed to send OTP. Check number and try again.');
+    if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; }
+  }
+  setLoading(false);
+};
 
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
@@ -546,14 +569,25 @@ export default function Signup() {
     setLoading(false);
   };
 
-  const handleDetailsNext = () => {
-    setError('');
-    if (!ownerName.trim()) return setError('Please enter your full name.');
-    if (!pgName.trim())    return setError('Please enter your PG name.');
-    if (!city.trim())      return setError('Please enter your city.');
-    if (!pgState.trim())   return setError('Please enter your state.');
-    setStep(4);
-  };
+  const handleDetailsNext = async () => {
+  setError('');
+  if (!ownerName.trim()) return setError('Please enter your full name.');
+  if (!pgName.trim())    return setError('Please enter your PG name.');
+  if (!city.trim())      return setError('Please enter your city.');
+  if (!pgState.trim())   return setError('Please enter your state.');
+
+  // ✅ Check if email already registered (only if email entered)
+  if (email.trim()) {
+    setLoading(true);
+    const emailExists = await isEmailAlreadyRegistered(email.trim());
+    setLoading(false);
+    if (emailExists) {
+      return setError('⚠️ This email is already registered. Please login instead.');
+    }
+  }
+
+  setStep(4);
+};
 
   const handleCreateAccount = async () => {
   setError('');
