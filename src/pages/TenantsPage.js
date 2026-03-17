@@ -6,558 +6,760 @@ import {
 } from 'firebase/firestore';
 import { useLimitCheck } from '../hooks/useLimitCheck';
 
-function Tenants() {
-  const [tenants, setTenants] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
-  const [editId, setEditId] = useState(null);
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+
+  .tn-root {
+    font-family: 'DM Sans', sans-serif;
+    background: #f0f2f8;
+    min-height: 100vh;
+  }
+
+  /* ── Top bar ── */
+  .tn-topbar {
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+    padding: 20px 20px 28px;
+    position: relative; overflow: hidden;
+  }
+  .tn-topbar::after {
+    content: '';
+    position: absolute;
+    width: 200px; height: 200px; border-radius: 50%;
+    background: rgba(233,69,96,0.13);
+    top: -60px; right: -40px; pointer-events: none;
+  }
+  .tn-topbar-row {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; position: relative; z-index: 1;
+  }
+  .tn-page-title { font-size: 22px; font-weight: 800; color: #fff; margin: 0 0 3px; }
+  .tn-page-sub   { font-size: 12px; color: rgba(255,255,255,0.5); font-weight: 500; }
+  .tn-add-fab {
+    width: 44px; height: 44px; border-radius: 14px;
+    background: #e94560; border: none; color: white;
+    font-size: 22px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; box-shadow: 0 4px 14px rgba(233,69,96,0.45);
+    -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .tn-add-fab:active { transform: scale(0.92); }
+  .tn-add-fab:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Stats strip ── */
+  .tn-stats {
+    display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 0; margin: -14px 16px 0;
+    background: white; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1); position: relative; z-index: 2;
+  }
+  .tn-stat {
+    padding: 12px 6px; text-align: center;
+    border-right: 1px solid #f1f5f9;
+  }
+  .tn-stat:last-child { border-right: none; }
+  .tn-stat-num  { font-size: 17px; font-weight: 800; line-height: 1.1; }
+  .tn-stat-label { font-size: 8px; color: #94a3b8; font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* ── Content ── */
+  .tn-content { padding: 20px 16px 100px; }
+
+  /* ── Banners ── */
+  .tn-banner {
+    border-radius: 14px; padding: 12px 16px;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 12px;
+  }
+  .tn-banner-icon { font-size: 20px; flex-shrink: 0; }
+  .tn-banner-title { font-size: 13px; font-weight: 700; }
+  .tn-banner-sub   { font-size: 11px; margin-top: 2px; }
+
+  /* ── Search ── */
+  .tn-search {
+    width: 100%; padding: 13px 16px;
+    border: 1.5px solid #e2e8f0; border-radius: 14px;
+    font-size: 14px; font-family: inherit;
+    background: white; outline: none;
+    box-sizing: border-box; margin-bottom: 16px;
+    -webkit-appearance: none;
+    transition: border-color 0.2s;
+  }
+  .tn-search:focus { border-color: #e94560; }
+
+  /* ── Tenant cards ── */
+  .tc {
+    background: white; border-radius: 18px;
+    margin-bottom: 12px; overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .tc-accent { height: 4px; }
+  .tc-body { padding: 14px; }
+  .tc-header {
+    display: flex; align-items: center;
+    gap: 10px; margin-bottom: 12px;
+  }
+  .tc-avatar {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 800; font-size: 18px; flex-shrink: 0;
+    background: linear-gradient(135deg, #4f46e5, #0891b2);
+  }
+  .tc-name  { font-size: 15px; font-weight: 800; color: #1e293b; }
+  .tc-phone { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .tc-status-badge {
+    margin-left: auto;
+    font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 20px;
+    background: #ecfdf5; color: #059669;
+  }
+  .tc-details {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; margin-bottom: 12px;
+  }
+  .tc-detail-item { display: flex; flex-direction: column; }
+  .tc-detail-key { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+  .tc-detail-val { font-size: 13px; color: #1e293b; font-weight: 700; margin-top: 2px; }
+  .tc-company {
+    font-size: 12px; color: #64748b;
+    padding: 7px 10px; background: #f8fafc;
+    border-radius: 8px; margin-bottom: 12px;
+  }
+  .tc-footer {
+    display: flex; gap: 8px;
+    padding-top: 12px; border-top: 1px solid #f1f5f9;
+  }
+  .tc-edit-btn {
+    flex: 1; padding: 10px;
+    background: #eef2ff; color: #4f46e5;
+    border: none; border-radius: 10px;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tc-del-btn {
+    flex: 1; padding: 10px;
+    background: #fef2f2; color: #dc2626;
+    border: none; border-radius: 10px;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── Empty / Loading ── */
+  .tn-empty {
+    text-align: center; padding: 50px 20px;
+    background: white; border-radius: 18px;
+  }
+  .tn-empty-icon  { font-size: 48px; margin-bottom: 12px; }
+  .tn-empty-title { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 6px; }
+  .tn-empty-sub   { font-size: 13px; color: #94a3b8; margin: 0 0 24px; }
+  .tn-empty-btn {
+    padding: 13px 28px;
+    background: linear-gradient(135deg, #e94560, #0f3460);
+    color: white; border: none; border-radius: 12px;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  .tn-loading { text-align: center; padding: 50px; color: #94a3b8; font-size: 14px; }
+  .tn-spinner {
+    width: 30px; height: 30px;
+    border: 3px solid #e2e8f0; border-top-color: #e94560;
+    border-radius: 50%; animation: tnspin 0.7s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes tnspin { to { transform: rotate(360deg); } }
+
+  /* ── Bottom sheet ── */
+  .bso {
+    position: fixed; inset: 0;
+    background: rgba(15,20,40,0.55); z-index: 100;
+    backdrop-filter: blur(2px);
+    animation: bsFade 0.2s ease;
+  }
+  @keyframes bsFade { from { opacity:0; } to { opacity:1; } }
+  .bs {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: white; border-radius: 24px 24px 0 0;
+    z-index: 101; max-height: 94dvh; overflow-y: auto;
+    animation: bsUp 0.3s cubic-bezier(0.32,0.72,0,1);
+    padding-bottom: env(safe-area-inset-bottom, 24px);
+  }
+  @keyframes bsUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @media (min-width: 640px) {
+    .bs {
+      left: 50%; right: auto; width: 560px;
+      border-radius: 24px; bottom: 50%;
+      transform: translate(-50%, 50%);
+      animation: bsZoom 0.25s cubic-bezier(0.32,0.72,0,1);
+      max-height: 90vh;
+    }
+    @keyframes bsZoom {
+      from { opacity:0; transform: translate(-50%,50%) scale(0.95); }
+      to   { opacity:1; transform: translate(-50%,50%) scale(1); }
+    }
+    .tn-stats  { margin: -14px 24px 0; }
+    .tn-content { padding: 24px 24px 40px; }
+    .tc-details { grid-template-columns: repeat(3,1fr); }
+  }
+  .bs-handle {
+    width: 40px; height: 4px; background: #e2e8f0;
+    border-radius: 99px; margin: 12px auto 0;
+  }
+  .bs-header {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 14px 20px 8px;
+    position: sticky; top: 0; background: white; z-index: 1;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .bs-title { font-size: 17px; font-weight: 800; color: #1a1a2e; margin: 0; }
+  .bs-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #f1f5f9; border: none; font-size: 14px; color: #64748b;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-family: inherit; -webkit-tap-highlight-color: transparent;
+  }
+  .bs-body { padding: 16px 20px 28px; }
+
+  /* ── Form section ── */
+  .fs-section { margin-bottom: 22px; }
+  .fs-section-title {
+    font-size: 11px; font-weight: 800; color: #4f46e5;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid #eef2ff;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .fs-field { margin-bottom: 12px; }
+  .fs-label {
+    display: block; font-size: 11px; font-weight: 700;
+    color: #64748b; text-transform: uppercase;
+    letter-spacing: 0.4px; margin-bottom: 6px;
+  }
+  .fs-input {
+    width: 100%; padding: 13px 14px;
+    border: 1.5px solid #e2e8f0; border-radius: 12px;
+    font-size: 15px; font-family: inherit;
+    color: #1a1a2e; background: #fafbff;
+    outline: none; box-sizing: border-box;
+    -webkit-appearance: none;
+    transition: border-color 0.2s;
+  }
+  .fs-input:focus { border-color: #e94560; background: white; }
+  .fs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .fs-no-bed {
+    padding: 13px 14px; border-radius: 12px;
+    font-size: 13px; font-weight: 600;
+    border: 1.5px solid #fde68a; background: #fffbeb; color: #d97706;
+  }
+  .fs-no-bed.error { border-color: #fecaca; background: #fef2f2; color: #dc2626; }
+
+  /* Room preview card */
+  .fs-room-preview {
+    background: #f0fdf4; border: 1px solid #bbf7d0;
+    border-radius: 12px; padding: 12px; margin-top: 10px;
+  }
+  .fs-rp-title { font-size: 10px; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .fs-rp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fs-rp-chip {
+    font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px;
+    background: white; color: #166534;
+  }
+
+  /* Bed selector grid */
+  .fs-bed-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .fs-bed-btn {
+    width: 44px; height: 44px; border-radius: 10px;
+    border: 2px solid #e2e8f0; background: #f8fafc;
+    font-size: 14px; font-weight: 800; color: #475569;
+    cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+  }
+  .fs-bed-btn.vacant { border-color: #059669; color: #059669; background: #f0fdf4; }
+  .fs-bed-btn.selected { background: #059669; color: white; border-color: #059669; }
+  .fs-bed-btn.occupied { border-color: #e2e8f0; color: #cbd5e0; background: #f8fafc; cursor: not-allowed; }
+
+  /* ID type segment */
+  .fs-seg { display: flex; background: #f1f5f9; border-radius: 10px; padding: 3px; gap: 3px; flex-wrap: wrap; }
+  .fs-seg-btn {
+    flex: 1; min-width: 60px; padding: 8px 4px;
+    border: none; border-radius: 8px;
+    font-size: 11px; font-weight: 700;
+    cursor: pointer; background: transparent;
+    color: #94a3b8; font-family: inherit;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
+  }
+  .fs-seg-btn.active { background: white; color: #4f46e5; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+  /* Save button */
+  .fs-save-btn {
+    width: 100%; padding: 15px;
+    background: linear-gradient(135deg, #e94560, #0f3460);
+    color: white; border: none; border-radius: 14px;
+    font-size: 15px; font-weight: 700; font-family: inherit;
+    cursor: pointer; margin-top: 6px;
+    box-shadow: 0 4px 14px rgba(233,69,96,0.3);
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .fs-save-btn:active { transform: scale(0.98); opacity: 0.9; }
+  .fs-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* Delete confirm */
+  .del-sheet { padding: 20px 20px 32px; text-align: center; }
+  .del-icon  { font-size: 44px; margin-bottom: 12px; }
+  .del-title { font-size: 17px; font-weight: 800; color: #1e293b; margin: 0 0 6px; }
+  .del-sub   { font-size: 13px; color: #94a3b8; margin: 0 0 24px; line-height: 1.6; }
+  .del-btn-row { display: flex; gap: 10px; }
+  .del-cancel  { flex:1; padding:13px; background:#f1f5f9; color:#64748b; border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .del-confirm { flex:1; padding:13px; background:#dc2626; color:white; border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
+
+  @media (min-width: 640px) {
+    .tn-tenants-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
+    .tn-tenants-grid .tc { margin-bottom: 0; }
+  }
+  @media (min-width: 1024px) {
+    .tn-tenants-grid { grid-template-columns: repeat(3,1fr); }
+  }
+`;
+
+export default function Tenants() {
+  const [tenants, setTenants]         = useState([]);
+  const [rooms, setRooms]             = useState([]);
+  const [showForm, setShowForm]       = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [saving, setSaving]           = useState(false);
+  const [search, setSearch]           = useState('');
+  const [editId, setEditId]           = useState(null);
   const [form, setForm] = useState({
-    name: '', phone: '', email: '', address: '',
-    company: '', roomNumber: '', bedNumber: '',
-    monthlyRent: '', deposit: '', checkIn: '',
-    idType: 'Aadhaar', idNumber: '',
-    emergencyContact: '', emergencyPhone: '',
+    name:'', phone:'', email:'', address:'', company:'',
+    roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
+    checkIn:'', idType:'Aadhaar', idNumber:'',
+    emergencyContact:'', emergencyPhone:'',
   });
 
   const user = auth.currentUser;
-
-  // ── Limit hook — only gets limits from Firestore
   const { limits } = useLimitCheck();
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
-      const tSnap = await getDocs(tq);
-      const all = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const active = all.filter(t => t.status !== 'deleted');
-      setTenants(active);
-
-      const rq = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
-      const rSnap = await getDocs(rq);
-      setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (err) {
-      console.error(err);
-    }
+      const tSnap = await getDocs(query(collection(db,'tenants'), where('ownerId','==',user.uid)));
+      setTenants(tSnap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.status!=='deleted'));
+      const rSnap = await getDocs(query(collection(db,'rooms'), where('ownerId','==',user.uid)));
+      setRooms(rSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e) { console.error(e); }
     setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  // ── Limit logic — AFTER tenants state, uses local state (always accurate)
   const tenantCount = tenants.length;
   const maxTenants  = limits?.maxTenants ?? 50;
-  const tenantPct   = maxTenants > 0 ? (tenantCount / maxTenants) * 100 : 0;
+  const tenantPct   = maxTenants > 0 ? (tenantCount/maxTenants)*100 : 0;
   const isNearLimit = tenantPct >= 90 && tenantPct < 100;
   const isAtLimit   = tenantCount >= maxTenants;
 
-  // ── Get vacant beds for selected room
   const getVacantBeds = (roomNumber) => {
     if (!roomNumber) return [];
-    const room = rooms.find(r => r.roomNumber === roomNumber);
+    const room = rooms.find(r=>r.roomNumber===roomNumber);
     if (!room) return [];
-    const totalBeds = room.totalBeds || 0;
-    const occupiedBedNumbers = tenants
-      .filter(t => t.roomNumber === roomNumber && t.id !== editId)
-      .map(t => parseInt(t.bedNumber))
-      .filter(n => !isNaN(n));
-    const vacant = [];
-    for (let i = 1; i <= totalBeds; i++) {
-      if (!occupiedBedNumbers.includes(i)) vacant.push(i);
-    }
-    return vacant;
+    const occupied = tenants
+      .filter(t=>t.roomNumber===roomNumber && t.id!==editId)
+      .map(t=>parseInt(t.bedNumber)).filter(n=>!isNaN(n));
+    const all = [];
+    for (let i=1; i<=room.totalBeds; i++) all.push({ num: i, occupied: occupied.includes(i) });
+    return all;
   };
 
   const resetForm = () => {
-    setForm({
-      name: '', phone: '', email: '', address: '',
-      company: '', roomNumber: '', bedNumber: '',
-      monthlyRent: '', deposit: '', checkIn: '',
-      idType: 'Aadhaar', idNumber: '',
-      emergencyContact: '', emergencyPhone: '',
-    });
+    setForm({ name:'', phone:'', email:'', address:'', company:'',
+      roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
+      checkIn:'', idType:'Aadhaar', idNumber:'',
+      emergencyContact:'', emergencyPhone:'' });
     setEditId(null);
     setShowForm(false);
   };
 
   const handleEdit = (tenant) => {
     setForm({
-      name: tenant.name || '',
-      phone: tenant.phone || '',
-      email: tenant.email || '',
-      address: tenant.address || '',
-      company: tenant.company || '',
-      roomNumber: tenant.roomNumber || '',
-      bedNumber: tenant.bedNumber || '',
-      monthlyRent: tenant.monthlyRent || '',
-      deposit: tenant.deposit || '',
-      checkIn: tenant.checkIn || '',
-      idType: tenant.idType || 'Aadhaar',
-      idNumber: tenant.idNumber || '',
-      emergencyContact: tenant.emergencyContact || '',
-      emergencyPhone: tenant.emergencyPhone || '',
+      name: tenant.name||'', phone: tenant.phone||'', email: tenant.email||'',
+      address: tenant.address||'', company: tenant.company||'',
+      roomNumber: tenant.roomNumber||'', bedNumber: tenant.bedNumber||'',
+      monthlyRent: tenant.monthlyRent||'', deposit: tenant.deposit||'',
+      checkIn: tenant.checkIn||'', idType: tenant.idType||'Aadhaar',
+      idNumber: tenant.idNumber||'', emergencyContact: tenant.emergencyContact||'',
+      emergencyPhone: tenant.emergencyPhone||'',
     });
     setEditId(tenant.id);
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSave = async () => {
-    // ── HARD BLOCK — new tenants only, editing always allowed
-    if (!editId && isAtLimit) {
-      return alert(`🚫 Tenant limit reached! (${tenantCount}/${maxTenants})\nContact your admin to increase the limit.`);
-    }
-    if (!form.name || !form.phone || !form.roomNumber) {
-      return alert('Please fill Name, Phone and Room Number!');
-    }
-    if (!form.bedNumber) {
-      return alert('Please select a Bed Number!');
-    }
+    if (!editId && isAtLimit) return alert(`🚫 Tenant limit reached! (${tenantCount}/${maxTenants})`);
+    if (!form.name||!form.phone||!form.roomNumber) return alert('Please fill Name, Phone and Room Number!');
+    if (!form.bedNumber) return alert('Please select a Bed Number!');
     setSaving(true);
     try {
-      const data = {
-        ...form,
-        monthlyRent: parseInt(form.monthlyRent) || 0,
-        deposit: parseInt(form.deposit) || 0,
-      };
-
+      const data = { ...form, monthlyRent: parseInt(form.monthlyRent)||0, deposit: parseInt(form.deposit)||0 };
       if (editId) {
-        const oldTenant = tenants.find(t => t.id === editId);
-        if (oldTenant && oldTenant.roomNumber !== form.roomNumber) {
-          const oldRoom = rooms.find(r => r.roomNumber === oldTenant.roomNumber);
-          if (oldRoom) {
-            await updateDoc(doc(db, 'rooms', oldRoom.id), {
-              occupiedBeds: Math.max(0, (oldRoom.occupiedBeds || 0) - 1)
-            });
-          }
-          const newRoom = rooms.find(r => r.roomNumber === form.roomNumber);
-          if (newRoom) {
-            await updateDoc(doc(db, 'rooms', newRoom.id), {
-              occupiedBeds: (newRoom.occupiedBeds || 0) + 1
-            });
-          }
+        const old = tenants.find(t=>t.id===editId);
+        if (old && old.roomNumber !== form.roomNumber) {
+          const oldRoom = rooms.find(r=>r.roomNumber===old.roomNumber);
+          if (oldRoom) await updateDoc(doc(db,'rooms',oldRoom.id), { occupiedBeds: Math.max(0,(oldRoom.occupiedBeds||0)-1) });
+          const newRoom = rooms.find(r=>r.roomNumber===form.roomNumber);
+          if (newRoom) await updateDoc(doc(db,'rooms',newRoom.id), { occupiedBeds: (newRoom.occupiedBeds||0)+1 });
         }
-        await updateDoc(doc(db, 'tenants', editId), data);
+        await updateDoc(doc(db,'tenants',editId), data);
       } else {
-        await addDoc(collection(db, 'tenants'), {
-          ...data,
-          ownerId: user.uid,
-          status: 'Active',
-          createdAt: new Date(),
-        });
-        const room = rooms.find(r => r.roomNumber === form.roomNumber);
-        if (room) {
-          await updateDoc(doc(db, 'rooms', room.id), {
-            occupiedBeds: (room.occupiedBeds || 0) + 1
-          });
-        }
+        await addDoc(collection(db,'tenants'), { ...data, ownerId:user.uid, status:'Active', createdAt:new Date() });
+        const room = rooms.find(r=>r.roomNumber===form.roomNumber);
+        if (room) await updateDoc(doc(db,'rooms',room.id), { occupiedBeds:(room.occupiedBeds||0)+1 });
       }
-
       resetForm();
       fetchData();
-    } catch (err) {
-      console.error(err);
-      alert('Something went wrong while saving!');
-    }
+    } catch(e) { console.error(e); alert('Something went wrong!'); }
     setSaving(false);
   };
 
-  const handleDelete = async (tenant) => {
-    const confirmed = window.confirm(
-      `Remove ${tenant.name} from active tenants?\n\nTheir rent history will be preserved in Reports.`
-    );
-    if (!confirmed) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await updateDoc(doc(db, 'tenants', tenant.id), {
-        status: 'deleted',
-        deletedAt: new Date().toISOString(),
-      });
-      const roomQuery = query(
-        collection(db, 'rooms'),
-        where('ownerId', '==', user.uid),
-        where('roomNumber', '==', tenant.roomNumber)
-      );
-      const roomSnap = await getDocs(roomQuery);
-      if (!roomSnap.empty) {
-        const roomDoc = roomSnap.docs[0];
-        const currentOccupied = roomDoc.data().occupiedBeds || 0;
-        await updateDoc(doc(db, 'rooms', roomDoc.id), {
-          occupiedBeds: Math.max(0, currentOccupied - 1)
-        });
+      await updateDoc(doc(db,'tenants',deleteTarget.id), { status:'deleted', deletedAt: new Date().toISOString() });
+      const rSnap = await getDocs(query(collection(db,'rooms'),
+        where('ownerId','==',user.uid), where('roomNumber','==',deleteTarget.roomNumber)));
+      if (!rSnap.empty) {
+        const rd = rSnap.docs[0];
+        await updateDoc(doc(db,'rooms',rd.id), { occupiedBeds: Math.max(0,(rd.data().occupiedBeds||0)-1) });
       }
-      alert(`✅ ${tenant.name} removed. History saved in Reports.`);
+      setDeleteTarget(null);
       fetchData();
-    } catch (err) {
-      console.error(err);
-      alert('Something went wrong!');
-    }
+    } catch(e) { console.error(e); }
   };
 
-  const filtered = tenants.filter(t =>
+  const filtered = tenants.filter(t=>
     t.name?.toLowerCase().includes(search.toLowerCase()) ||
-    t.phone?.includes(search) ||
-    t.roomNumber?.includes(search)
+    t.phone?.includes(search) || t.roomNumber?.includes(search)
   );
 
-  const vacantBeds  = getVacantBeds(form.roomNumber);
-  const selectedRoom = rooms.find(r => r.roomNumber === form.roomNumber);
+  const beds = getVacantBeds(form.roomNumber);
+  const selectedRoom = rooms.find(r=>r.roomNumber===form.roomNumber);
 
   return (
-    <div style={styles.container}>
+    <>
+      <style>{css}</style>
+      <div className="tn-root">
 
-      {/* Header */}
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Tenant Management</h1>
-          <p style={styles.subtitle}>Manage all your tenants in one place</p>
-        </div>
-
-        {/* Add Tenant Button — auto disabled at limit */}
-        <button
-          style={{
-            ...styles.addBtn,
-            opacity: isAtLimit ? 0.5 : 1,
-            cursor: isAtLimit ? 'not-allowed' : 'pointer',
-            background: isAtLimit
-              ? '#94a3b8'
-              : 'linear-gradient(135deg, #e94560, #0f3460)',
-          }}
-          disabled={isAtLimit}
-          onClick={() => {
-            if (isAtLimit) return;
-            resetForm();
-            setShowForm(!showForm);
-          }}>
-          {showForm ? '✕ Cancel' : isAtLimit ? '🚫 Limit Reached' : '➕ Add Tenant'}
-        </button>
-      </div>
-
-      {/* ── LIMIT REACHED BANNER */}
-      {isAtLimit && (
-        <div style={{
-          background: '#fef2f2', border: '1.5px solid #fecaca',
-          borderRadius: '12px', padding: '14px 18px',
-          marginBottom: '16px', display: 'flex',
-          alignItems: 'center', gap: '12px',
-        }}>
-          <span style={{ fontSize: '20px' }}>🚫</span>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#dc2626' }}>
-              Tenant Limit Reached ({tenantCount}/{maxTenants})
+        {/* Top bar */}
+        <div className="tn-topbar">
+          <div className="tn-topbar-row">
+            <div>
+              <h1 className="tn-page-title">Tenants</h1>
+              <p className="tn-page-sub">{tenantCount} active · {maxTenants - tenantCount} slots left</p>
             </div>
-            <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '2px' }}>
-              You cannot add more tenants. Contact your admin to increase the limit.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── NEAR LIMIT WARNING BANNER */}
-      {isNearLimit && (
-        <div style={{
-          background: '#fffbeb', border: '1.5px solid #fde68a',
-          borderRadius: '12px', padding: '14px 18px',
-          marginBottom: '16px', display: 'flex',
-          alignItems: 'center', gap: '12px',
-        }}>
-          <span style={{ fontSize: '20px' }}>⚠️</span>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#d97706' }}>
-              Approaching Tenant Limit ({tenantCount}/{maxTenants})
-            </div>
-            <div style={{ fontSize: '12px', color: '#f59e0b', marginTop: '2px' }}>
-              You are close to your limit. Contact your admin to increase it soon.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Stats */}
-      <div style={styles.statsRow}>
-        {[
-          {
-            label: `Tenants (${tenantCount}/${maxTenants})`,
-            value: tenantCount,
-            color: isAtLimit ? '#dc2626' : isNearLimit ? '#d97706' : '#4f46e5',
-            bg:    isAtLimit ? '#fef2f2' : isNearLimit ? '#fffbeb' : '#eef2ff',
-          },
-          { label: 'Active Tenants',  value: tenants.filter(t => t.status === 'Active').length, color: '#059669', bg: '#ecfdf5' },
-          { label: 'Total Deposit',   value: `₹${tenants.reduce((a, t) => a + (t.deposit || 0), 0).toLocaleString()}`, color: '#d97706', bg: '#fffbeb' },
-          { label: 'Monthly Revenue', value: `₹${tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0).toLocaleString()}`, color: '#0891b2', bg: '#ecfeff' },
-        ].map(({ label, value, color, bg }) => (
-          <div key={label} style={{ ...styles.statCard, background: bg }}>
-            <div style={{ ...styles.statValue, color }}>{value}</div>
-            <div style={styles.statLabel}>{label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Form */}
-      {showForm && (
-        <div style={styles.formCard}>
-          <h3 style={styles.formTitle}>
-            {editId ? '✏️ Edit Tenant' : '➕ Add New Tenant'}
-          </h3>
-
-          {/* Personal Details */}
-          <div style={styles.formSection}>
-            <div style={styles.formSectionTitle}>👤 Personal Details</div>
-            <div style={styles.formGrid}>
-              {[
-                { label: 'Full Name *',       key: 'name',    type: 'text',  ph: 'John Doe'      },
-                { label: 'Phone Number *',    key: 'phone',   type: 'tel',   ph: '9876543210'    },
-                { label: 'Email',             key: 'email',   type: 'email', ph: 'john@email.com'},
-                { label: 'Company / College', key: 'company', type: 'text',  ph: 'ABC Company'   },
-                { label: 'Address',           key: 'address', type: 'text',  ph: 'Home address'  },
-              ].map(({ label, key, type, ph }) => (
-                <div key={key} style={styles.field}>
-                  <label style={styles.label}>{label}</label>
-                  <input style={styles.input} type={type} placeholder={ph}
-                    value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Room Details */}
-          <div style={styles.formSection}>
-            <div style={styles.formSectionTitle}>🛏️ Room Details</div>
-            <div style={styles.formGrid}>
-              <div style={styles.field}>
-                <label style={styles.label}>Room Number *</label>
-                <select style={styles.input} value={form.roomNumber}
-                  onChange={e => setForm({ ...form, roomNumber: e.target.value, bedNumber: '' })}>
-                  <option value="">Select Room</option>
-                  {rooms.map(r => {
-                    const vacant = r.totalBeds - (r.occupiedBeds || 0);
-                    return (
-                      <option key={r.id} value={r.roomNumber}
-                        disabled={vacant === 0 && r.roomNumber !== form.roomNumber}>
-                        Room {r.roomNumber} ({r.roomType}) — {vacant} vacant
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>Bed Number *</label>
-                {!form.roomNumber ? (
-                  <div style={styles.noBedMsg}>← Select a room first</div>
-                ) : vacantBeds.length > 0 ? (
-                  <select style={styles.input} value={form.bedNumber}
-                    onChange={e => setForm({ ...form, bedNumber: e.target.value })}>
-                    <option value="">Select Bed</option>
-                    {vacantBeds.map(bed => (
-                      <option key={bed} value={bed}>🟢 Bed {bed} — Vacant</option>
-                    ))}
-                    {editId && form.bedNumber && !vacantBeds.includes(parseInt(form.bedNumber)) && (
-                      <option value={form.bedNumber}>🔴 Bed {form.bedNumber} — Current</option>
-                    )}
-                  </select>
-                ) : (
-                  <div style={{ ...styles.noBedMsg, background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca' }}>
-                    ❌ No vacant beds in this room!
-                  </div>
-                )}
-              </div>
-
-              {selectedRoom && (
-                <div style={styles.roomPreview}>
-                  <div style={styles.roomPreviewTitle}>📋 Room Info</div>
-                  <div style={styles.roomPreviewDetails}>
-                    <span>🛏️ {selectedRoom.totalBeds} total beds</span>
-                    <span style={{ color: '#059669' }}>🟢 {selectedRoom.totalBeds - (selectedRoom.occupiedBeds || 0)} vacant</span>
-                    <span style={{ color: '#dc2626' }}>🔴 {selectedRoom.occupiedBeds || 0} occupied</span>
-                    <span>💰 ₹{selectedRoom.rentPerBed?.toLocaleString()}/bed</span>
-                  </div>
-                </div>
-              )}
-
-              {[
-                { label: 'Monthly Rent (₹)', key: 'monthlyRent', type: 'text', ph: '5000'  },
-                { label: 'Deposit (₹)',       key: 'deposit',     type: 'text', ph: '10000' },
-                { label: 'Check-in Date',     key: 'checkIn',     type: 'date', ph: ''      },
-              ].map(({ label, key, type, ph }) => (
-                <div key={key} style={styles.field}>
-                  <label style={styles.label}>{label}</label>
-                  <input style={styles.input} type={type} placeholder={ph}
-                    value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ID Proof */}
-          <div style={styles.formSection}>
-            <div style={styles.formSectionTitle}>🪪 ID Proof</div>
-            <div style={styles.formGrid}>
-              <div style={styles.field}>
-                <label style={styles.label}>ID Type</label>
-                <select style={styles.input} value={form.idType}
-                  onChange={e => setForm({ ...form, idType: e.target.value })}>
-                  {['Aadhaar', 'Passport', 'Driving License', 'PAN Card'].map(o => (
-                    <option key={o}>{o}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={styles.field}>
-                <label style={styles.label}>ID Number</label>
-                <input style={styles.input} type="text" placeholder="Enter ID number"
-                  value={form.idNumber} onChange={e => setForm({ ...form, idNumber: e.target.value })} />
-              </div>
-            </div>
-          </div>
-
-          {/* Emergency Contact */}
-          <div style={styles.formSection}>
-            <div style={styles.formSectionTitle}>🆘 Emergency Contact</div>
-            <div style={styles.formGrid}>
-              {[
-                { label: 'Contact Name',  key: 'emergencyContact', type: 'text', ph: 'Parent / Spouse' },
-                { label: 'Contact Phone', key: 'emergencyPhone',   type: 'tel',  ph: '9876543210'      },
-              ].map(({ label, key, type, ph }) => (
-                <div key={key} style={styles.field}>
-                  <label style={styles.label}>{label}</label>
-                  <input style={styles.input} type={type} placeholder={ph}
-                    value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={styles.formButtons}>
-            <button style={styles.cancelBtn} onClick={resetForm}>Cancel</button>
-            <button
-              style={{
-                ...styles.saveBtn,
-                opacity: (saving || (isAtLimit && !editId)) ? 0.5 : 1,
-                cursor:  (saving || (isAtLimit && !editId)) ? 'not-allowed' : 'pointer',
-              }}
-              onClick={handleSave}
-              disabled={saving || (isAtLimit && !editId)}>
-              {saving ? 'Saving...' : editId ? '✏️ Update Tenant' : '💾 Save Tenant'}
+            <button className="tn-add-fab"
+              disabled={isAtLimit}
+              onClick={() => { if (!isAtLimit) { resetForm(); setShowForm(true); } }}>
+              ＋
             </button>
           </div>
         </div>
-      )}
 
-      {/* Search */}
-      <div style={styles.searchBox}>
-        <input style={styles.searchInput} type="text"
-          placeholder="🔍 Search by name, phone or room..."
-          value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
-
-      {/* Tenants List */}
-      {loading ? (
-        <div style={styles.loading}>Loading tenants...</div>
-      ) : filtered.length === 0 ? (
-        <div style={styles.empty}>
-          <div style={styles.emptyIcon}>👥</div>
-          <p style={styles.emptyText}>{search ? 'No tenants found' : 'No tenants added yet'}</p>
-          <p style={styles.emptySub}>{search ? 'Try a different search' : 'Click "Add Tenant" to get started'}</p>
-        </div>
-      ) : (
-        <div style={styles.tenantsGrid}>
-          {filtered.map(tenant => (
-            <div key={tenant.id} style={styles.tenantCard}>
-              <div style={styles.tenantHeader}>
-                <div style={styles.tenantAvatar}>
-                  {tenant.name?.charAt(0).toUpperCase()}
-                </div>
-                <div style={styles.tenantInfo}>
-                  <div style={styles.tenantName}>{tenant.name}</div>
-                  <div style={styles.tenantPhone}>📞 {tenant.phone}</div>
-                </div>
-                <div style={{ ...styles.statusBadge, background: '#ecfdf5', color: '#059669' }}>
-                  {tenant.status}
-                </div>
-              </div>
-
-              <div style={styles.tenantDetails}>
-                {[
-                  ['🛏️ Room',    `Room ${tenant.roomNumber}`],
-                  ['🪑 Bed',     `Bed ${tenant.bedNumber || 'N/A'}`],
-                  ['💰 Rent',    `₹${(tenant.monthlyRent || 0).toLocaleString()}/mo`],
-                  ['💵 Deposit', `₹${(tenant.deposit || 0).toLocaleString()}`],
-                  ['📅 Check-in', tenant.checkIn || 'N/A'],
-                  ['🪪 ID',      tenant.idType],
-                ].map(([k, v]) => (
-                  <div key={k} style={styles.detail}>
-                    <span style={styles.detailKey}>{k}</span>
-                    <span style={styles.detailVal}>{v}</span>
-                  </div>
-                ))}
-              </div>
-
-              {tenant.company && (
-                <div style={styles.company}>🏢 {tenant.company}</div>
-              )}
-
-              <div style={styles.tenantFooter}>
-                <button style={styles.editBtn}   onClick={() => handleEdit(tenant)}>✏️ Edit</button>
-                <button style={styles.deleteBtn} onClick={() => handleDelete(tenant)}>🗑️ Remove</button>
-              </div>
+        {/* Stats strip */}
+        <div className="tn-stats">
+          {[
+            { label:'Tenants', value:`${tenantCount}/${maxTenants}`,
+              color: isAtLimit?'#dc2626': isNearLimit?'#d97706':'#4f46e5' },
+            { label:'Active',   value: tenants.filter(t=>t.status==='Active').length, color:'#059669' },
+            { label:'Deposits', value:`₹${(tenants.reduce((a,t)=>a+(t.deposit||0),0)/1000).toFixed(0)}k`, color:'#d97706' },
+            { label:'Revenue',  value:`₹${(tenants.reduce((a,t)=>a+(t.monthlyRent||0),0)/1000).toFixed(0)}k`, color:'#0891b2' },
+          ].map(({label,value,color})=>(
+            <div key={label} className="tn-stat">
+              <div className="tn-stat-num" style={{color}}>{value}</div>
+              <div className="tn-stat-label">{label}</div>
             </div>
           ))}
         </div>
-      )}
-    </div>
+
+        {/* Content */}
+        <div className="tn-content">
+
+          {/* Limit banners */}
+          {isAtLimit && (
+            <div className="tn-banner" style={{background:'#fef2f2',border:'1.5px solid #fecaca'}}>
+              <span className="tn-banner-icon">🚫</span>
+              <div>
+                <div className="tn-banner-title" style={{color:'#dc2626'}}>Tenant Limit Reached ({tenantCount}/{maxTenants})</div>
+                <div className="tn-banner-sub" style={{color:'#ef4444'}}>Contact your admin to increase the limit.</div>
+              </div>
+            </div>
+          )}
+          {isNearLimit && (
+            <div className="tn-banner" style={{background:'#fffbeb',border:'1.5px solid #fde68a'}}>
+              <span className="tn-banner-icon">⚠️</span>
+              <div>
+                <div className="tn-banner-title" style={{color:'#d97706'}}>Approaching Limit ({tenantCount}/{maxTenants})</div>
+                <div className="tn-banner-sub" style={{color:'#f59e0b'}}>Contact your admin soon to increase your limit.</div>
+              </div>
+            </div>
+          )}
+
+          {/* Search */}
+          <input className="tn-search" type="text"
+            placeholder="🔍 Search by name, phone or room…"
+            value={search} onChange={e=>setSearch(e.target.value)} />
+
+          {/* Tenant list */}
+          {loading ? (
+            <div className="tn-loading"><div className="tn-spinner"/>Loading tenants…</div>
+          ) : filtered.length===0 ? (
+            <div className="tn-empty">
+              <div className="tn-empty-icon">👥</div>
+              <p className="tn-empty-title">{search ? 'No tenants found' : 'No tenants yet'}</p>
+              <p className="tn-empty-sub">{search ? 'Try a different search' : 'Add your first tenant to get started'}</p>
+              {!search && !isAtLimit && (
+                <button className="tn-empty-btn" onClick={()=>{ resetForm(); setShowForm(true); }}>
+                  ➕ Add First Tenant
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="tn-tenants-grid">
+              {filtered.map(tenant=>(
+                <div key={tenant.id} className="tc">
+                  <div className="tc-accent" style={{background:'linear-gradient(90deg,#4f46e5,#0891b2)'}} />
+                  <div className="tc-body">
+                    <div className="tc-header">
+                      <div className="tc-avatar">{tenant.name?.charAt(0).toUpperCase()}</div>
+                      <div style={{flex:1}}>
+                        <div className="tc-name">{tenant.name}</div>
+                        <div className="tc-phone">📞 {tenant.phone}</div>
+                      </div>
+                      <div className="tc-status-badge">{tenant.status}</div>
+                    </div>
+
+                    <div className="tc-details">
+                      {[
+                        ['🛏️ Room',    `Room ${tenant.roomNumber}`],
+                        ['🪑 Bed',     `Bed ${tenant.bedNumber||'N/A'}`],
+                        ['💰 Rent',    `₹${(tenant.monthlyRent||0).toLocaleString()}/mo`],
+                        ['💵 Deposit', `₹${(tenant.deposit||0).toLocaleString()}`],
+                        ['📅 Check-in', tenant.checkIn||'N/A'],
+                        ['🪪 ID',      tenant.idType],
+                      ].map(([k,v])=>(
+                        <div key={k} className="tc-detail-item">
+                          <span className="tc-detail-key">{k}</span>
+                          <span className="tc-detail-val">{v}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {tenant.company && <div className="tc-company">🏢 {tenant.company}</div>}
+
+                    <div className="tc-footer">
+                      <button className="tc-edit-btn" onClick={()=>handleEdit(tenant)}>✏️ Edit</button>
+                      <button className="tc-del-btn" onClick={()=>setDeleteTarget(tenant)}>🗑️ Remove</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Add / Edit Tenant Sheet ── */}
+        {showForm && (
+          <>
+            <div className="bso" onClick={resetForm} />
+            <div className="bs">
+              <div className="bs-handle" />
+              <div className="bs-header">
+                <h2 className="bs-title">{editId ? '✏️ Edit Tenant' : '➕ Add Tenant'}</h2>
+                <button className="bs-close" onClick={resetForm}>✕</button>
+              </div>
+              <div className="bs-body">
+
+                {/* Personal */}
+                <div className="fs-section">
+                  <div className="fs-section-title">👤 Personal Details</div>
+                  <div className="fs-row">
+                    <div className="fs-field">
+                      <label className="fs-label">Full Name *</label>
+                      <input className="fs-input" type="text" placeholder="John Doe"
+                        value={form.name} onChange={e=>setForm({...form,name:e.target.value})} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Phone *</label>
+                      <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
+                        value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="fs-row">
+                    <div className="fs-field">
+                      <label className="fs-label">Email</label>
+                      <input className="fs-input" type="email" placeholder="john@email.com"
+                        value={form.email} onChange={e=>setForm({...form,email:e.target.value})} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Company / College</label>
+                      <input className="fs-input" type="text" placeholder="ABC Company"
+                        value={form.company} onChange={e=>setForm({...form,company:e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="fs-field">
+                    <label className="fs-label">Address</label>
+                    <input className="fs-input" type="text" placeholder="Home address"
+                      value={form.address} onChange={e=>setForm({...form,address:e.target.value})} />
+                  </div>
+                </div>
+
+                {/* Room */}
+                <div className="fs-section">
+                  <div className="fs-section-title">🛏️ Room Details</div>
+                  <div className="fs-field">
+                    <label className="fs-label">Room Number *</label>
+                    <select className="fs-input" value={form.roomNumber}
+                      onChange={e=>setForm({...form,roomNumber:e.target.value,bedNumber:''})}>
+                      <option value="">Select Room</option>
+                      {rooms.map(r=>{
+                        const vacant = r.totalBeds-(r.occupiedBeds||0);
+                        return (
+                          <option key={r.id} value={r.roomNumber}
+                            disabled={vacant===0 && r.roomNumber!==form.roomNumber}>
+                            Room {r.roomNumber} ({r.roomType}) — {vacant} vacant
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Bed selector */}
+                  {form.roomNumber && (
+                    <div className="fs-field">
+                      <label className="fs-label">Bed Number *</label>
+                      {beds.length===0 ? (
+                        <div className="fs-no-bed error">❌ No vacant beds in this room!</div>
+                      ) : (
+                        <div className="fs-bed-grid">
+                          {beds.map(({num, occupied})=>(
+                            <button key={num}
+                              className={`fs-bed-btn ${occupied?'occupied':form.bedNumber==num?'selected':'vacant'}`}
+                              disabled={occupied}
+                              onClick={()=>!occupied&&setForm({...form,bedNumber:num.toString()})}>
+                              {num}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!form.roomNumber && (
+                    <div className="fs-no-bed">← Select a room first</div>
+                  )}
+
+                  {/* Room preview */}
+                  {selectedRoom && (
+                    <div className="fs-room-preview">
+                      <div className="fs-rp-title">📋 Room Info</div>
+                      <div className="fs-rp-chips">
+                        <span className="fs-rp-chip">🛏️ {selectedRoom.totalBeds} beds</span>
+                        <span className="fs-rp-chip" style={{color:'#059669'}}>🟢 {selectedRoom.totalBeds-(selectedRoom.occupiedBeds||0)} vacant</span>
+                        <span className="fs-rp-chip" style={{color:'#dc2626'}}>🔴 {selectedRoom.occupiedBeds||0} occupied</span>
+                        <span className="fs-rp-chip">💰 ₹{selectedRoom.rentPerBed?.toLocaleString()}/bed</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="fs-row" style={{marginTop:'12px'}}>
+                    <div className="fs-field">
+                      <label className="fs-label">Monthly Rent (₹)</label>
+                      <input className="fs-input" type="number" inputMode="numeric" placeholder="5000"
+                        value={form.monthlyRent} onChange={e=>setForm({...form,monthlyRent:e.target.value})} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Deposit (₹)</label>
+                      <input className="fs-input" type="number" inputMode="numeric" placeholder="10000"
+                        value={form.deposit} onChange={e=>setForm({...form,deposit:e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="fs-field">
+                    <label className="fs-label">Check-in Date</label>
+                    <input className="fs-input" type="date"
+                      value={form.checkIn} onChange={e=>setForm({...form,checkIn:e.target.value})} />
+                  </div>
+                </div>
+
+                {/* ID Proof */}
+                <div className="fs-section">
+                  <div className="fs-section-title">🪪 ID Proof</div>
+                  <div className="fs-field">
+                    <label className="fs-label">ID Type</label>
+                    <div className="fs-seg">
+                      {['Aadhaar','Passport','Driving License','PAN Card'].map(t=>(
+                        <button key={t} className={`fs-seg-btn${form.idType===t?' active':''}`}
+                          onClick={()=>setForm({...form,idType:t})}>{t}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="fs-field">
+                    <label className="fs-label">ID Number</label>
+                    <input className="fs-input" type="text" placeholder="Enter ID number"
+                      value={form.idNumber} onChange={e=>setForm({...form,idNumber:e.target.value})} />
+                  </div>
+                </div>
+
+                {/* Emergency */}
+                <div className="fs-section">
+                  <div className="fs-section-title">🆘 Emergency Contact</div>
+                  <div className="fs-row">
+                    <div className="fs-field">
+                      <label className="fs-label">Contact Name</label>
+                      <input className="fs-input" type="text" placeholder="Parent / Spouse"
+                        value={form.emergencyContact} onChange={e=>setForm({...form,emergencyContact:e.target.value})} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Contact Phone</label>
+                      <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
+                        value={form.emergencyPhone} onChange={e=>setForm({...form,emergencyPhone:e.target.value})} />
+                    </div>
+                  </div>
+                </div>
+
+                <button className="fs-save-btn" onClick={handleSave}
+                  disabled={saving||(isAtLimit&&!editId)}>
+                  {saving ? 'Saving…' : editId ? '✏️ Update Tenant' : '💾 Save Tenant'}
+                </button>
+
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Delete Confirm Sheet ── */}
+        {deleteTarget && (
+          <>
+            <div className="bso" onClick={()=>setDeleteTarget(null)} />
+            <div className="bs">
+              <div className="bs-handle" />
+              <div className="del-sheet">
+                <div className="del-icon">🗑️</div>
+                <p className="del-title">Remove {deleteTarget.name}?</p>
+                <p className="del-sub">
+                  They will be removed from active tenants.<br/>
+                  Their rent history will be preserved in Reports.
+                </p>
+                <div className="del-btn-row">
+                  <button className="del-cancel" onClick={()=>setDeleteTarget(null)}>Cancel</button>
+                  <button className="del-confirm" onClick={handleDelete}>Yes, Remove</button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+      </div>
+    </>
   );
 }
-
-const styles = {
-  container:          { padding: '0' },
-  header:             { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' },
-  title:              { fontSize: '24px', fontWeight: '800', color: '#1e293b', margin: 0 },
-  subtitle:           { color: '#94a3b8', fontSize: '13px', marginTop: '4px' },
-  addBtn:             { padding: '12px 24px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
-  statsRow:           { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '24px' },
-  statCard:           { borderRadius: '14px', padding: '20px', textAlign: 'center' },
-  statValue:          { fontSize: '28px', fontWeight: '800' },
-  statLabel:          { color: '#64748b', fontSize: '13px', marginTop: '4px' },
-  formCard:           { background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
-  formTitle:          { fontSize: '18px', fontWeight: '700', color: '#1e293b', marginTop: 0, marginBottom: '24px' },
-  formSection:        { marginBottom: '24px' },
-  formSectionTitle:   { fontSize: '14px', fontWeight: '700', color: '#4f46e5', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' },
-  formGrid:           { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px' },
-  field:              { display: 'flex', flexDirection: 'column' },
-  label:              { fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' },
-  input:              { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: '#f8fafc', MozAppearance: 'textfield', WebkitAppearance: 'none' },
-  noBedMsg:           { padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #fde68a', fontSize: '13px', background: '#fef9ec', color: '#d97706', fontWeight: '600' },
-  roomPreview:        { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px' },
-  roomPreviewTitle:   { fontSize: '11px', fontWeight: '700', color: '#059669', marginBottom: '8px', textTransform: 'uppercase' },
-  roomPreviewDetails: { display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#166534', fontWeight: '600' },
-  formButtons:        { display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' },
-  cancelBtn:          { padding: '12px 24px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-  saveBtn:            { padding: '12px 32px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
-  searchBox:          { marginBottom: '20px' },
-  searchInput:        { width: '100%', padding: '13px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: 'white', boxSizing: 'border-box' },
-  loading:            { textAlign: 'center', padding: '60px', color: '#94a3b8' },
-  empty:              { textAlign: 'center', padding: '60px', background: 'white', borderRadius: '16px' },
-  emptyIcon:          { fontSize: '48px', marginBottom: '12px' },
-  emptyText:          { fontSize: '16px', fontWeight: '600', color: '#1e293b', margin: '0 0 8px' },
-  emptySub:           { color: '#94a3b8', fontSize: '14px', margin: 0 },
-  tenantsGrid:        { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '20px' },
-  tenantCard:         { background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
-  tenantHeader:       { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' },
-  tenantAvatar:       { width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #0891b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '18px', flexShrink: 0 },
-  tenantInfo:         { flex: 1 },
-  tenantName:         { fontSize: '15px', fontWeight: '700', color: '#1e293b' },
-  tenantPhone:        { fontSize: '13px', color: '#64748b', marginTop: '2px' },
-  statusBadge:        { padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' },
-  tenantDetails:      { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' },
-  detail:             { display: 'flex', flexDirection: 'column' },
-  detailKey:          { fontSize: '11px', color: '#94a3b8', fontWeight: '600' },
-  detailVal:          { fontSize: '13px', color: '#1e293b', fontWeight: '600', marginTop: '2px' },
-  company:            { fontSize: '13px', color: '#64748b', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', marginBottom: '12px' },
-  tenantFooter:       { display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' },
-  editBtn:            { padding: '8px 14px', background: '#eef2ff', color: '#4f46e5', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
-  deleteBtn:          { padding: '8px 14px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
-};
-
-export default Tenants;
