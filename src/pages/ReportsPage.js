@@ -4,959 +4,932 @@ import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firesto
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-function ReportsPage() {
-  const [tenants, setTenants] = useState([]);
-  const [rooms, setRooms] = useState([]);
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+
+  .rp-root { font-family:'DM Sans',sans-serif; background:#f0f2f8; min-height:100vh; }
+
+  /* ── Top bar ── */
+  .rp-topbar {
+    background:linear-gradient(135deg,#1a1a2e 0%,#0f3460 100%);
+    padding:20px 20px 28px; position:relative; overflow:hidden;
+  }
+  .rp-topbar::after {
+    content:''; position:absolute; width:200px; height:200px; border-radius:50%;
+    background:rgba(233,69,96,0.13); top:-60px; right:-40px; pointer-events:none;
+  }
+  .rp-topbar-row { display:flex; justify-content:space-between; align-items:flex-start; position:relative; z-index:1; }
+  .rp-page-title { font-size:22px; font-weight:800; color:#fff; margin:0 0 3px; }
+  .rp-page-sub   { font-size:12px; color:rgba(255,255,255,0.5); font-weight:500; }
+
+  /* ── Content ── */
+  .rp-content { padding:16px 16px 100px; }
+  @media(min-width:640px){ .rp-content{ padding:24px 24px 40px; } }
+
+  /* ── Period box ── */
+  .rp-period-box {
+    background:white; border-radius:16px; padding:16px;
+    margin-bottom:16px; box-shadow:0 2px 10px rgba(0,0,0,0.06);
+  }
+  .rp-period-seg {
+    display:flex; background:#f1f5f9; border-radius:10px; padding:3px; gap:3px; margin-bottom:14px;
+  }
+  .rp-period-btn {
+    flex:1; padding:9px 8px; border:none; border-radius:8px;
+    font-size:12px; font-weight:700; cursor:pointer;
+    background:transparent; color:#94a3b8; font-family:inherit;
+    transition:all 0.2s; -webkit-tap-highlight-color:transparent;
+  }
+  .rp-period-btn.active { background:white; color:#e94560; box-shadow:0 1px 4px rgba(0,0,0,0.1); }
+
+  /* Month chips */
+  .rp-month-scroll {
+    display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:10px;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .rp-month-scroll::-webkit-scrollbar { display:none; }
+  .rp-month-chip {
+    white-space:nowrap; padding:7px 12px; border-radius:20px;
+    border:1.5px solid #e2e8f0; background:white;
+    font-size:12px; font-weight:600; color:#64748b;
+    cursor:pointer; font-family:inherit; flex-shrink:0;
+    -webkit-tap-highlight-color:transparent; transition:all 0.15s;
+  }
+  .rp-month-chip.active { background:#1a1a2e; color:white; border-color:#1a1a2e; }
+
+  .rp-year-row { display:flex; gap:6px; }
+  .rp-year-chip {
+    padding:7px 14px; border-radius:20px; border:1.5px solid #e2e8f0;
+    background:white; font-size:12px; font-weight:600; color:#64748b;
+    cursor:pointer; font-family:inherit; -webkit-tap-highlight-color:transparent; transition:all 0.15s;
+  }
+  .rp-year-chip.active { background:#1a1a2e; color:white; border-color:#1a1a2e; }
+
+  .rp-custom-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .rp-custom-label { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:5px; }
+  .rp-custom-input {
+    width:100%; padding:11px 12px; border:1.5px solid #e2e8f0; border-radius:10px;
+    font-size:14px; font-family:inherit; background:#fafbff; outline:none;
+    box-sizing:border-box; -webkit-appearance:none;
+  }
+  .rp-custom-input:focus { border-color:#e94560; }
+
+  /* ── Report type tabs ── */
+  .rp-type-scroll {
+    display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:16px;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .rp-type-scroll::-webkit-scrollbar { display:none; }
+  .rp-type-chip {
+    white-space:nowrap; padding:9px 16px; border-radius:20px;
+    border:1.5px solid #e2e8f0; background:white;
+    font-size:12px; font-weight:700; color:#64748b;
+    cursor:pointer; font-family:inherit; flex-shrink:0;
+    -webkit-tap-highlight-color:transparent; transition:all 0.15s;
+  }
+
+  /* ── Report card ── */
+  .rp-card {
+    background:white; border-radius:18px; overflow:hidden;
+    box-shadow:0 2px 10px rgba(0,0,0,0.06); margin-bottom:16px;
+  }
+  .rp-card-header {
+    padding:16px; display:flex; justify-content:space-between;
+    align-items:flex-start; border-bottom:1px solid #f1f5f9;
+  }
+  .rp-card-title  { font-size:16px; font-weight:800; color:#1e293b; margin:0 0 3px; }
+  .rp-card-period { font-size:11px; color:#94a3b8; }
+  .rp-dl-btn {
+    padding:9px 14px; border:none; border-radius:12px;
+    color:white; font-size:12px; font-weight:700;
+    cursor:pointer; font-family:inherit; flex-shrink:0;
+    -webkit-tap-highlight-color:transparent;
+    transition:opacity 0.15s,transform 0.1s;
+  }
+  .rp-dl-btn:active { transform:scale(0.96); opacity:0.9; }
+
+  /* ── Stats strip ── */
+  .rp-stats-strip {
+    display:grid; gap:0; overflow:hidden;
+  }
+  .rp-stat-tile {
+    padding:14px 10px; text-align:center; border-right:1px solid #f1f5f9;
+  }
+  .rp-stat-tile:last-child { border-right:none; }
+  .rp-stat-icon  { font-size:18px; margin-bottom:4px; }
+  .rp-stat-val   { font-size:12px; font-weight:800; line-height:1.2; word-break:break-all; }
+  .rp-stat-label { font-size:9px; color:#94a3b8; font-weight:600; margin-top:3px; text-transform:uppercase; letter-spacing:0.3px; }
+
+  /* ── Section title ── */
+  .rp-section-title {
+    font-size:12px; font-weight:800; color:#475569;
+    text-transform:uppercase; letter-spacing:0.5px;
+    margin:16px 16px 10px;
+  }
+
+  /* ── Summary chips row ── */
+  .rp-chips-row {
+    display:flex; flex-wrap:wrap; gap:6px;
+    padding:0 16px 14px;
+  }
+  .rp-chip {
+    font-size:11px; font-weight:600; padding:5px 12px;
+    border-radius:20px; background:#f1f5f9; color:#475569;
+  }
+
+  /* ── Tenant row cards (mobile list) ── */
+  .rp-tenant-row {
+    margin:0 16px 8px; padding:12px; border-radius:12px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .rp-tr-left { display:flex; align-items:center; gap:10px; }
+  .rp-tr-avatar {
+    width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    color:white; font-weight:800; font-size:14px;
+  }
+  .rp-tr-name   { font-size:13px; font-weight:700; color:#1e293b; }
+  .rp-tr-sub    { font-size:10px; color:#94a3b8; margin-top:2px; }
+  .rp-tr-right  { text-align:right; flex-shrink:0; }
+  .rp-tr-amount { font-size:14px; font-weight:800; }
+  .rp-tr-tag    { font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; margin-top:3px; display:inline-block; }
+
+  /* ── Payment history rows ── */
+  .rp-payment-row {
+    margin:0 16px 6px; padding:12px;
+    background:#f8fafc; border-radius:10px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .rp-pr-name   { font-size:13px; font-weight:700; color:#1e293b; }
+  .rp-pr-sub    { font-size:10px; color:#94a3b8; margin-top:2px; }
+  .rp-pr-amount { font-size:14px; font-weight:800; color:#059669; }
+  .rp-pr-method { font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; background:#eef2ff; color:#4f46e5; margin-top:3px; display:inline-block; }
+
+  /* ── Occupancy bar ── */
+  .rp-occ-bar { margin:0 16px 16px; }
+  .rp-occ-bar-row { display:flex; justify-content:space-between; font-size:12px; color:#64748b; margin-bottom:6px; }
+  .rp-occ-bar-bg  { height:8px; background:#e2e8f0; border-radius:99px; overflow:hidden; }
+  .rp-occ-bar-fill { height:100%; border-radius:99px; transition:width 0.5s; }
+
+  /* ── Stay filter chips ── */
+  .rp-stay-scroll {
+    display:flex; gap:6px; overflow-x:auto; padding:0 16px 12px;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .rp-stay-scroll::-webkit-scrollbar { display:none; }
+  .rp-stay-chip {
+    white-space:nowrap; padding:6px 12px; border-radius:20px;
+    border:1.5px solid #e2e8f0; background:white;
+    font-size:11px; font-weight:600; color:#64748b;
+    cursor:pointer; font-family:inherit; flex-shrink:0;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .rp-stay-chip.active { background:#0891b2; color:white; border-color:#0891b2; }
+
+  /* ── Empty / Loading ── */
+  .rp-empty { text-align:center; padding:40px 20px; }
+  .rp-empty-icon  { font-size:40px; margin-bottom:10px; }
+  .rp-empty-title { font-size:14px; font-weight:700; color:#94a3b8; }
+  .rp-loading { text-align:center; padding:50px; }
+  .rp-spinner { width:30px; height:30px; border:3px solid #e2e8f0; border-top-color:#e94560; border-radius:50%; animation:rpspin 0.7s linear infinite; margin:0 auto 12px; }
+  @keyframes rpspin { to{transform:rotate(360deg)} }
+
+  /* ── Penalty banner ── */
+  .rp-penalty-banner {
+    margin:0 16px 12px; padding:10px 14px;
+    background:#fef2f2; border:1px solid #fecaca; border-radius:12px;
+    font-size:12px; color:#dc2626; font-weight:600; line-height:1.6;
+  }
+  .rp-pb { padding-bottom:16px; }
+`;
+
+export default function ReportsPage() {
+  const [tenants, setTenants]   = useState([]);
+  const [rooms, setRooms]       = useState([]);
   const [payments, setPayments] = useState([]);
   const [elecBills, setElecBills] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
   const [activeReport, setActiveReport] = useState('rent');
-  const [filterMonth, setFilterMonth] = useState(
-    new Date().toLocaleString('default', { month: 'long' })
-  );
-  const [filterYear, setFilterYear] = useState(
-    new Date().getFullYear().toString()
-  );
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
-  const [periodMode, setPeriodMode] = useState('monthly');
-  const [stayFilter, setStayFilter] = useState('all');
-
-  // Penalty settings loaded from Firestore
+  const [filterMonth, setFilterMonth]   = useState(new Date().toLocaleString('en-US',{month:'long'}));
+  const [filterYear, setFilterYear]     = useState(new Date().getFullYear().toString());
+  const [customStart, setCustomStart]   = useState('');
+  const [customEnd, setCustomEnd]       = useState('');
+  const [periodMode, setPeriodMode]     = useState('monthly');
+  const [stayFilter, setStayFilter]     = useState('all');
   const [penaltyEnabled, setPenaltyEnabled] = useState(false);
-  const [penaltyAmount, setPenaltyAmount] = useState(0);
-  const [gracePeriod, setGracePeriod] = useState(0);
+  const [penaltyAmount, setPenaltyAmount]   = useState(0);
+  const [gracePeriod, setGracePeriod]       = useState(0);
 
-  const user = auth.currentUser;
-  const today = new Date();
-  today.setHours(0,0,0,0);
-
-  const months = ['January','February','March','April','May','June',
-    'July','August','September','October','November','December'];
+  const user   = auth.currentUser;
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const years  = ['2024','2025','2026','2027'];
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const tq = query(collection(db, 'tenants'), where('ownerId', '==', user.uid));
-      const tSnap = await getDocs(tq);
-      setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-      const rq = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
-      const rSnap = await getDocs(rq);
-      setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-      const pq = query(collection(db, 'payments'), where('ownerId', '==', user.uid));
-      const pSnap = await getDocs(pq);
-      setPayments(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-      const eq = query(collection(db, 'electricityBills'), where('ownerId', '==', user.uid));
-      const eSnap = await getDocs(eq);
-      setElecBills(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-      // Load penalty settings
-      const ownerDoc = await getDoc(doc(db, 'pgOwners', user.uid));
-      if (ownerDoc.exists()) {
-        const data = ownerDoc.data();
-        setPenaltyEnabled(data.penaltyEnabled || false);
-        setPenaltyAmount(data.penaltyAmount || 0);
-        setGracePeriod(data.gracePeriod || 0);
+      const [tS,rS,pS,eS,oD] = await Promise.all([
+        getDocs(query(collection(db,'tenants'),          where('ownerId','==',user.uid))),
+        getDocs(query(collection(db,'rooms'),            where('ownerId','==',user.uid))),
+        getDocs(query(collection(db,'payments'),         where('ownerId','==',user.uid))),
+        getDocs(query(collection(db,'electricityBills'), where('ownerId','==',user.uid))),
+        getDoc(doc(db,'pgOwners',user.uid)),
+      ]);
+      setTenants(tS.docs.map(d=>({id:d.id,...d.data()})));
+      setRooms(rS.docs.map(d=>({id:d.id,...d.data()})));
+      setPayments(pS.docs.map(d=>({id:d.id,...d.data()})));
+      setElecBills(eS.docs.map(d=>({id:d.id,...d.data()})));
+      if (oD.exists()) {
+        const d = oD.data();
+        setPenaltyEnabled(d.penaltyEnabled||false);
+        setPenaltyAmount(d.penaltyAmount||0);
+        setGracePeriod(d.gracePeriod||0);
       }
-    } catch (err) { console.error(err); }
+    } catch(e){ console.error(e); }
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(()=>{ fetchData(); },[]);
 
-  // Days stayed
-  const getDaysStayed = (tenant) => {
-    const checkIn = tenant.checkIn ? new Date(tenant.checkIn) : null;
-    if (!checkIn) return 0;
-    const checkOut = tenant.status === 'deleted' && tenant.deletedAt
-      ? new Date(tenant.deletedAt) : new Date();
-    return Math.max(0, Math.floor((checkOut - checkIn) / (1000 * 60 * 60 * 24)));
+  // ── Helpers ──
+  const getDaysStayed = (t) => {
+    const ci = t.checkIn ? new Date(t.checkIn) : null;
+    if (!ci) return 0;
+    const co = t.status==='deleted' && t.deletedAt ? new Date(t.deletedAt) : new Date();
+    return Math.max(0, Math.floor((co-ci)/(1000*60*60*24)));
+  };
+  const getDaysLabel = (d) => {
+    if (!d) return '0 days';
+    if (d<7)  return `${d}d`;
+    if (d<30) { const w=Math.floor(d/7),r=d%7; return `${w}w${r?` ${r}d`:''}`; }
+    const m=Math.floor(d/30),r=d%30; return `${m}mo${r?` ${r}d`:''}`;
+  };
+  const getCheckOut = (t) => t.status==='deleted' && t.deletedAt
+    ? new Date(t.deletedAt).toLocaleDateString('en-IN') : null;
+
+  const getMonthStart = () => { const i=months.indexOf(filterMonth); return new Date(parseInt(filterYear),i,1); };
+  const getMonthEnd   = () => { const i=months.indexOf(filterMonth); return new Date(parseInt(filterYear),i+1,0); };
+
+  const now = new Date();
+  const isCurrentMonth = periodMode==='monthly' && filterMonth===now.toLocaleString('en-US',{month:'long'}) && filterYear===now.getFullYear().toString();
+
+  const getDaysDiff = (t) => {
+    if (!t.checkIn) return 999;
+    const dueDay = new Date(t.checkIn).getDate();
+    const due = new Date(today.getFullYear(), today.getMonth(), dueDay);
+    return Math.floor((due-today)/(1000*60*60*24));
   };
 
-  const getDaysLabel = (days) => {
-    if (days === 0) return '0 days';
-    if (days < 7) return `${days} day${days > 1 ? 's' : ''}`;
-    if (days < 30) {
-      const w = Math.floor(days / 7), d = days % 7;
-      return `${w} week${w > 1 ? 's' : ''}${d > 0 ? ` ${d}d` : ''}`;
-    }
-    const m = Math.floor(days / 30), d = days % 30;
-    return `${m} month${m > 1 ? 's' : ''}${d > 0 ? ` ${d}d` : ''}`;
+  const getTenantPenalty = (t) => {
+    if (!penaltyEnabled) return 0;
+
+    // For past months — use the penalty that was actually recorded in payment
+    // This reflects what was ACTUALLY charged, not a recalculation
+    const completedPmt = rentPmts.find(p =>
+      p.tenantId === t.id && p.isCompleted === true
+    );
+    if (completedPmt) return completedPmt.penaltyAmount || 0;
+
+    // Current month + not yet paid → calculate from today
+    if (!isCurrentMonth) return 0;
+    const d = getDaysDiff(t);
+    if (d >= 0) return 0;
+    return Math.max(0, Math.abs(d)-(gracePeriod||0)) * (penaltyAmount||0);
   };
 
-  const getCheckOutDate = (tenant) => {
-    if (tenant.status === 'deleted' && tenant.deletedAt)
-      return new Date(tenant.deletedAt).toLocaleDateString('en-IN');
-    return null;
+  // Get electricity share for a tenant for the selected period
+  const getElecShareForTenant = (t) => {
+    const bill = getFilteredElec().find(b => b.roomNumber === t.roomNumber);
+    if (!bill) return 0;
+    return Math.round((bill.amount||0) / (bill.tenantCount||1));
   };
 
-  const getFilteredPayments = () => {
-    return payments.filter(p => {
-      if (periodMode === 'monthly') return p.month === filterMonth && p.year === filterYear;
-      const pd = new Date(p.paymentDate);
-      const start = customStart ? new Date(customStart) : null;
-      const end = customEnd ? new Date(customEnd) : null;
-      if (start && pd < start) return false;
-      if (end && pd > end) return false;
-      return true;
-    }).sort((a, b) => {
-      const aTime = a.recordedAt ? new Date(a.recordedAt) : new Date(a.paymentDate);
-      const bTime = b.recordedAt ? new Date(b.recordedAt) : new Date(b.paymentDate);
-      return bTime - aTime;
-    });
-  };
+  const getFilteredPayments = () => payments.filter(p=>{
+    if (periodMode==='monthly') return p.month===filterMonth && p.year===filterYear;
+    const pd=new Date(p.paymentDate);
+    const s=customStart?new Date(customStart):null;
+    const e=customEnd?new Date(customEnd):null;
+    if (s && pd<s) return false;
+    if (e && pd>e) return false;
+    return true;
+  }).sort((a,b)=>{
+    const at=a.recordedAt?new Date(a.recordedAt):new Date(a.paymentDate);
+    const bt=b.recordedAt?new Date(b.recordedAt):new Date(b.paymentDate);
+    return bt-at;
+  });
 
-  const getFilteredElecBills = () => {
-    return elecBills.filter(b => {
-      if (periodMode === 'monthly') return b.month === filterMonth && b.year === filterYear;
-      const bd = new Date(b.readingDate);
-      const start = customStart ? new Date(customStart) : null;
-      const end = customEnd ? new Date(customEnd) : null;
-      if (start && bd < start) return false;
-      if (end && bd > end) return false;
+  const getFilteredElec = () => elecBills.filter(b=>{
+    if (periodMode==='monthly') return b.month===filterMonth && b.year===filterYear;
+    const bd=new Date(b.readingDate);
+    const s=customStart?new Date(customStart):null;
+    const e=customEnd?new Date(customEnd):null;
+    if (s && bd<s) return false;
+    if (e && bd>e) return false;
+    return true;
+  });
+
+  const getTenantsForPeriod = () => {
+    if (periodMode!=='monthly') return tenants.filter(t=>t.status!=='deleted');
+    const ms=getMonthStart(), me=getMonthEnd();
+    return tenants.filter(t=>{
+      if (!t.checkIn) return false;
+      const ci=new Date(t.checkIn);
+      if (ci>me) return false;
+      if (t.status==='deleted' && t.deletedAt && new Date(t.deletedAt)<ms) return false;
       return true;
     });
   };
 
   const getPeriodLabel = () => {
-    if (periodMode === 'monthly') return `${filterMonth} ${filterYear}`;
-    if (customStart && customEnd) return `${customStart} to ${customEnd}`;
+    if (periodMode==='monthly') return `${filterMonth} ${filterYear}`;
+    if (customStart&&customEnd) return `${customStart} to ${customEnd}`;
     return 'Custom Period';
   };
 
-  const activeTenants = tenants.filter(t => t.status !== 'deleted');
+  const rentPmts         = getFilteredPayments();
+  const tenantsForPeriod = getTenantsForPeriod();
+  const totalCollected   = rentPmts.reduce((a,p)=>a+(p.amount||0),0);
+  const getTenantPaid    = (tid) => rentPmts.filter(p=>p.tenantId===tid).reduce((a,p)=>a+(p.amount||0),0);
 
-  // ─── PERIOD HELPERS ───
-  const now = new Date();
-  const currentMonthName = now.toLocaleString('default', { month: 'long' });
-  const currentYearStr = now.getFullYear().toString();
+  // Expected = Rent + Electricity (if bill exists) + Penalty (only if overdue/late)
+  const getTenantDue = (t) => (t.monthlyRent||0) + getElecShareForTenant(t) + getTenantPenalty(t);
 
-  const isCurrentMonth = periodMode === 'monthly'
-    && filterMonth === currentMonthName
-    && filterYear === currentYearStr;
+  const totalExpected  = tenantsForPeriod.reduce((a,t)=>a+getTenantDue(t),0);
+  const totalPenalty   = tenantsForPeriod.reduce((a,t)=>a+getTenantPenalty(t),0);
+  const totalPending   = Math.max(0,totalExpected-totalCollected);
 
-  // Get the last day of selected month/year
-  const getSelectedMonthEnd = () => {
-    const monthIndex = ['January','February','March','April','May','June',
-      'July','August','September','October','November','December']
-      .indexOf(filterMonth);
-    return new Date(parseInt(filterYear), monthIndex + 1, 0); // last day of month
-  };
+  const tenantStatus = tenantsForPeriod.map(t=>{
+    const paid = getTenantPaid(t.id);
+    const pen  = getTenantPenalty(t);
+    const elec = getElecShareForTenant(t);
+    const due  = getTenantDue(t);
+    const bal  = Math.max(0,due-paid);
+    const cnt  = rentPmts.filter(p=>p.tenantId===t.id).length;
+    const status = paid>=due?'paid':paid>0?'partial':'unpaid';
+    // Only flag penalty if it's actually > 0 (late payer)
+    const showPen = pen > 0;
+    return {...t, paid, pen, elec, due, bal, cnt, status, showPen};
+  }).sort((a,b)=>({unpaid:0,partial:1,paid:2}[a.status]-({unpaid:0,partial:1,paid:2}[b.status])));
 
-  // Get the first day of selected month/year
-  const getSelectedMonthStart = () => {
-    const monthIndex = ['January','February','March','April','May','June',
-      'July','August','September','October','November','December']
-      .indexOf(filterMonth);
-    return new Date(parseInt(filterYear), monthIndex, 1);
-  };
+  const paidCount    = tenantStatus.filter(t=>t.status==='paid').length;
+  const partialCount = tenantStatus.filter(t=>t.status==='partial').length;
+  const unpaidCount  = tenantStatus.filter(t=>t.status==='unpaid').length;
+  const penTenants   = tenantStatus.filter(t=>t.showPen); // only actual late payers
 
-  // Tenants who were active DURING the selected month
-  // = checked in on or before end of that month
-  // AND (still active OR moved out after start of that month)
-  const getTenantsForSelectedMonth = () => {
-    if (periodMode !== 'monthly') return activeTenants;
-    const monthEnd = getSelectedMonthEnd();
-    const monthStart = getSelectedMonthStart();
-    return tenants.filter(t => {
-      if (!t.checkIn) return false;
-      const checkIn = new Date(t.checkIn);
-      if (checkIn > monthEnd) return false; // checked in after selected month
-      if (t.status === 'deleted' && t.deletedAt) {
-        const movedOut = new Date(t.deletedAt);
-        if (movedOut < monthStart) return false; // moved out before selected month
-      }
-      return true;
-    });
-  };
+  // ── Elec stats ──
+  const elecFiltered   = getFilteredElec();
+  const totalElecBilled= elecFiltered.reduce((a,b)=>a+(b.amount||0),0);
 
-  // ─── PENALTY CALC ───
-  // Penalty only applies when viewing CURRENT month
-  // For past months, penalty was collected as part of payment — don't recalculate
-  const getDaysDiff = (tenant) => {
-    if (!tenant.checkIn) return 999;
-    const checkIn = new Date(tenant.checkIn);
-    const dueDay = checkIn.getDate();
-    const thisMonthDue = new Date(today.getFullYear(), today.getMonth(), dueDay);
-    return Math.floor((thisMonthDue - today) / (1000 * 60 * 60 * 24));
-  };
+  // ── Occupancy ──
+  const activeTenants = tenants.filter(t=>t.status!=='deleted');
+  const totalBeds     = rooms.reduce((a,r)=>a+(r.totalBeds||0),0);
+  const occupiedBeds  = rooms.reduce((a,r)=>a+(r.occupiedBeds||0),0);
+  const occupancyPct  = totalBeds>0 ? Math.round((occupiedBeds/totalBeds)*100) : 0;
+  const vacantRooms   = rooms.filter(r=>(r.occupiedBeds||0)<r.totalBeds);
+  const totalVacant   = rooms.reduce((a,r)=>a+Math.max(0,r.totalBeds-(r.occupiedBeds||0)),0);
 
-  const getTenantPenalty = (tenant) => {
-    if (!penaltyEnabled) return 0;
-    if (!isCurrentMonth) return 0; // ✅ past/future months = NO penalty
-    const daysDiff = getDaysDiff(tenant);
-    if (daysDiff >= 0) return 0;
-    const overdueDays = Math.abs(daysDiff);
-    const penaltyDays = Math.max(0, overdueDays - (gracePeriod || 0));
-    return penaltyDays * (penaltyAmount || 0);
-  };
-
-  // ─── RENT REPORT ───
-  const rentPayments = getFilteredPayments();
-
-  // Tenants for this selected month (not just current active)
-  const tenantsForPeriod = getTenantsForSelectedMonth();
-
-  // Total collected this period
-  const totalRentCollected = rentPayments.reduce((a, p) => a + (p.amount || 0), 0);
-
-  // Per-tenant paid amount this period
-  const getTenantPaidThisPeriod = (tenantId) => {
-    return rentPayments
-      .filter(p => p.tenantId === tenantId)
-      .reduce((a, p) => a + (p.amount || 0), 0);
-  };
-
-  // Per-tenant total due = rent + penalty (penalty only for current month)
-  const getTenantTotalDue = (tenant) => {
-    return (tenant.monthlyRent || 0) + getTenantPenalty(tenant);
-  };
-
-  // ✅ Expected = tenants who were active THAT month × their rent
-  // ✅ Penalty only added for current month
-  const totalRentExpected = tenantsForPeriod.reduce((a, t) => a + getTenantTotalDue(t), 0);
-  const totalPenaltyAmount = tenantsForPeriod.reduce((a, t) => a + getTenantPenalty(t), 0);
-  const totalPending = Math.max(0, totalRentExpected - totalRentCollected);
-
-  // Payment counts
-  const fullPayments = rentPayments.filter(p => !p.isPartial).length;
-  const partialPayments = rentPayments.filter(p => p.isPartial).length;
-
-  // Tenant wise status for report
-  const tenantRentStatus = tenantsForPeriod.map(tenant => {
-    const paid = getTenantPaidThisPeriod(tenant.id);
-    const penalty = getTenantPenalty(tenant);
-    const totalDue = getTenantTotalDue(tenant);
-    const balance = Math.max(0, totalDue - paid);
-    const paymentCount = rentPayments.filter(p => p.tenantId === tenant.id).length;
-    let status = 'unpaid';
-    if (paid >= totalDue) status = 'paid';
-    else if (paid > 0) status = 'partial';
-    return { ...tenant, paid, penalty, totalDue, balance, paymentCount, status };
-  }).sort((a, b) => {
-    const order = { unpaid: 0, partial: 1, paid: 2 };
-    return order[a.status] - order[b.status];
+  // ── History ──
+  const allSorted = [...tenants].sort((a,b)=>{
+    const aD=a.createdAt?.seconds?new Date(a.createdAt.seconds*1000):new Date(a.checkIn||0);
+    const bD=b.createdAt?.seconds?new Date(b.createdAt.seconds*1000):new Date(b.checkIn||0);
+    return bD-aD;
   });
-
-  const paidCount = tenantRentStatus.filter(t => t.status === 'paid').length;
-  const partialCount = tenantRentStatus.filter(t => t.status === 'partial').length;
-  const unpaidCount = tenantRentStatus.filter(t => t.status === 'unpaid').length;
-  const penaltyTenants = tenantRentStatus.filter(t => t.penalty > 0);
-
-  // ─── ELECTRICITY ───
-  const elecBillsFiltered = getFilteredElecBills();
-  const totalElecBilled = elecBillsFiltered.reduce((a, b) => a + (b.amount || 0), 0);
-
-  // ─── OCCUPANCY ───
-  const totalBeds = rooms.reduce((a, r) => a + (r.totalBeds || 0), 0);
-  const occupiedBeds = rooms.reduce((a, r) => a + (r.occupiedBeds || 0), 0);
-  const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
-  const vacantRooms = rooms.filter(r => (r.occupiedBeds || 0) < r.totalBeds);
-  const totalVacantBeds = rooms.reduce((a, r) => a + Math.max(0, r.totalBeds - (r.occupiedBeds || 0)), 0);
-
-  // ─── TENANT HISTORY ───
-  const allTenantsSorted = [...tenants].sort((a, b) => {
-    const aDate = a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000) : new Date(a.checkIn || 0);
-    const bDate = b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000) : new Date(b.checkIn || 0);
-    return bDate - aDate;
-  });
-
-  const stayFilters = [
-    { id: 'all', label: '👥 All' },
-    { id: '1-3', label: '1–3 Days' },
-    { id: 'week', label: '4–7 Days' },
-    { id: 'month', label: '1–4 Weeks' },
-    { id: 'long', label: '1+ Month' },
-  ];
-
-  const historyTenants = allTenantsSorted.filter(t => {
-    const days = getDaysStayed(t);
-    if (stayFilter === 'all') return true;
-    if (stayFilter === '1-3') return days >= 1 && days <= 3;
-    if (stayFilter === 'week') return days >= 4 && days <= 7;
-    if (stayFilter === 'month') return days > 7 && days <= 30;
-    if (stayFilter === 'long') return days > 30;
+  const stayFilters = [{id:'all',label:'All'},{id:'1-3',label:'1–3d'},{id:'week',label:'4–7d'},{id:'month',label:'1–4w'},{id:'long',label:'1m+'}];
+  const historyTenants = allSorted.filter(t=>{
+    const d=getDaysStayed(t);
+    if (stayFilter==='all')   return true;
+    if (stayFilter==='1-3')   return d>=1&&d<=3;
+    if (stayFilter==='week')  return d>=4&&d<=7;
+    if (stayFilter==='month') return d>7&&d<=30;
+    if (stayFilter==='long')  return d>30;
     return true;
   });
 
-  // ─── PDF ───
-  const downloadPDF = (reportType) => {
+  // ── PDF download ──
+  const downloadPDF = (type) => {
     const pdf = new jsPDF();
     const period = getPeriodLabel();
-    pdf.setFillColor(233, 69, 96);
-    pdf.rect(0, 0, 210, 35, 'F');
-    pdf.setTextColor(255,255,255);
-    pdf.setFontSize(20); pdf.setFont('helvetica','bold');
-    pdf.text('PG Manager', 14, 15);
-    pdf.setFontSize(12); pdf.setFont('helvetica','normal');
-    pdf.text(`${reportType} Report — ${period}`, 14, 25);
-    pdf.setTextColor(0,0,0);
-    let y = 45;
+    pdf.setFillColor(233,69,96); pdf.rect(0,0,210,35,'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(20); pdf.setFont('helvetica','bold');
+    pdf.text('PG Manager',14,15); pdf.setFontSize(12); pdf.setFont('helvetica','normal');
+    pdf.text(`${type} Report — ${period}`,14,25); pdf.setTextColor(0,0,0);
+    let y=45;
 
-    if (reportType === 'Rent Collection') {
-      // Stat boxes
-      const stats = [
-        { label: 'Expected', value: `Rs. ${totalRentExpected.toLocaleString()}`, color: [79,70,229], bg: [238,242,255] },
-        { label: 'Collected', value: `Rs. ${totalRentCollected.toLocaleString()}`, color: [5,150,105], bg: [236,253,245] },
-        { label: 'Pending', value: `Rs. ${totalPending.toLocaleString()}`, color: [220,38,38], bg: [254,242,242] },
-        { label: 'Penalty', value: `Rs. ${totalPenaltyAmount.toLocaleString()}`, color: [220,38,38], bg: [254,242,242] },
-        { label: 'Payments', value: `${rentPayments.length} total`, color: [217,119,6], bg: [255,251,235] },
+    if (type==='Rent Collection') {
+      const stats=[
+        {label:'Expected',value:`Rs. ${totalExpected.toLocaleString()}`,color:[79,70,229],bg:[238,242,255]},
+        {label:'Collected',value:`Rs. ${totalCollected.toLocaleString()}`,color:[5,150,105],bg:[236,253,245]},
+        {label:'Pending',value:`Rs. ${totalPending.toLocaleString()}`,color:[220,38,38],bg:[254,242,242]},
+        {label:'Penalty',value:`Rs. ${totalPenalty.toLocaleString()}`,color:[220,38,38],bg:[254,242,242]},
+        {label:'Payments',value:`${rentPmts.length} total`,color:[217,119,6],bg:[255,251,235]},
       ];
-      stats.forEach((s, i) => {
-        const x = 14 + (i % 3) * 62;
-        const rowY = i < 3 ? y : y + 38;
-        pdf.setFillColor(...s.bg);
-        pdf.rect(x, rowY, 58, 30, 'F');
+      stats.forEach((s,i)=>{
+        const x=14+(i%3)*62, ry=i<3?y:y+38;
+        pdf.setFillColor(...s.bg); pdf.rect(x,ry,58,30,'F');
         pdf.setFontSize(9); pdf.setTextColor(100,100,100); pdf.setFont('helvetica','normal');
-        pdf.text(s.label, x+4, rowY+10);
+        pdf.text(s.label,x+4,ry+10);
         pdf.setFontSize(12); pdf.setTextColor(...s.color); pdf.setFont('helvetica','bold');
-        pdf.text(s.value, x+4, rowY+22);
+        pdf.text(s.value,x+4,ry+22);
       });
-      y += 80;
-
-      // Penalty tenants
-      if (penaltyEnabled && penaltyTenants.length > 0) {
+      y+=80;
+      if (penaltyEnabled&&penTenants.length>0) {
         pdf.setFontSize(12); pdf.setFont('helvetica','bold'); pdf.setTextColor(220,38,38);
-        pdf.text(`Penalty Tenants (${penaltyTenants.length})`, 14, y); y += 6;
-        autoTable(pdf, {
-          startY: y,
-          head: [['Tenant','Room','Base Rent','Penalty','Total Due','Paid','Balance']],
-          body: penaltyTenants.map(t => [
-            t.name, `Room ${t.roomNumber}`,
-            `Rs. ${(t.monthlyRent||0).toLocaleString()}`,
-            `Rs. ${t.penalty.toLocaleString()}`,
-            `Rs. ${t.totalDue.toLocaleString()}`,
-            `Rs. ${t.paid.toLocaleString()}`,
-            `Rs. ${t.balance.toLocaleString()}`,
-          ]),
-          headStyles: { fillColor: [220,38,38], textColor: 255 },
-          alternateRowStyles: { fillColor: [254,242,242] },
-          styles: { fontSize: 9 },
-        });
-        y = pdf.lastAutoTable.finalY + 10;
+        pdf.text(`Penalty Tenants (${penTenants.length})`,14,y); y+=6;
+        autoTable(pdf,{startY:y,head:[['Tenant','Room','Rent','Penalty','Total','Paid','Balance']],
+          body:penTenants.map(t=>[t.name,`Room ${t.roomNumber}`,`Rs.${(t.monthlyRent||0).toLocaleString()}`,`Rs.${t.pen.toLocaleString()}`,`Rs.${t.due.toLocaleString()}`,`Rs.${t.paid.toLocaleString()}`,`Rs.${t.bal.toLocaleString()}`]),
+          headStyles:{fillColor:[220,38,38],textColor:255},alternateRowStyles:{fillColor:[254,242,242]},styles:{fontSize:9}});
+        y=pdf.lastAutoTable.finalY+10;
       }
-
       pdf.setFontSize(12); pdf.setFont('helvetica','bold'); pdf.setTextColor(0,0,0);
-      pdf.text('Payment Details', 14, y); y += 6;
-      autoTable(pdf, {
-        startY: y,
-        head: [['Tenant','Room','Amount','Method','Date','Type']],
-        body: rentPayments.map(p => [
-          p.tenantName, `Room ${p.roomNumber}`,
-          `Rs. ${p.amount?.toLocaleString()}`,
-          p.paymentMethod, p.paymentDate,
-          p.isPartial ? 'Partial' : 'Full',
-        ]),
-        headStyles: { fillColor: [233,69,96], textColor: 255 },
-        alternateRowStyles: { fillColor: [248,250,252] },
-        styles: { fontSize: 9 },
-      });
-
-      const unpaid = tenantRentStatus.filter(t => t.status !== 'paid');
-      if (unpaid.length > 0) {
-        const fy = pdf.lastAutoTable.finalY + 10;
+      pdf.text('Payment Details',14,y); y+=6;
+      autoTable(pdf,{startY:y,head:[['Tenant','Room','Amount','Method','Date','Type']],
+        body:rentPmts.map(p=>[p.tenantName,`Room ${p.roomNumber}`,`Rs.${p.amount?.toLocaleString()}`,p.paymentMethod,p.paymentDate,p.isPartial?'Partial':'Full']),
+        headStyles:{fillColor:[233,69,96],textColor:255},alternateRowStyles:{fillColor:[248,250,252]},styles:{fontSize:9}});
+      const unpaid=tenantStatus.filter(t=>t.status!=='paid');
+      if (unpaid.length>0) {
+        const fy=pdf.lastAutoTable.finalY+10;
         pdf.setFontSize(12); pdf.setFont('helvetica','bold'); pdf.setTextColor(220,38,38);
-        pdf.text('Pending / Partial Tenants', 14, fy);
-        autoTable(pdf, {
-          startY: fy + 6,
-          head: [['Tenant','Room','Rent','Penalty','Paid','Balance','Status']],
-          body: unpaid.map(t => [
-            t.name, `Room ${t.roomNumber}`,
-            `Rs. ${(t.monthlyRent||0).toLocaleString()}`,
-            t.penalty > 0 ? `Rs. ${t.penalty.toLocaleString()}` : '-',
-            `Rs. ${t.paid.toLocaleString()}`,
-            `Rs. ${t.balance.toLocaleString()}`,
-            t.status === 'partial' ? 'Partial' : 'Unpaid',
-          ]),
-          headStyles: { fillColor: [220,38,38], textColor: 255 },
-          alternateRowStyles: { fillColor: [254,242,242] },
-          styles: { fontSize: 9 },
-        });
+        pdf.text('Pending Tenants',14,fy);
+        autoTable(pdf,{startY:fy+6,head:[['Tenant','Room','Rent','Penalty','Paid','Balance','Status']],
+          body:unpaid.map(t=>[t.name,`Room ${t.roomNumber}`,`Rs.${(t.monthlyRent||0).toLocaleString()}`,t.pen>0?`Rs.${t.pen.toLocaleString()}`:'-',`Rs.${t.paid.toLocaleString()}`,`Rs.${t.bal.toLocaleString()}`,t.status==='partial'?'Partial':'Unpaid']),
+          headStyles:{fillColor:[220,38,38],textColor:255},alternateRowStyles:{fillColor:[254,242,242]},styles:{fontSize:9}});
       }
     }
-
-    if (reportType === 'Tenant History') {
-      pdf.setFontSize(12); pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold');
-      pdf.text(`Total Records: ${historyTenants.length}`, 14, y); y += 10;
-      autoTable(pdf, {
-        startY: y,
-        head: [['Name','Room','Check-In','Check-Out','Days Stayed','Status']],
-        body: historyTenants.map(t => [
-          t.name, `Room ${t.roomNumber}`, t.checkIn || '-',
-          getCheckOutDate(t) || 'Still staying',
-          getDaysLabel(getDaysStayed(t)),
-          t.status === 'deleted' ? 'Moved Out' : 'Active',
-        ]),
-        headStyles: { fillColor: [8,145,178], textColor: 255 },
-        alternateRowStyles: { fillColor: [248,250,252] },
-        styles: { fontSize: 9 },
-      });
+    if (type==='Tenant History') {
+      autoTable(pdf,{startY:y,head:[['Name','Room','Check-In','Check-Out','Days','Status']],
+        body:historyTenants.map(t=>[t.name,`Room ${t.roomNumber}`,t.checkIn||'-',getCheckOut(t)||'Still staying',getDaysLabel(getDaysStayed(t)),t.status==='deleted'?'Moved Out':'Active']),
+        headStyles:{fillColor:[8,145,178],textColor:255},alternateRowStyles:{fillColor:[248,250,252]},styles:{fontSize:9}});
     }
-
-    if (reportType === 'Electricity') {
-      pdf.setFillColor(255,251,235);
-      pdf.rect(14, y, 85, 30, 'F');
-      pdf.setFontSize(10); pdf.setTextColor(100,100,100);
-      pdf.text('Total Billed', 18, y+10);
-      pdf.setFontSize(14); pdf.setTextColor(217,119,6); pdf.setFont('helvetica','bold');
-      pdf.text(`Rs. ${totalElecBilled.toLocaleString()}`, 18, y+22);
-      y += 40;
-      autoTable(pdf, {
-        startY: y,
-        head: [['Room','Month','Amount','Tenants','Reading Date','Status']],
-        body: elecBillsFiltered.map(b => [
-          `Room ${b.roomNumber}`, `${b.month} ${b.year}`,
-          `Rs. ${b.amount?.toLocaleString()}`,
-          b.tenantCount || 0, b.readingDate,
-          b.isPaid ? 'Collected' : 'Pending',
-        ]),
-        headStyles: { fillColor: [217,119,6], textColor: 255 },
-        alternateRowStyles: { fillColor: [255,251,235] },
-        styles: { fontSize: 9 },
-      });
+    if (type==='Electricity') {
+      autoTable(pdf,{startY:y,head:[['Room','Month','Amount','Tenants','Reading Date','Status']],
+        body:elecFiltered.map(b=>[`Room ${b.roomNumber}`,`${b.month} ${b.year}`,`Rs.${b.amount?.toLocaleString()}`,b.tenantCount||0,b.readingDate,b.isPaid?'Collected':'Pending']),
+        headStyles:{fillColor:[217,119,6],textColor:255},alternateRowStyles:{fillColor:[255,251,235]},styles:{fontSize:9}});
     }
-
-    if (reportType === 'Occupancy') {
-      autoTable(pdf, {
-        startY: y,
-        head: [['Name','Room','Check-In','Monthly Rent','Phone']],
-        body: activeTenants.map(t => [
-          t.name, `Room ${t.roomNumber}`, t.checkIn,
-          `Rs. ${(t.monthlyRent||0).toLocaleString()}`, t.phone || '-',
-        ]),
-        headStyles: { fillColor: [79,70,229], textColor: 255 },
-        alternateRowStyles: { fillColor: [248,250,252] },
-        styles: { fontSize: 9 },
-      });
+    if (type==='Occupancy') {
+      autoTable(pdf,{startY:y,head:[['Name','Room','Check-In','Rent','Phone']],
+        body:activeTenants.map(t=>[t.name,`Room ${t.roomNumber}`,t.checkIn,`Rs.${(t.monthlyRent||0).toLocaleString()}`,t.phone||'-']),
+        headStyles:{fillColor:[79,70,229],textColor:255},alternateRowStyles:{fillColor:[248,250,252]},styles:{fontSize:9}});
     }
-
-    if (reportType === 'Vacant Rooms') {
-      pdf.setFontSize(12); pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold');
-      pdf.text(`Total Vacant Beds: ${totalVacantBeds}`, 14, y); y += 10;
-      autoTable(pdf, {
-        startY: y,
-        head: [['Room','Floor','Type','Total','Occupied','Vacant','Rent/Bed']],
-        body: vacantRooms.map(r => [
-          `Room ${r.roomNumber}`, r.floor || '-', r.roomType || '-',
-          r.totalBeds, r.occupiedBeds || 0,
-          r.totalBeds - (r.occupiedBeds || 0),
-          `Rs. ${(r.rentPerBed||0).toLocaleString()}`,
-        ]),
-        headStyles: { fillColor: [5,150,105], textColor: 255 },
-        alternateRowStyles: { fillColor: [236,253,245] },
-        styles: { fontSize: 9 },
-      });
+    if (type==='Vacant Rooms') {
+      autoTable(pdf,{startY:y,head:[['Room','Floor','Type','Total','Occupied','Vacant','Rent/Bed']],
+        body:vacantRooms.map(r=>[`Room ${r.roomNumber}`,r.floor||'-',r.roomType||'-',r.totalBeds,r.occupiedBeds||0,r.totalBeds-(r.occupiedBeds||0),`Rs.${(r.rentPerBed||0).toLocaleString()}`]),
+        headStyles:{fillColor:[5,150,105],textColor:255},alternateRowStyles:{fillColor:[236,253,245]},styles:{fontSize:9}});
     }
-
-    const pageCount = pdf.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      pdf.setPage(i);
-      pdf.setFontSize(8); pdf.setTextColor(150,150,150);
-      pdf.text(`Generated by PG Manager • ${new Date().toLocaleDateString('en-IN')} • Page ${i} of ${pageCount}`,
-        14, pdf.internal.pageSize.height - 10);
+    const pc=pdf.internal.getNumberOfPages();
+    for(let i=1;i<=pc;i++){
+      pdf.setPage(i); pdf.setFontSize(8); pdf.setTextColor(150,150,150);
+      pdf.text(`PG Manager • ${new Date().toLocaleDateString('en-IN')} • Page ${i}/${pc}`,14,pdf.internal.pageSize.height-10);
     }
-    pdf.save(`${reportType}-Report-${period}.pdf`);
+    pdf.save(`${type}-${period}.pdf`);
   };
 
   const reportTypes = [
-    { id: 'rent', label: '💰 Rent Collection', color: '#4f46e5', bg: '#eef2ff' },
-    { id: 'electricity', label: '⚡ Electricity', color: '#d97706', bg: '#fffbeb' },
-    { id: 'occupancy', label: '👥 Occupancy', color: '#059669', bg: '#ecfdf5' },
-    { id: 'vacant', label: '🛏️ Vacant Rooms', color: '#dc2626', bg: '#fef2f2' },
-    { id: 'history', label: '📋 Tenant History', color: '#0891b2', bg: '#ecfeff' },
+    {id:'rent',      label:'💰 Rent',      color:'#4f46e5', dlColor:'linear-gradient(135deg,#e94560,#0f3460)'},
+    {id:'electricity',label:'⚡ Electricity',color:'#d97706', dlColor:'linear-gradient(135deg,#d97706,#b45309)'},
+    {id:'occupancy', label:'👥 Occupancy',  color:'#059669', dlColor:'linear-gradient(135deg,#059669,#0891b2)'},
+    {id:'vacant',    label:'🛏️ Vacant',     color:'#dc2626', dlColor:'linear-gradient(135deg,#dc2626,#9f1239)'},
+    {id:'history',   label:'📋 History',    color:'#0891b2', dlColor:'linear-gradient(135deg,#0891b2,#0f3460)'},
   ];
 
+  const activeType = reportTypes.find(r=>r.id===activeReport);
+
+  const StatusTag = ({status}) => {
+    const cfg = status==='paid'?{bg:'#dcfce7',color:'#059669',label:'✅ Paid'}
+      : status==='partial'?{bg:'#fffbeb',color:'#d97706',label:'⚠️ Partial'}
+      : {bg:'#fef2f2',color:'#dc2626',label:'❌ Unpaid'};
+    return <span className="rp-tr-tag" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>;
+  };
+
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Reports & Analytics</h1>
-          <p style={styles.subtitle}>View and download detailed reports</p>
-        </div>
-      </div>
+    <>
+      <style>{css}</style>
+      <div className="rp-root">
 
-      {/* Period Filter */}
-      <div style={styles.periodBox}>
-        <div style={styles.periodToggle}>
-          <button style={{ ...styles.toggleBtn, ...(periodMode === 'monthly' ? styles.toggleActive : {}) }}
-            onClick={() => setPeriodMode('monthly')}>📅 Monthly</button>
-          <button style={{ ...styles.toggleBtn, ...(periodMode === 'custom' ? styles.toggleActive : {}) }}
-            onClick={() => setPeriodMode('custom')}>📆 Custom Range</button>
-        </div>
-        {periodMode === 'monthly' && (
-          <div style={styles.periodFilters}>
-            <select style={styles.filterSelect} value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
-              {months.map(m => <option key={m}>{m}</option>)}
-            </select>
-            <select style={styles.filterSelect} value={filterYear} onChange={e => setFilterYear(e.target.value)}>
-              {['2024','2025','2026','2027'].map(y => <option key={y}>{y}</option>)}
-            </select>
-          </div>
-        )}
-        {periodMode === 'custom' && (
-          <div style={styles.periodFilters}>
-            <div style={styles.dateField}>
-              <label style={styles.dateLabel}>From</label>
-              <input style={styles.filterSelect} type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} />
-            </div>
-            <div style={styles.dateField}>
-              <label style={styles.dateLabel}>To</label>
-              <input style={styles.filterSelect} type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} />
+        {/* Top bar */}
+        <div className="rp-topbar">
+          <div className="rp-topbar-row">
+            <div>
+              <h1 className="rp-page-title">Reports</h1>
+              <p className="rp-page-sub">{getPeriodLabel()} · {activeType?.label}</p>
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Report Tabs */}
-      <div style={styles.reportTabs}>
-        {reportTypes.map(({ id, label, color, bg }) => (
-          <button key={id} style={{
-            ...styles.reportTab,
-            background: activeReport === id ? bg : 'white',
-            color: activeReport === id ? color : '#64748b',
-            border: activeReport === id ? `2px solid ${color}` : '1.5px solid #e2e8f0',
-          }} onClick={() => setActiveReport(id)}>{label}</button>
-        ))}
-      </div>
+        <div className="rp-content">
 
-      {loading ? <div style={styles.loading}>Loading...</div> : (
-        <>
-          {/* ── RENT REPORT ── */}
-          {activeReport === 'rent' && (
-            <div style={styles.reportCard}>
-              <div style={styles.reportCardHeader}>
+          {/* Period selector */}
+          <div className="rp-period-box">
+            <div className="rp-period-seg">
+              {[{id:'monthly',label:'📅 Monthly'},{id:'custom',label:'📆 Custom'}].map(({id,label})=>(
+                <button key={id} className={`rp-period-btn${periodMode===id?' active':''}`}
+                  onClick={()=>setPeriodMode(id)}>{label}</button>
+              ))}
+            </div>
+
+            {periodMode==='monthly' && (
+              <>
+                <div className="rp-month-scroll">
+                  {months.map(m=>(
+                    <button key={m} className={`rp-month-chip${filterMonth===m?' active':''}`}
+                      onClick={()=>setFilterMonth(m)}>{m.slice(0,3)}</button>
+                  ))}
+                </div>
+                <div className="rp-year-row">
+                  {years.map(y=>(
+                    <button key={y} className={`rp-year-chip${filterYear===y?' active':''}`}
+                      onClick={()=>setFilterYear(y)}>{y}</button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {periodMode==='custom' && (
+              <div className="rp-custom-row">
                 <div>
-                  <h2 style={styles.reportTitle}>💰 Rent Collection Report</h2>
-                  <p style={styles.reportPeriod}>{getPeriodLabel()}</p>
+                  <div className="rp-custom-label">From</div>
+                  <input className="rp-custom-input" type="date"
+                    value={customStart} onChange={e=>setCustomStart(e.target.value)} />
                 </div>
-                <button style={styles.downloadBtn} onClick={() => downloadPDF('Rent Collection')}>⬇️ Download PDF</button>
-              </div>
-
-              {/* 5 Stat Cards */}
-              <div style={styles.summaryGrid5}>
-                {[
-                  { label: 'Total Expected', value: `₹${totalRentExpected.toLocaleString()}`, color: '#4f46e5', bg: '#eef2ff', icon: '💰' },
-                  { label: 'Total Collected', value: `₹${totalRentCollected.toLocaleString()}`, color: '#059669', bg: '#ecfdf5', icon: '✅' },
-                  { label: 'Total Pending', value: `₹${totalPending.toLocaleString()}`, color: '#dc2626', bg: '#fef2f2', icon: '⏳' },
-                  { label: 'Penalty Amt', value: `₹${totalPenaltyAmount.toLocaleString()}`, color: penaltyEnabled ? '#dc2626' : '#94a3b8', bg: penaltyEnabled ? '#fef2f2' : '#f8fafc', icon: '🔴' },
-                  { label: 'No. of Payments', value: rentPayments.length, color: '#d97706', bg: '#fffbeb', icon: '📋' },
-                ].map(({ label, value, color, bg, icon }) => (
-                  <div key={label} style={{ ...styles.summaryCard, background: bg }}>
-                    <div style={styles.summaryIcon}>{icon}</div>
-                    <div style={{ ...styles.summaryValue, color }}>{value}</div>
-                    <div style={styles.summaryLabel}>{label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Payment count breakdown */}
-              <div style={styles.paymentBreakdownRow}>
-                <div style={styles.breakdownChip}>
-                  <span style={{ color: '#059669', fontWeight: '700' }}>✅ {fullPayments}</span> Full Payments
-                </div>
-                <div style={styles.breakdownChip}>
-                  <span style={{ color: '#d97706', fontWeight: '700' }}>⚠️ {partialPayments}</span> Partial Payments
-                </div>
-                <div style={styles.breakdownChip}>
-                  <span style={{ color: '#059669', fontWeight: '700' }}>✅ {paidCount}</span> Fully Paid Tenants
-                </div>
-                <div style={styles.breakdownChip}>
-                  <span style={{ color: '#d97706', fontWeight: '700' }}>⚠️ {partialCount}</span> Partial Tenants
-                </div>
-                <div style={styles.breakdownChip}>
-                  <span style={{ color: '#dc2626', fontWeight: '700' }}>❌ {unpaidCount}</span> Unpaid Tenants
+                <div>
+                  <div className="rp-custom-label">To</div>
+                  <input className="rp-custom-input" type="date"
+                    value={customEnd} onChange={e=>setCustomEnd(e.target.value)} />
                 </div>
               </div>
+            )}
+          </div>
 
-              {/* Penalty Tenants Section */}
-              {penaltyEnabled && penaltyTenants.length > 0 && (
-                <>
-                  <h3 style={{ ...styles.tableTitle, color: '#dc2626', marginTop: '24px' }}>
-                    🔴 Tenants with Penalty ({penaltyTenants.length})
-                  </h3>
-                  <div style={styles.table}>
-                    <div style={{ ...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr' }}>
-                      <span>Tenant</span><span>Room</span><span>Base Rent</span>
-                      <span>🔴 Penalty</span><span>Total Due</span><span>Paid</span><span>Balance</span>
+          {/* Report type chips */}
+          <div className="rp-type-scroll">
+            {reportTypes.map(({id,label,color})=>(
+              <button key={id} className="rp-type-chip"
+                style={{
+                  background: activeReport===id ? color : 'white',
+                  color:      activeReport===id ? 'white' : '#64748b',
+                  borderColor: activeReport===id ? color : '#e2e8f0',
+                }}
+                onClick={()=>setActiveReport(id)}>{label}</button>
+            ))}
+          </div>
+
+          {loading ? (
+            <div className="rp-loading"><div className="rp-spinner"/>Loading…</div>
+          ) : (
+            <>
+
+              {/* ── RENT ── */}
+              {activeReport==='rent' && (
+                <div className="rp-card">
+                  <div className="rp-card-header">
+                    <div>
+                      <div className="rp-card-title">💰 Rent Collection</div>
+                      <div className="rp-card-period">{getPeriodLabel()}</div>
                     </div>
-                    {penaltyTenants.map(t => (
-                      <div key={t.id} style={{ ...styles.tableRow, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr', background: '#fff5f5', borderLeft: '3px solid #dc2626' }}>
-                        <span style={styles.tableName}>{t.name}</span>
-                        <span>Room {t.roomNumber}</span>
-                        <span style={{ color: '#64748b' }}>₹{(t.monthlyRent||0).toLocaleString()}</span>
-                        <span style={{ color: '#dc2626', fontWeight: '700' }}>₹{t.penalty.toLocaleString()}</span>
-                        <span style={{ color: '#1e293b', fontWeight: '700' }}>₹{t.totalDue.toLocaleString()}</span>
-                        <span style={{ color: '#059669' }}>₹{t.paid.toLocaleString()}</span>
-                        <span style={{ color: t.balance > 0 ? '#dc2626' : '#059669', fontWeight: '700' }}>₹{t.balance.toLocaleString()}</span>
+                    <button className="rp-dl-btn" style={{background:activeType.dlColor}}
+                      onClick={()=>downloadPDF('Rent Collection')}>⬇️ PDF</button>
+                  </div>
+
+                  {/* Stats strip */}
+                  <div className="rp-stats-strip" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
+                    {[
+                      {icon:'💰',label:'Expected', val:`₹${totalExpected.toLocaleString()}`, color:'#4f46e5'},
+                      {icon:'✅',label:'Collected',val:`₹${totalCollected.toLocaleString()}`,color:'#059669'},
+                      {icon:'⏳',label:'Pending',  val:`₹${totalPending.toLocaleString()}`,  color:'#dc2626'},
+                      {icon:'🔴',label:'Penalty',  val:`₹${totalPenalty.toLocaleString()}`,  color:penaltyEnabled?'#dc2626':'#94a3b8'},
+                      {icon:'📋',label:'Payments', val:rentPmts.length,                        color:'#d97706'},
+                    ].map(({icon,label,val,color})=>(
+                      <div key={label} className="rp-stat-tile">
+                        <div className="rp-stat-icon">{icon}</div>
+                        <div className="rp-stat-val" style={{color}}>{val}</div>
+                        <div className="rp-stat-label">{label}</div>
                       </div>
                     ))}
                   </div>
-                </>
-              )}
 
-              {/* Tenant-wise full breakdown */}
-              <h3 style={{ ...styles.tableTitle, marginTop: '24px' }}>
-                👥 Tenant-wise Breakdown ({activeTenants.length})
-              </h3>
-              <div style={styles.table}>
-                <div style={{ ...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr' }}>
-                  <span>Tenant</span><span>Room</span><span>Monthly Rent</span>
-                  <span>Penalty</span><span>Total Due</span><span>Paid</span><span>Status</span>
-                </div>
-                {tenantRentStatus.map(t => (
-                  <div key={t.id} style={{
-                    ...styles.tableRow,
-                    gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr',
-                    background: t.status === 'paid' ? '#f0fdf4' : t.status === 'partial' ? '#fffbeb' : '#fef2f2',
-                  }}>
-                    <span style={styles.tableName}>
-                      {t.name}
-                      <span style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: '400' }}>
-                        {t.paymentCount} payment{t.paymentCount !== 1 ? 's' : ''}
-                      </span>
-                    </span>
-                    <span>Room {t.roomNumber}</span>
-                    <span style={{ color: '#64748b' }}>₹{(t.monthlyRent||0).toLocaleString()}</span>
-                    <span style={{ color: t.penalty > 0 ? '#dc2626' : '#94a3b8', fontWeight: t.penalty > 0 ? '700' : '400' }}>
-                      {t.penalty > 0 ? `₹${t.penalty.toLocaleString()}` : '—'}
-                    </span>
-                    <span style={{ fontWeight: '700', color: '#1e293b' }}>₹{t.totalDue.toLocaleString()}</span>
-                    <span style={{ color: '#059669' }}>₹{t.paid.toLocaleString()}</span>
-                    <span>
-                      <div style={{
-                        ...styles.typeTag,
-                        background: t.status === 'paid' ? '#dcfce7' : t.status === 'partial' ? '#fffbeb' : '#fef2f2',
-                        color: t.status === 'paid' ? '#059669' : t.status === 'partial' ? '#d97706' : '#dc2626',
-                      }}>
-                        {t.status === 'paid' ? '✅ Paid' : t.status === 'partial' ? '⚠️ Partial' : '❌ Unpaid'}
-                      </div>
-                    </span>
+                  {/* Summary chips */}
+                  <div className="rp-chips-row">
+                    <span className="rp-chip">✅ {paidCount} paid</span>
+                    <span className="rp-chip">⚠️ {partialCount} partial</span>
+                    <span className="rp-chip">❌ {unpaidCount} unpaid</span>
+                    <span className="rp-chip">📋 {rentPmts.filter(p=>!p.isPartial).length} full payments</span>
+                    <span className="rp-chip">⚠️ {rentPmts.filter(p=>p.isPartial).length} partial payments</span>
                   </div>
-                ))}
-              </div>
 
-              {/* Payments received table */}
-              <h3 style={{ ...styles.tableTitle, marginTop: '24px' }}>
-                📋 All Payments ({rentPayments.length})
-              </h3>
-              {rentPayments.length === 0 ? (
-                <div style={styles.noData}>No payments found for this period</div>
-              ) : (
-                <div style={styles.table}>
-                  <div style={styles.tableHeader}>
-                    <span>Tenant</span><span>Room</span><span>Amount</span>
-                    <span>Method</span><span>Date & Time</span><span>Type</span>
-                  </div>
-                  {rentPayments.map(p => (
-                    <div key={p.id} style={styles.tableRow}>
-                      <span style={styles.tableName}>{p.tenantName}</span>
-                      <span>Room {p.roomNumber}</span>
-                      <span style={{ color: '#059669', fontWeight: '700' }}>₹{p.amount?.toLocaleString()}</span>
-                      <span>{p.paymentMethod}</span>
-                      <span style={{ color: '#94a3b8' }}>
-                        {p.paymentDate}
-                        {p.paymentTime && <span style={{ display: 'block', fontSize: '11px' }}>🕐 {p.paymentTime}</span>}
-                      </span>
-                      <span>
-                        <div style={{ ...styles.typeTag, background: p.isPartial ? '#fffbeb' : '#ecfdf5', color: p.isPartial ? '#d97706' : '#059669' }}>
-                          {p.isPartial ? '⚠️ Partial' : '✅ Full'}
+                  {/* Penalty banner */}
+                  {penaltyEnabled && penTenants.length>0 && (
+                    <div className="rp-penalty-banner">
+                      🔴 {penTenants.length} tenant{penTenants.length!==1?'s':''} with late penalty
+                      · Total ₹{totalPenalty.toLocaleString()}
+                    </div>
+                  )}
+
+                  {/* Tenant status list */}
+                  <div className="rp-section-title">👥 Tenant Breakdown ({tenantStatus.length})</div>
+                  {tenantStatus.map(t=>(
+                    <div key={t.id} className="rp-tenant-row" style={{
+                      background:t.status==='paid'?'#f0fdf4':t.status==='partial'?'#fffbeb':'#fef2f2',
+                      borderLeft:`3px solid ${t.status==='paid'?'#059669':t.status==='partial'?'#d97706':'#dc2626'}`,
+                    }}>
+                      <div className="rp-tr-left">
+                        <div className="rp-tr-avatar" style={{
+                          background:t.status==='paid'?'linear-gradient(135deg,#059669,#0891b2)'
+                            :t.status==='partial'?'linear-gradient(135deg,#d97706,#b45309)'
+                            :'linear-gradient(135deg,#dc2626,#9f1239)'
+                        }}>
+                          {t.name?.charAt(0).toUpperCase()}
                         </div>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ELECTRICITY */}
-          {activeReport === 'electricity' && (
-            <div style={styles.reportCard}>
-              <div style={styles.reportCardHeader}>
-                <div>
-                  <h2 style={styles.reportTitle}>⚡ Electricity Bill Report</h2>
-                  <p style={styles.reportPeriod}>{getPeriodLabel()}</p>
-                </div>
-                <button style={{ ...styles.downloadBtn, background: 'linear-gradient(135deg, #d97706, #b45309)' }}
-                  onClick={() => downloadPDF('Electricity')}>⬇️ Download PDF</button>
-              </div>
-              <div style={styles.summaryGrid}>
-                {[
-                  { label: 'Total Billed', value: `₹${totalElecBilled.toLocaleString()}`, color: '#d97706', bg: '#fffbeb' },
-                  { label: 'Rooms Billed', value: elecBillsFiltered.length, color: '#4f46e5', bg: '#eef2ff' },
-                  { label: 'Collected', value: elecBillsFiltered.filter(b => b.isPaid).length, color: '#059669', bg: '#ecfdf5' },
-                  { label: 'Pending', value: elecBillsFiltered.filter(b => !b.isPaid).length, color: '#dc2626', bg: '#fef2f2' },
-                ].map(({ label, value, color, bg }) => (
-                  <div key={label} style={{ ...styles.summaryCard, background: bg }}>
-                    <div style={{ ...styles.summaryValue, color }}>{value}</div>
-                    <div style={styles.summaryLabel}>{label}</div>
-                  </div>
-                ))}
-              </div>
-              <h3 style={styles.tableTitle}>⚡ Bill Details</h3>
-              {elecBillsFiltered.length === 0 ? <div style={styles.noData}>No electricity bills for this period</div> : (
-                <div style={styles.table}>
-                  <div style={{ ...styles.tableHeader, gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr' }}>
-                    <span>Room</span><span>Month</span><span>Amount</span>
-                    <span>Tenants</span><span>Reading Date</span><span>Status</span>
-                  </div>
-                  {elecBillsFiltered.map(b => (
-                    <div key={b.id} style={{ ...styles.tableRow, gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr' }}>
-                      <span style={styles.tableName}>Room {b.roomNumber}</span>
-                      <span>{b.month} {b.year}</span>
-                      <span style={{ color: '#d97706', fontWeight: '700' }}>₹{b.amount?.toLocaleString()}</span>
-                      <span>{b.tenantCount}</span>
-                      <span style={{ color: '#94a3b8' }}>{b.readingDate}</span>
-                      <span>
-                        <div style={{ ...styles.typeTag, background: b.isPaid ? '#ecfdf5' : '#fef2f2', color: b.isPaid ? '#059669' : '#dc2626' }}>
-                          {b.isPaid ? '✅ Done' : '⏳ Pending'}
-                        </div>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* OCCUPANCY */}
-          {activeReport === 'occupancy' && (
-            <div style={styles.reportCard}>
-              <div style={styles.reportCardHeader}>
-                <div>
-                  <h2 style={styles.reportTitle}>👥 Tenant Occupancy Report</h2>
-                  <p style={styles.reportPeriod}>Current Status</p>
-                </div>
-                <button style={{ ...styles.downloadBtn, background: 'linear-gradient(135deg, #059669, #0891b2)' }}
-                  onClick={() => downloadPDF('Occupancy')}>⬇️ Download PDF</button>
-              </div>
-              <div style={styles.summaryGrid}>
-                {[
-                  { label: 'Total Beds', value: totalBeds, color: '#4f46e5', bg: '#eef2ff' },
-                  { label: 'Occupied', value: occupiedBeds, color: '#059669', bg: '#ecfdf5' },
-                  { label: 'Vacant', value: totalBeds - occupiedBeds, color: '#dc2626', bg: '#fef2f2' },
-                  { label: 'Occupancy Rate', value: `${occupancyRate}%`, color: '#d97706', bg: '#fffbeb' },
-                ].map(({ label, value, color, bg }) => (
-                  <div key={label} style={{ ...styles.summaryCard, background: bg }}>
-                    <div style={{ ...styles.summaryValue, color }}>{value}</div>
-                    <div style={styles.summaryLabel}>{label}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={styles.occupancyBarBox}>
-                <div style={styles.occupancyBarLabel}>
-                  <span>Occupancy</span>
-                  <span style={{ color: '#059669', fontWeight: '700' }}>{occupancyRate}%</span>
-                </div>
-                <div style={styles.occupancyBarBg}>
-                  <div style={{ ...styles.occupancyBarFill, width: `${occupancyRate}%`, background: occupancyRate >= 80 ? '#059669' : occupancyRate >= 50 ? '#d97706' : '#dc2626' }} />
-                </div>
-              </div>
-              <h3 style={styles.tableTitle}>👥 Active Tenants ({activeTenants.length})</h3>
-              <div style={styles.table}>
-                <div style={{ ...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
-                  <span>Name</span><span>Room</span><span>Check-In</span>
-                  <span>Monthly Rent</span><span>Phone</span>
-                </div>
-                {activeTenants.map(t => (
-                  <div key={t.id} style={{ ...styles.tableRow, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
-                    <span style={styles.tableName}>{t.name}</span>
-                    <span>Room {t.roomNumber}</span>
-                    <span style={{ color: '#94a3b8' }}>{t.checkIn}</span>
-                    <span style={{ color: '#4f46e5', fontWeight: '700' }}>₹{(t.monthlyRent||0).toLocaleString()}</span>
-                    <span>{t.phone || '-'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* VACANT */}
-          {activeReport === 'vacant' && (
-            <div style={styles.reportCard}>
-              <div style={styles.reportCardHeader}>
-                <div>
-                  <h2 style={styles.reportTitle}>🛏️ Vacant Rooms Report</h2>
-                  <p style={styles.reportPeriod}>Current Status</p>
-                </div>
-                <button style={{ ...styles.downloadBtn, background: 'linear-gradient(135deg, #dc2626, #9f1239)' }}
-                  onClick={() => downloadPDF('Vacant Rooms')}>⬇️ Download PDF</button>
-              </div>
-              <div style={styles.summaryGrid}>
-                {[
-                  { label: 'Total Rooms', value: rooms.length, color: '#4f46e5', bg: '#eef2ff' },
-                  { label: 'Vacant Rooms', value: vacantRooms.length, color: '#dc2626', bg: '#fef2f2' },
-                  { label: 'Vacant Beds', value: totalVacantBeds, color: '#d97706', bg: '#fffbeb' },
-                  { label: 'Revenue Lost', value: `₹${vacantRooms.reduce((a,r) => a+((r.totalBeds-(r.occupiedBeds||0))*(r.rentPerBed||0)),0).toLocaleString()}`, color: '#dc2626', bg: '#fef2f2' },
-                ].map(({ label, value, color, bg }) => (
-                  <div key={label} style={{ ...styles.summaryCard, background: bg }}>
-                    <div style={{ ...styles.summaryValue, color }}>{value}</div>
-                    <div style={styles.summaryLabel}>{label}</div>
-                  </div>
-                ))}
-              </div>
-              <h3 style={styles.tableTitle}>🛏️ Rooms with Vacant Beds</h3>
-              {vacantRooms.length === 0 ? (
-                <div style={{ ...styles.noData, color: '#059669' }}>🎉 All beds are occupied!</div>
-              ) : (
-                <div style={styles.table}>
-                  <div style={{ ...styles.tableHeader, gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr 1fr' }}>
-                    <span>Room</span><span>Floor</span><span>Type</span>
-                    <span>Total</span><span>Occupied</span><span>Vacant</span><span>Rent/Bed</span>
-                  </div>
-                  {vacantRooms.map(r => (
-                    <div key={r.id} style={{ ...styles.tableRow, gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr 1fr', background: '#fef2f2' }}>
-                      <span style={styles.tableName}>Room {r.roomNumber}</span>
-                      <span>{r.floor || '-'}</span><span>{r.roomType || '-'}</span>
-                      <span>{r.totalBeds}</span>
-                      <span style={{ color: '#059669' }}>{r.occupiedBeds || 0}</span>
-                      <span style={{ color: '#dc2626', fontWeight: '700' }}>{r.totalBeds-(r.occupiedBeds||0)}</span>
-                      <span style={{ color: '#4f46e5' }}>₹{(r.rentPerBed||0).toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TENANT HISTORY */}
-          {activeReport === 'history' && (
-            <div style={styles.reportCard}>
-              <div style={styles.reportCardHeader}>
-                <div>
-                  <h2 style={styles.reportTitle}>📋 Tenant History</h2>
-                  <p style={styles.reportPeriod}>All tenants — latest first • {historyTenants.length} records</p>
-                </div>
-                <button style={{ ...styles.downloadBtn, background: 'linear-gradient(135deg, #0891b2, #0f3460)' }}
-                  onClick={() => downloadPDF('Tenant History')}>⬇️ Download PDF</button>
-              </div>
-              <div style={styles.summaryGrid}>
-                {[
-                  { label: 'Total Ever', value: tenants.length, color: '#4f46e5', bg: '#eef2ff' },
-                  { label: 'Currently Active', value: activeTenants.length, color: '#059669', bg: '#ecfdf5' },
-                  { label: 'Moved Out', value: tenants.filter(t => t.status === 'deleted').length, color: '#dc2626', bg: '#fef2f2' },
-                  {
-                    label: 'Avg Stay',
-                    value: (() => {
-                      const moved = tenants.filter(t => t.status === 'deleted');
-                      if (!moved.length) return '—';
-                      const avg = moved.reduce((a, t) => a + getDaysStayed(t), 0) / moved.length;
-                      return getDaysLabel(Math.round(avg));
-                    })(),
-                    color: '#d97706', bg: '#fffbeb'
-                  },
-                ].map(({ label, value, color, bg }) => (
-                  <div key={label} style={{ ...styles.summaryCard, background: bg }}>
-                    <div style={{ ...styles.summaryValue, color }}>{value}</div>
-                    <div style={styles.summaryLabel}>{label}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={styles.stayFilterRow}>
-                <span style={styles.stayFilterLabel}>🔍 Filter by stay:</span>
-                <div style={styles.stayFilterBtns}>
-                  {stayFilters.map(({ id, label }) => (
-                    <button key={id} style={{
-                      ...styles.stayFilterBtn,
-                      background: stayFilter === id ? '#0891b2' : 'white',
-                      color: stayFilter === id ? 'white' : '#64748b',
-                      border: stayFilter === id ? '2px solid #0891b2' : '1.5px solid #e2e8f0',
-                    }} onClick={() => setStayFilter(id)}>{label}</button>
-                  ))}
-                </div>
-              </div>
-              {historyTenants.length === 0 ? (
-                <div style={styles.noData}>No tenants found for this filter</div>
-              ) : (
-                <div style={styles.table}>
-                  <div style={{ ...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr' }}>
-                    <span>Tenant</span><span>Room</span><span>Check-In</span>
-                    <span>Check-Out</span><span>Days Stayed</span><span>Status</span>
-                  </div>
-                  {historyTenants.map(t => {
-                    const days = getDaysStayed(t);
-                    const checkOut = getCheckOutDate(t);
-                    const isMovedOut = t.status === 'deleted';
-                    return (
-                      <div key={t.id} style={{
-                        ...styles.tableRow,
-                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr',
-                        background: isMovedOut ? '#fafafa' : '#f8fafc',
-                        opacity: isMovedOut ? 0.85 : 1,
-                      }}>
-                        <span style={styles.tableName}>
-                          {t.name}
-                          <span style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: '400' }}>📞 {t.phone || '-'}</span>
-                        </span>
-                        <span>Room {t.roomNumber}</span>
-                        <span style={{ color: '#059669', fontWeight: '600' }}>{t.checkIn || '-'}</span>
-                        <span style={{ color: isMovedOut ? '#dc2626' : '#94a3b8' }}>{checkOut || '—'}</span>
-                        <span style={{ color: '#4f46e5', fontWeight: '700' }}>{getDaysLabel(days)}</span>
-                        <span>
-                          <div style={{ ...styles.typeTag, background: isMovedOut ? '#fef2f2' : '#ecfdf5', color: isMovedOut ? '#dc2626' : '#059669' }}>
-                            {isMovedOut ? '🚪 Moved Out' : '✅ Active'}
+                        <div>
+                          <div className="rp-tr-name">{t.name}</div>
+                          <div className="rp-tr-sub">
+                            Room {t.roomNumber} · {t.cnt} payment{t.cnt!==1?'s':''}
+                            {t.elec > 0 && <span style={{color:'#0891b2'}}> · ⚡ ₹{t.elec.toLocaleString()}</span>}
+                            {t.showPen && <span style={{color:'#dc2626'}}> · 🔴 Late penalty ₹{t.pen.toLocaleString()}</span>}
                           </div>
-                        </span>
+                        </div>
                       </div>
-                    );
-                  })}
+                      <div className="rp-tr-right">
+                        <div className="rp-tr-amount" style={{color:t.status==='paid'?'#059669':t.status==='partial'?'#d97706':'#dc2626'}}>
+                          ₹{t.status==='paid'?t.due.toLocaleString():t.bal.toLocaleString()}
+                        </div>
+                        <div style={{fontSize:'9px',color:'#94a3b8',marginTop:'2px'}}>
+                          {t.status==='paid'?'paid':`of ₹${t.due.toLocaleString()}`}
+                        </div>
+                        <StatusTag status={t.status} />
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Payments list */}
+                  <div className="rp-section-title">📋 All Payments ({rentPmts.length})</div>
+                  {rentPmts.length===0 ? (
+                    <div className="rp-empty rp-pb">
+                      <div className="rp-empty-icon">📋</div>
+                      <div className="rp-empty-title">No payments this period</div>
+                    </div>
+                  ) : (
+                    <div className="rp-pb">
+                      {rentPmts.map(p=>(
+                        <div key={p.id} className="rp-payment-row" style={{
+                          background:p.isCompleted?'#f0fdf4':p.isPartial?'#fffbeb':'#f8fafc'
+                        }}>
+                          <div>
+                            <div className="rp-pr-name">{p.tenantName}</div>
+                            <div className="rp-pr-sub">Room {p.roomNumber} · {p.paymentDate}{p.paymentTime&&` · ${p.paymentTime}`}</div>
+                          </div>
+                          <div style={{textAlign:'right'}}>
+                            <div className="rp-pr-amount" style={{color:p.isCompleted?'#059669':p.isPartial?'#d97706':'#4f46e5'}}>₹{p.amount?.toLocaleString()}</div>
+                            <div className="rp-pr-method">{p.paymentMethod}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+
+              {/* ── ELECTRICITY ── */}
+              {activeReport==='electricity' && (
+                <div className="rp-card">
+                  <div className="rp-card-header">
+                    <div>
+                      <div className="rp-card-title">⚡ Electricity Bills</div>
+                      <div className="rp-card-period">{getPeriodLabel()}</div>
+                    </div>
+                    <button className="rp-dl-btn" style={{background:activeType.dlColor}}
+                      onClick={()=>downloadPDF('Electricity')}>⬇️ PDF</button>
+                  </div>
+                  <div className="rp-stats-strip" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+                    {[
+                      {icon:'⚡',label:'Billed',     val:`₹${totalElecBilled.toLocaleString()}`, color:'#d97706'},
+                      {icon:'🏠',label:'Rooms',      val:elecFiltered.length,                        color:'#4f46e5'},
+                      {icon:'✅',label:'Collected',  val:elecFiltered.filter(b=>b.isPaid).length,    color:'#059669'},
+                      {icon:'⏳',label:'Pending',    val:elecFiltered.filter(b=>!b.isPaid).length,   color:'#dc2626'},
+                    ].map(({icon,label,val,color})=>(
+                      <div key={label} className="rp-stat-tile">
+                        <div className="rp-stat-icon">{icon}</div>
+                        <div className="rp-stat-val" style={{color}}>{val}</div>
+                        <div className="rp-stat-label">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rp-section-title">⚡ Bill Details</div>
+                  {elecFiltered.length===0 ? (
+                    <div className="rp-empty rp-pb"><div className="rp-empty-icon">⚡</div><div className="rp-empty-title">No bills this period</div></div>
+                  ) : (
+                    <div className="rp-pb">
+                      {elecFiltered.map(b=>(
+                        <div key={b.id} className="rp-payment-row" style={{background:b.isPaid?'#f0fdf4':'#fffbeb'}}>
+                          <div>
+                            <div className="rp-pr-name">Room {b.roomNumber}</div>
+                            <div className="rp-pr-sub">{b.month} {b.year} · {b.tenantCount} tenants · {b.readingDate}</div>
+                            {b.notes && <div className="rp-pr-sub">📝 {b.notes}</div>}
+                          </div>
+                          <div style={{textAlign:'right'}}>
+                            <div className="rp-pr-amount" style={{color:'#d97706'}}>₹{b.amount?.toLocaleString()}</div>
+                            <span className="rp-tr-tag" style={{background:b.isPaid?'#dcfce7':'#fef2f2',color:b.isPaid?'#059669':'#dc2626'}}>
+                              {b.isPaid?'✅ Done':'⏳ Pending'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── OCCUPANCY ── */}
+              {activeReport==='occupancy' && (
+                <div className="rp-card">
+                  <div className="rp-card-header">
+                    <div>
+                      <div className="rp-card-title">👥 Occupancy Report</div>
+                      <div className="rp-card-period">Current Status</div>
+                    </div>
+                    <button className="rp-dl-btn" style={{background:activeType.dlColor}}
+                      onClick={()=>downloadPDF('Occupancy')}>⬇️ PDF</button>
+                  </div>
+                  <div className="rp-stats-strip" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+                    {[
+                      {icon:'🛏️',label:'Total Beds', val:totalBeds,      color:'#4f46e5'},
+                      {icon:'✅',label:'Occupied',   val:occupiedBeds,    color:'#059669'},
+                      {icon:'🔴',label:'Vacant',     val:totalBeds-occupiedBeds, color:'#dc2626'},
+                      {icon:'📊',label:'Rate',       val:`${occupancyPct}%`,     color:'#d97706'},
+                    ].map(({icon,label,val,color})=>(
+                      <div key={label} className="rp-stat-tile">
+                        <div className="rp-stat-icon">{icon}</div>
+                        <div className="rp-stat-val" style={{color}}>{val}</div>
+                        <div className="rp-stat-label">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rp-occ-bar">
+                    <div className="rp-occ-bar-row"><span>Occupancy Rate</span><span style={{color:'#059669',fontWeight:'800'}}>{occupancyPct}%</span></div>
+                    <div className="rp-occ-bar-bg">
+                      <div className="rp-occ-bar-fill" style={{
+                        width:`${occupancyPct}%`,
+                        background:occupancyPct>=80?'#059669':occupancyPct>=50?'#d97706':'#dc2626'
+                      }}/>
+                    </div>
+                  </div>
+                  <div className="rp-section-title">👥 Active Tenants ({activeTenants.length})</div>
+                  <div className="rp-pb">
+                    {activeTenants.map(t=>(
+                      <div key={t.id} className="rp-tenant-row" style={{background:'#f0fdf4',borderLeft:'3px solid #059669'}}>
+                        <div className="rp-tr-left">
+                          <div className="rp-tr-avatar" style={{background:'linear-gradient(135deg,#4f46e5,#0891b2)'}}>
+                            {t.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="rp-tr-name">{t.name}</div>
+                            <div className="rp-tr-sub">Room {t.roomNumber} · {t.checkIn||'—'}</div>
+                          </div>
+                        </div>
+                        <div className="rp-tr-right">
+                          <div className="rp-tr-amount" style={{color:'#4f46e5'}}>₹{(t.monthlyRent||0).toLocaleString()}</div>
+                          <div style={{fontSize:'9px',color:'#94a3b8'}}>per month</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── VACANT ── */}
+              {activeReport==='vacant' && (
+                <div className="rp-card">
+                  <div className="rp-card-header">
+                    <div>
+                      <div className="rp-card-title">🛏️ Vacant Rooms</div>
+                      <div className="rp-card-period">Current Status</div>
+                    </div>
+                    <button className="rp-dl-btn" style={{background:activeType.dlColor}}
+                      onClick={()=>downloadPDF('Vacant Rooms')}>⬇️ PDF</button>
+                  </div>
+                  <div className="rp-stats-strip" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+                    {[
+                      {icon:'🏠',label:'Total Rooms',  val:rooms.length,     color:'#4f46e5'},
+                      {icon:'🔴',label:'Vacant Rooms', val:vacantRooms.length,color:'#dc2626'},
+                      {icon:'🛏️',label:'Vacant Beds',  val:totalVacant,       color:'#d97706'},
+                      {icon:'💸',label:'Rev. Lost',    val:`₹${vacantRooms.reduce((a,r)=>a+((r.totalBeds-(r.occupiedBeds||0))*(r.rentPerBed||0)),0).toLocaleString()}`, color:'#dc2626'},
+                    ].map(({icon,label,val,color})=>(
+                      <div key={label} className="rp-stat-tile">
+                        <div className="rp-stat-icon">{icon}</div>
+                        <div className="rp-stat-val" style={{color}}>{val}</div>
+                        <div className="rp-stat-label">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rp-section-title">🛏️ Rooms with Vacant Beds</div>
+                  {vacantRooms.length===0 ? (
+                    <div className="rp-empty rp-pb"><div className="rp-empty-icon">🎉</div><div className="rp-empty-title" style={{color:'#059669'}}>All beds are occupied!</div></div>
+                  ) : (
+                    <div className="rp-pb">
+                      {vacantRooms.map(r=>{
+                        const vacant=r.totalBeds-(r.occupiedBeds||0);
+                        return (
+                          <div key={r.id} className="rp-tenant-row" style={{background:'#fef2f2',borderLeft:'3px solid #dc2626'}}>
+                            <div className="rp-tr-left">
+                              <div className="rp-tr-avatar" style={{background:'linear-gradient(135deg,#dc2626,#9f1239)'}}>
+                                {r.roomNumber}
+                              </div>
+                              <div>
+                                <div className="rp-tr-name">Room {r.roomNumber}</div>
+                                <div className="rp-tr-sub">{r.floor||'—'} · {r.roomType} · {r.bathType} · {r.acType}</div>
+                              </div>
+                            </div>
+                            <div className="rp-tr-right">
+                              <div className="rp-tr-amount" style={{color:'#dc2626'}}>🔴 {vacant} vacant</div>
+                              <div style={{fontSize:'9px',color:'#94a3b8'}}>of {r.totalBeds} beds</div>
+                              <div style={{fontSize:'11px',color:'#4f46e5',fontWeight:'700',marginTop:'2px'}}>₹{(r.rentPerBed||0).toLocaleString()}/bed</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── HISTORY ── */}
+              {activeReport==='history' && (
+                <div className="rp-card">
+                  <div className="rp-card-header">
+                    <div>
+                      <div className="rp-card-title">📋 Tenant History</div>
+                      <div className="rp-card-period">{historyTenants.length} records</div>
+                    </div>
+                    <button className="rp-dl-btn" style={{background:activeType.dlColor}}
+                      onClick={()=>downloadPDF('Tenant History')}>⬇️ PDF</button>
+                  </div>
+                  <div className="rp-stats-strip" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+                    {[
+                      {icon:'👥',label:'Total',   val:tenants.length,                                    color:'#4f46e5'},
+                      {icon:'✅',label:'Active',  val:activeTenants.length,                              color:'#059669'},
+                      {icon:'🚪',label:'Moved Out',val:tenants.filter(t=>t.status==='deleted').length,   color:'#dc2626'},
+                      {icon:'📅',label:'Avg Stay', val:(()=>{
+                        const m=tenants.filter(t=>t.status==='deleted');
+                        if(!m.length) return '—';
+                        return getDaysLabel(Math.round(m.reduce((a,t)=>a+getDaysStayed(t),0)/m.length));
+                      })(), color:'#d97706'},
+                    ].map(({icon,label,val,color})=>(
+                      <div key={label} className="rp-stat-tile">
+                        <div className="rp-stat-icon">{icon}</div>
+                        <div className="rp-stat-val" style={{color}}>{val}</div>
+                        <div className="rp-stat-label">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rp-stay-scroll">
+                    {stayFilters.map(({id,label})=>(
+                      <button key={id} className={`rp-stay-chip${stayFilter===id?' active':''}`}
+                        onClick={()=>setStayFilter(id)}>{label}</button>
+                    ))}
+                  </div>
+                  <div className="rp-section-title">Records ({historyTenants.length})</div>
+                  {historyTenants.length===0 ? (
+                    <div className="rp-empty rp-pb"><div className="rp-empty-icon">📋</div><div className="rp-empty-title">No records found</div></div>
+                  ) : (
+                    <div className="rp-pb">
+                      {historyTenants.map(t=>{
+                        const days=getDaysStayed(t), co=getCheckOut(t), out=t.status==='deleted';
+                        return (
+                          <div key={t.id} className="rp-tenant-row" style={{
+                            background:out?'#fafafa':'#f8fafc',
+                            borderLeft:`3px solid ${out?'#dc2626':'#059669'}`,
+                            opacity:out?0.9:1,
+                          }}>
+                            <div className="rp-tr-left">
+                              <div className="rp-tr-avatar" style={{
+                                background:out?'linear-gradient(135deg,#dc2626,#9f1239)':'linear-gradient(135deg,#059669,#0891b2)'
+                              }}>
+                                {t.name?.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="rp-tr-name">{t.name}</div>
+                                <div className="rp-tr-sub">
+                                  Room {t.roomNumber} · In: {t.checkIn||'—'}
+                                  {co && <span style={{color:'#dc2626'}}> · Out: {co}</span>}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="rp-tr-right">
+                              <div className="rp-tr-amount" style={{color:'#4f46e5',fontSize:'13px'}}>{getDaysLabel(days)}</div>
+                              <span className="rp-tr-tag" style={{background:out?'#fef2f2':'#ecfdf5',color:out?'#dc2626':'#059669'}}>
+                                {out?'🚪 Moved Out':'✅ Active'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </>
           )}
-        </>
-      )}
-    </div>
+        </div>
+      </div>
+    </>
   );
 }
-
-const styles = {
-  container: { padding: '0' },
-  header: { marginBottom: '24px' },
-  title: { fontSize: '24px', fontWeight: '800', color: '#1e293b', margin: 0 },
-  subtitle: { color: '#94a3b8', fontSize: '13px', marginTop: '4px' },
-  periodBox: { background: 'white', borderRadius: '16px', padding: '20px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' },
-  periodToggle: { display: 'flex', gap: '8px' },
-  toggleBtn: { padding: '8px 18px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: '#64748b' },
-  toggleActive: { background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none' },
-  periodFilters: { display: 'flex', gap: '12px', alignItems: 'center' },
-  filterSelect: { padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '13px', outline: 'none', background: '#f8fafc', cursor: 'pointer' },
-  dateField: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  dateLabel: { fontSize: '11px', fontWeight: '600', color: '#94a3b8' },
-  reportTabs: { display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' },
-  reportTab: { padding: '12px 20px', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-  reportCard: { background: 'white', borderRadius: '16px', padding: '28px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
-  reportCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' },
-  reportTitle: { fontSize: '20px', fontWeight: '800', color: '#1e293b', margin: 0 },
-  reportPeriod: { color: '#94a3b8', fontSize: '13px', marginTop: '4px' },
-  downloadBtn: { padding: '12px 24px', background: 'linear-gradient(135deg, #e94560, #0f3460)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '28px' },
-  summaryGrid5: { display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '14px', marginBottom: '20px' },
-  summaryCard: { borderRadius: '12px', padding: '16px', textAlign: 'center' },
-  summaryIcon: { fontSize: '22px', marginBottom: '6px' },
-  summaryValue: { fontSize: '20px', fontWeight: '800', marginBottom: '4px' },
-  summaryLabel: { color: '#64748b', fontSize: '12px' },
-  paymentBreakdownRow: { display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' },
-  breakdownChip: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '20px', padding: '6px 14px', fontSize: '13px', color: '#475569' },
-  stayFilterRow: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' },
-  stayFilterLabel: { fontSize: '13px', fontWeight: '600', color: '#475569', whiteSpace: 'nowrap' },
-  stayFilterBtns: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  stayFilterBtn: { padding: '8px 16px', borderRadius: '100px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
-  occupancyBarBox: { background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '24px' },
-  occupancyBarLabel: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' },
-  occupancyBarBg: { height: '12px', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' },
-  occupancyBarFill: { height: '100%', borderRadius: '99px', transition: 'width 0.5s ease' },
-  tableTitle: { fontSize: '15px', fontWeight: '700', color: '#1e293b', marginBottom: '12px', marginTop: 0 },
-  table: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  tableHeader: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', padding: '10px 14px', background: '#f1f5f9', borderRadius: '8px', fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' },
-  tableRow: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', fontSize: '13px', color: '#1e293b', alignItems: 'center' },
-  tableName: { fontWeight: '600' },
-  typeTag: { padding: '3px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', display: 'inline-block' },
-  noData: { textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' },
-  loading: { textAlign: 'center', padding: '60px', color: '#94a3b8' },
-};
-
-export default ReportsPage;

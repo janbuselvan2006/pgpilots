@@ -618,7 +618,7 @@ export default function RentPage() {
 
   const user     = auth.currentUser;
   const today    = new Date(); today.setHours(0,0,0,0);
-  const thisMonth = new Date().toLocaleString('default', { month: 'long' });
+  const thisMonth = new Date().toLocaleString('en-US', { month: 'long' });
   const thisYear  = new Date().getFullYear().toString();
 
   const fetchData = async () => {
@@ -668,15 +668,52 @@ export default function RentPage() {
     const pd = new Date(payDate);
     const due = new Date(pd.getFullYear(), pd.getMonth(), dueDay);
     const diff = Math.floor((pd-due)/(1000*60*60*24));
-    if (diff <= 0) return 0;
+    if (diff <= 0) return 0; // paid on or before due date → no penalty
     return Math.max(0, diff-(parseInt(gracePeriod)||0)) * (parseInt(penaltyAmount)||0);
+  };
+
+  // ── FIX: Check if tenant already paid this month (any payment recorded)
+  // If they have a completed payment this month, DON'T add penalty on top
+  // Penalty is only charged based on WHEN they paid (payment date vs due date)
+  // If already paid, use the penalty that was recorded AT TIME of payment
+  const getThisMonthCompletedPenalty = (tid) => {
+    // Find completed payment this month and return the penalty that was recorded
+    const completedPmt = payments.find(p => {
+      const pd = new Date(p.paymentDate);
+      return p.tenantId===tid &&
+        pd.getMonth()===today.getMonth() &&
+        pd.getFullYear()===today.getFullYear() &&
+        p.isCompleted===true;
+    });
+    return completedPmt ? (completedPmt.penaltyAmount || 0) : null;
+    // Returns null = not yet paid, number = already paid (use recorded penalty)
   };
 
   const getPenaltyDisplay = (t) => {
     if (!penaltyEnabled) return 0;
+
+    // If tenant already completed payment this month → use RECORDED penalty from payment
+    // (could be ₹0 if they paid on time — never recalculate from today)
+    const completedPenalty = getThisMonthCompletedPenalty(t.id);
+    if (completedPenalty !== null) return completedPenalty;
+
+    // Not paid yet → only show penalty if actually overdue TODAY
     const d = getDaysDiff(t);
-    if (d >= 0) return 0;
+    if (d >= 0) return 0; // due today or future → no penalty
     return Math.max(0, Math.abs(d)-(parseInt(gracePeriod)||0)) * (parseInt(penaltyAmount)||0);
+  };
+
+  // Penalty is only relevant to SHOW on card if tenant is overdue (not paid, past due date)
+  // On-time payers or future-due tenants → never show penalty pill
+  const shouldShowPenaltyOnCard = (t) => {
+    if (!penaltyEnabled) return false;
+    if (isPaid(t)) {
+      // Only show if their recorded payment actually had penalty
+      const rec = getThisMonthCompletedPenalty(t.id);
+      return rec !== null && rec > 0;
+    }
+    // Unpaid → show only if overdue
+    return getDaysDiff(t) < 0;
   };
 
   const getThisMonthPaid = (tid) => payments.filter(p=>{
@@ -695,7 +732,7 @@ export default function RentPage() {
   const upcomingTenants = unpaid.filter(t=>getDaysDiff(t)>0).sort((a,b)=>getDaysDiff(a)-getDaysDiff(b));
   const paidTenants     = tenants.filter(t=>isPaid(t));
 
-  const totalExpected  = tenants.reduce((a,t)=>a+getTotalDue(t),0);
+  const totalExpected  = tenants.reduce((a,t)=>a+getTotalDue(t),0); // rent + elec + penalty(if overdue)
   const totalCollected = tenants.reduce((a,t)=>a+getThisMonthPaid(t.id),0);
   const totalPending   = Math.max(0, totalExpected-totalCollected);
 
@@ -736,7 +773,7 @@ export default function RentPage() {
         paymentDate: form.paymentDate,
         paymentTime: new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),
         recordedAt: new Date().toISOString(),
-        month: new Date(form.paymentDate).toLocaleString('default',{month:'long'}),
+        month: new Date(form.paymentDate).toLocaleString('en-US',{month:'long'}),
         year: new Date(form.paymentDate).getFullYear().toString(),
         notes: form.notes,
         isPartial: amt < liveTotalDue,
@@ -766,24 +803,25 @@ export default function RentPage() {
     'July','August','September','October','November','December'];
 
   const filteredPayments = payments.filter(p=>{
-    const ms = !search || p.tenantName?.toLowerCase().includes(search.toLowerCase()) || p.roomNumber?.includes(search);
-    const mm = !filterMonth || p.month===filterMonth;
-    const mmt = !filterMethod || p.paymentMethod===filterMethod;
+    const ms  = !search      || p.tenantName?.toLowerCase().includes(search.toLowerCase()) || p.roomNumber?.includes(search);
+    const mm  = !filterMonth || p.month === filterMonth;
+    const mmt = !filterMethod|| p.paymentMethod === filterMethod;
     return ms && mm && mmt;
   }).sort((a,b)=>{
     const at = a.recordedAt ? new Date(a.recordedAt) : new Date(a.paymentDate);
     const bt = b.recordedAt ? new Date(b.recordedAt) : new Date(b.paymentDate);
-    return bt-at;
+    return bt - at;
   });
 
   // ── Tenant Card Component ──
   const TenantCard = ({ tenant, status }) => {
-    const daysDiff = getDaysDiff(tenant);
-    const balance  = getBalance(tenant);
-    const paid     = getThisMonthPaid(tenant.id);
-    const partial  = isPartial(tenant);
-    const penalty  = getPenaltyDisplay(tenant);
-    const elec     = getElecShare(tenant);
+    const daysDiff  = getDaysDiff(tenant);
+    const balance   = getBalance(tenant);
+    const paid      = getThisMonthPaid(tenant.id);
+    const partial   = isPartial(tenant);
+    const penalty   = getPenaltyDisplay(tenant);
+    const elec      = getElecShare(tenant);
+    const showPenalty = shouldShowPenaltyOnCard(tenant); // ← only show for late/overdue
     const accentColor =
       status==='late'     ? '#dc2626' :
       status==='today'    ? '#d97706' :
@@ -825,7 +863,7 @@ export default function RentPage() {
             <span className="trc-pill">📅 Due {getDueDate(tenant)?.getDate()}th</span>
             {elec > 0 && <span className="trc-pill info">⚡ ₹{elec.toLocaleString()}</span>}
             {!hasElecBill(tenant) && <span className="trc-pill warning">⚠️ No elec bill</span>}
-            {penalty > 0 && <span className="trc-pill danger">🔴 Penalty ₹{penalty.toLocaleString()}</span>}
+            {showPenalty && penalty > 0 && <span className="trc-pill danger">🔴 Late penalty ₹{penalty.toLocaleString()}</span>}
             {partial && <span className="trc-pill warning">⚠️ Partial ₹{paid.toLocaleString()} paid</span>}
           </div>
 
@@ -833,7 +871,7 @@ export default function RentPage() {
           <div className="trc-breakdown">
             <div className="trc-bd-item">Rent <span>₹{(tenant.monthlyRent||0).toLocaleString()}</span></div>
             {elec > 0 && <div className="trc-bd-item">Elec <span>₹{elec.toLocaleString()}</span></div>}
-            {penalty > 0 && <div className="trc-bd-item">Penalty <span style={{color:'#dc2626'}}>₹{penalty.toLocaleString()}</span></div>}
+            {showPenalty && penalty > 0 && <div className="trc-bd-item">Late Penalty <span style={{color:'#dc2626'}}>₹{penalty.toLocaleString()}</span></div>}
             <div className="trc-bd-item">Total <span>₹{getTotalDue(tenant).toLocaleString()}</span></div>
           </div>
 
@@ -891,9 +929,9 @@ export default function RentPage() {
         {/* Stats strip */}
         <div className="rent-stats">
           {[
-            { label:'Expected', value:`₹${(totalExpected/1000).toFixed(0)}k`, color:'#4f46e5', icon:'💰' },
-            { label:'Collected', value:`₹${(totalCollected/1000).toFixed(0)}k`, color:'#059669', icon:'✅' },
-            { label:'Pending', value:`₹${(totalPending/1000).toFixed(0)}k`, color:'#dc2626', icon:'⏳' },
+            { label:'Expected', value:`₹${totalExpected.toLocaleString()}`,  color:'#4f46e5', icon:'💰' },
+            { label:'Collected', value:`₹${totalCollected.toLocaleString()}`, color:'#059669', icon:'✅' },
+            { label:'Pending', value:`₹${totalPending.toLocaleString()}`,     color:'#dc2626', icon:'⏳' },
             { label:'Paid', value:`${paidTenants.length}/${tenants.length}`, color:'#d97706', icon:'👥' },
           ].map(({label,value,color,icon}) => (
             <div key={label} className="rent-stat">
