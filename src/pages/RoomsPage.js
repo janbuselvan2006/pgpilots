@@ -323,7 +323,7 @@ const css = `
     max-height: 92dvh;
     overflow-y: auto;
     animation: slideUp 0.32s cubic-bezier(0.32,0.72,0,1);
-    padding-bottom: env(safe-area-inset-bottom, 24px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
   }
   @keyframes slideUp {
     from { transform: translateY(100%); }
@@ -378,7 +378,7 @@ const css = `
     color: #64748b;
     font-family: inherit;
   }
-  .sheet-body { padding: 16px 20px 24px; }
+  .sheet-body { padding: 16px 20px 96px; }
 
   /* Form fields */
   .sf-field { margin-bottom: 14px; }

@@ -414,7 +414,7 @@ const css = `
     max-height: 94dvh;
     overflow-y: auto;
     animation: bsSlideUp 0.3s cubic-bezier(0.32,0.72,0,1);
-    padding-bottom: env(safe-area-inset-bottom, 24px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
   }
   @keyframes bsSlideUp {
     from { transform: translateY(100%); }
@@ -457,7 +457,7 @@ const css = `
     font-family: inherit;
     -webkit-tap-highlight-color: transparent;
   }
-  .bs-body { padding: 12px 20px 24px; }
+  .bs-body { padding: 12px 20px 96px; }
 
   /* Payment sheet */
   .pay-tenant-box {

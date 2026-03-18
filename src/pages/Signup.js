@@ -334,8 +334,55 @@ const css = `
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* ── Switch text ── */
-  .pg-switch {
+  /* ── Terms checkbox ── */
+  .pg-terms-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 14px 0 18px;
+    padding: 14px;
+    background: #f8faff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .pg-terms-row.checked {
+    border-color: #059669;
+    background: #f0fdf4;
+  }
+  .pg-terms-checkbox {
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    border: 2px solid #cbd5e0;
+    background: white;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+    transition: all 0.2s;
+  }
+  .pg-terms-checkbox.checked {
+    background: #059669;
+    border-color: #059669;
+  }
+  .pg-terms-text {
+    font-size: 12px;
+    color: #475569;
+    line-height: 1.6;
+    font-weight: 500;
+  }
+  .pg-terms-link {
+    color: #e94560;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .pg-terms-link:hover { text-decoration: underline; }
+
+  /* Disabled send button when not agreed */
+  .pg-btn.disabled-terms {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
     text-align: center;
     margin-top: 20px;
     font-size: 13px;
@@ -457,26 +504,13 @@ const css = `
   }
 `;
 
-// Check if phone already exists in pgOwners
-const isPhoneAlreadyRegistered = async (phone) => {
-  const q = query(collection(db, 'pgOwners'), where('phone', '==', phone));
-  const snap = await getDocs(q);
-  return !snap.empty;
-};
-
-// Check if email already exists in pgOwners
-const isEmailAlreadyRegistered = async (email) => {
-  const q = query(collection(db, 'pgOwners'), where('email', '==', email));
-  const snap = await getDocs(q);
-  return !snap.empty;
-};
-
 export default function Signup() {
   const [step, setStep]           = useState(1);
   const [phone, setPhone]         = useState('');
   const [otp, setOtp]             = useState(['', '', '', '', '', '']);
   const [confirmResult, setConfirmResult] = useState(null);
   const [resendTimer, setResendTimer]     = useState(0);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const [ownerName, setOwnerName] = useState('');
   const [pgName, setPgName]       = useState('');
@@ -513,33 +547,25 @@ export default function Signup() {
   };
 
   const handleSendOTP = async () => {
-  setError('');
-  if (!phone || phone.length < 10) return setError('Enter a valid 10-digit mobile number.');
-  
-  setLoading(true);
-
-  // ✅ Check if phone already registered
-  const phoneExists = await isPhoneAlreadyRegistered(phone);
-  if (phoneExists) {
+    setError('');
+    if (!phone || phone.length < 10) return setError('Enter a valid 10-digit mobile number.');
+    if (!agreedToTerms) return setError('Please agree to the Terms & Conditions and Privacy Policy to continue.');
+    setLoading(true);
+    try {
+      setupRecaptcha();
+      const formatted = `+91${phone.replace(/\D/g, '')}`;
+      const result    = await signInWithPhoneNumber(auth, formatted, window.recaptchaVerifier);
+      setConfirmResult(result);
+      setStep(2);
+      setResendTimer(30);
+      setSuccess('OTP sent to +91 ' + phone);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to send OTP. Check number and try again.');
+      if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; }
+    }
     setLoading(false);
-    return setError('⚠️ This mobile number is already registered. Please login instead.');
-  }
-
-  try {
-    setupRecaptcha();
-    const formatted = `+91${phone.replace(/\D/g, '')}`;
-    const result    = await signInWithPhoneNumber(auth, formatted, window.recaptchaVerifier);
-    setConfirmResult(result);
-    setStep(2);
-    setResendTimer(30);
-    setSuccess('OTP sent to +91 ' + phone);
-  } catch (err) {
-    console.error(err);
-    setError('Failed to send OTP. Check number and try again.');
-    if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; }
-  }
-  setLoading(false);
-};
+  };
 
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
@@ -569,82 +595,47 @@ export default function Signup() {
     setLoading(false);
   };
 
-  const handleDetailsNext = async () => {
-  setError('');
-  if (!ownerName.trim()) return setError('Please enter your full name.');
-  if (!pgName.trim())    return setError('Please enter your PG name.');
-  if (!city.trim())      return setError('Please enter your city.');
-  if (!pgState.trim())   return setError('Please enter your state.');
-
-  // ✅ Check if email already registered (only if email entered)
-  if (email.trim()) {
-    setLoading(true);
-    const emailExists = await isEmailAlreadyRegistered(email.trim());
-    setLoading(false);
-    if (emailExists) {
-      return setError('⚠️ This email is already registered. Please login instead.');
-    }
-  }
-
-  setStep(4);
-};
+  const handleDetailsNext = () => {
+    setError('');
+    if (!ownerName.trim()) return setError('Please enter your full name.');
+    if (!pgName.trim())    return setError('Please enter your PG name.');
+    if (!city.trim())      return setError('Please enter your city.');
+    if (!pgState.trim())   return setError('Please enter your state.');
+    setStep(4);
+  };
 
   const handleCreateAccount = async () => {
-  setError('');
-  if (!password)                return setError('Please enter a password.');
-  if (password.length < 6)      return setError('Password must be at least 6 characters.');
-  if (password !== confirmPass)  return setError('Passwords do not match!');
+    setError('');
+    if (!password)                return setError('Please enter a password.');
+    if (password.length < 6)      return setError('Password must be at least 6 characters.');
+    if (password !== confirmPass)  return setError('Passwords do not match!');
+    setLoading(true);
+    try {
+      const user  = auth.currentUser;
+      const code  = await createUniquePGCode(pgName);
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 14);
 
-  setLoading(true);
-  try {
-    const user      = auth.currentUser;
-    const code      = await createUniquePGCode(pgName);
-    const trialEnd  = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 14);
+      await setDoc(doc(db, 'pgOwners', user.uid), {
+        ownerName, pgName, city, state: pgState,
+        email: email || '', phone, pgCode: code,
+        plan: 'trial', isActive: true,
+        trialEnd: trialEnd.toISOString().split('T')[0],
+        createdAt: new Date(),
+        features: { electricity: true, payments: true, rooms: true, tenants: true, reports: true },
+        limits: { maxTenants: 50, maxRooms: 20, maxReportsPerMonth: 5 },
+      });
 
-    // Use real email if provided, else generate one from phone
-    const userEmail = email.trim() || `${phone}@pgmanager.app`;
-
-    // Save to Firestore
-    await setDoc(doc(db, 'pgOwners', user.uid), {
-      ownerName,
-      pgName,
-      city,
-      state:    pgState,
-      email:    userEmail,
-      phone,
-      pgCode:   code,
-      plan:     'trial',
-      isActive: true,
-      trialEnd: trialEnd.toISOString().split('T')[0],
-      createdAt: new Date(),
-      features: {
-        electricity: true,
-        payments:    true,
-        rooms:       true,
-        tenants:     true,
-        reports:     true,
-      },
-      limits: {
-        maxTenants:         50,
-        maxRooms:           20,
-        maxReportsPerMonth: 5,
-      },
-    });
-
-    // Link email+password credential to phone auth user
-    const { EmailAuthProvider, linkWithCredential } = await import('firebase/auth');
-    const credential = EmailAuthProvider.credential(userEmail, password);
-    await linkWithCredential(user, credential);
-
-    setPgCode(code);
-    setStep(5);
-  } catch (err) {
-    console.error(err);
-    setError('Something went wrong. Please try again.');
-  }
-  setLoading(false);
-};
+      const { updatePassword } = await import('firebase/auth');
+      await updatePassword(user, password);
+      setPgCode(code);
+      setStep(5);
+    } catch (err) {
+      console.error(err);
+      setError('Something went wrong. Please try again.');
+    }
+    setLoading(false);
+  };
 
   const copyCode = () => {
     navigator.clipboard.writeText(pgCode);
@@ -667,7 +658,7 @@ export default function Signup() {
         {/* ── Hero ── */}
         <div className="pg-hero">
           <div className="pg-hero-inner">
-            <div className="pg-hero-brand">🏠 PGpilots</div>
+            <div className="pg-hero-brand">🏠 PG Manager</div>
             <h1 className="pg-hero-title">Start managing<br />smarter today</h1>
             {/* desktop only sub */}
             <p className="pg-hero-sub" style={{ display: 'none' }}>
@@ -735,7 +726,31 @@ export default function Signup() {
                     />
                   </div>
                 </div>
-                <button className="pg-btn" onClick={handleSendOTP} disabled={loading}>
+                {/* Terms & Conditions checkbox */}
+                <div
+                  className={`pg-terms-row${agreedToTerms?' checked':''}`}
+                  onClick={() => setAgreedToTerms(!agreedToTerms)}
+                >
+                  <div className={`pg-terms-checkbox${agreedToTerms?' checked':''}`}>
+                    {agreedToTerms && <span style={{color:'white',fontSize:'13px',fontWeight:'800',lineHeight:1}}>✓</span>}
+                  </div>
+                  <div className="pg-terms-text">
+                    I agree to the{' '}
+                    <a href="/terms-and-conditions.html" target="_blank" rel="noopener noreferrer"
+                      className="pg-terms-link" onClick={e => e.stopPropagation()}>
+                      Terms &amp; Conditions
+                    </a>
+                    {' '}and{' '}
+                    <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer"
+                      className="pg-terms-link" onClick={e => e.stopPropagation()}>
+                      Privacy Policy
+                    </a>
+                    . I confirm I am 18+ and authorized to manage this PG property.
+                  </div>
+                </div>
+
+                <button className={`pg-btn${!agreedToTerms?' disabled-terms':''}`}
+                  onClick={handleSendOTP} disabled={loading}>
                   {loading ? 'Sending OTP…' : <>Send OTP <span>→</span></>}
                 </button>
                 <p className="pg-switch">

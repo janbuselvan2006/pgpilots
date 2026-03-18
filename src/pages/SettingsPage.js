@@ -461,7 +461,7 @@ function SettingsPage() {
                   </div>
 
                   <div style={styles.supportNote}>
-                    📞 To upgrade your plan, contact us at support@pgmanager.in
+                    📞 To upgrade your plan, contact us at support@pgpilots.in
                   </div>
                 </div>
               )}

@@ -110,7 +110,7 @@ const css = `
   .bs-header { display:flex; justify-content:space-between; align-items:center; padding:14px 20px 8px; position:sticky; top:0; background:white; z-index:1; border-bottom:1px solid #f1f5f9; }
   .bs-title  { font-size:17px; font-weight:800; color:#1a1a2e; margin:0; }
   .bs-close  { width:32px; height:32px; border-radius:50%; background:#f1f5f9; border:none; font-size:14px; color:#64748b; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:inherit; -webkit-tap-highlight-color:transparent; }
-  .bs-body   { padding:16px 20px 28px; }
+  .bs-body   { padding:16px 20px 96px; }
 
   .ef-field  { margin-bottom:14px; }
   .ef-label  { display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px; }

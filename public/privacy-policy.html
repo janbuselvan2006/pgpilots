@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Privacy Policy — PGpilots</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.8; }
+
+    .header {
+      background: linear-gradient(135deg, #0f3460 0%, #1a1a2e 100%);
+      padding: 48px 24px 56px; text-align: center; position: relative; overflow: hidden;
+    }
+    .header::after {
+      content: ''; position: absolute; width: 300px; height: 300px; border-radius: 50%;
+      background: rgba(8,145,178,0.15); top: -80px; right: -60px; pointer-events: none;
+    }
+    .header-brand { color: #38bdf8; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+    .header h1 { color: white; font-size: clamp(26px, 5vw, 38px); font-weight: 800; margin-bottom: 10px; position: relative; z-index: 1; }
+    .header-sub { color: rgba(255,255,255,0.55); font-size: 14px; }
+    .header-meta {
+      display: inline-flex; gap: 20px; margin-top: 20px;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px; padding: 8px 20px; font-size: 13px; color: rgba(255,255,255,0.7);
+    }
+
+    .container { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    .toc {
+      background: white; border-radius: 16px; padding: 24px 28px;
+      margin-bottom: 36px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      border-left: 4px solid #0891b2;
+    }
+    .toc-title { font-size: 14px; font-weight: 800; color: #0891b2; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+    .toc ol { padding-left: 20px; }
+    .toc li { margin-bottom: 6px; }
+    .toc a { color: #0f3460; font-size: 14px; font-weight: 500; text-decoration: none; }
+    .toc a:hover { color: #0891b2; }
+
+    .section { background: white; border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+    .section-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; background: #0891b2; color: white;
+      border-radius: 8px; font-size: 13px; font-weight: 800; margin-right: 10px; flex-shrink: 0;
+    }
+    .section h2 { font-size: 17px; font-weight: 800; color: #1a1a2e; margin-bottom: 16px; display: flex; align-items: center; }
+    .section p { font-size: 14px; color: #475569; margin-bottom: 12px; line-height: 1.8; }
+    .section p:last-child { margin-bottom: 0; }
+    .section ul, .section ol { padding-left: 20px; margin-bottom: 12px; }
+    .section li { font-size: 14px; color: #475569; margin-bottom: 8px; line-height: 1.7; }
+
+    .highlight-box {
+      background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px;
+      padding: 16px 20px; margin: 16px 0; font-size: 14px; color: #dc2626; font-weight: 600;
+    }
+    .info-box {
+      background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px;
+      padding: 16px 20px; margin: 16px 0; font-size: 14px; color: #0369a1;
+    }
+    .green-box {
+      background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;
+      padding: 16px 20px; margin: 16px 0; font-size: 14px; color: #15803d; font-weight: 600;
+    }
+    .warning-box {
+      background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
+      padding: 16px 20px; margin: 16px 0; font-size: 14px; color: #92400e;
+    }
+
+    /* Data table */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+    th { background: #0f3460; color: white; padding: 10px 14px; text-align: left; font-weight: 700; }
+    td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; color: #475569; vertical-align: top; }
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    /* Rights grid */
+    .rights-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 16px 0; }
+    .right-card {
+      background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .right-card-icon { font-size: 22px; margin-bottom: 6px; }
+    .right-card-title { font-size: 13px; font-weight: 800; color: #0f3460; margin-bottom: 4px; }
+    .right-card-desc { font-size: 12px; color: #64748b; line-height: 1.5; }
+
+    .contact-card {
+      background: linear-gradient(135deg, #0f3460, #1a1a2e);
+      border-radius: 16px; padding: 28px 32px; color: white; margin-top: 8px;
+    }
+    .contact-card h3 { font-size: 16px; font-weight: 800; margin-bottom: 14px; }
+    .contact-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 14px; color: rgba(255,255,255,0.8); }
+    .contact-item strong { color: white; }
+
+    .doc-footer { text-align: center; padding: 24px; font-size: 13px; color: #94a3b8; }
+
+    @media (max-width: 600px) {
+      .section { padding: 20px 18px; }
+      .container { padding: 24px 16px 60px; }
+      .header-meta { flex-direction: column; gap: 4px; }
+      .rights-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-brand">🔒 PGpilots</div>
+    <h1>Privacy Policy</h1>
+    <p class="header-sub">Your privacy matters. Here's exactly how we handle your data.</p>
+    <div class="header-meta">
+      <span>📅 Effective: March 2026</span>
+      <span>🔄 Last Updated: March 2026</span>
+      <span>📍 Jurisdiction: India</span>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <div class="toc">
+      <div class="toc-title">📋 Table of Contents</div>
+      <ol>
+        <li><a href="#p1">Introduction &amp; Scope</a></li>
+        <li><a href="#p2">Information We Collect</a></li>
+        <li><a href="#p3">How We Use Your Information</a></li>
+        <li><a href="#p4">Information Sharing &amp; Disclosure</a></li>
+        <li><a href="#p5">Data Storage &amp; Security</a></li>
+        <li><a href="#p6">Tenant Data &amp; PG Owner Responsibilities</a></li>
+        <li><a href="#p7">Cookies &amp; Tracking Technologies</a></li>
+        <li><a href="#p8">Data Retention</a></li>
+        <li><a href="#p9">Your Privacy Rights</a></li>
+        <li><a href="#p10">Children's Privacy</a></li>
+        <li><a href="#p11">Third-Party Services</a></li>
+        <li><a href="#p12">International Data Transfers</a></li>
+        <li><a href="#p13">Changes to This Policy</a></li>
+        <li><a href="#p14">Contact &amp; Grievance Officer</a></li>
+      </ol>
+    </div>
+
+    <div class="green-box">
+      ✅ We do not sell your personal data. We do not run ads. Your data is used only to provide the PGpilots service to you.
+    </div>
+
+    <!-- Section 1 -->
+    <div class="section" id="p1">
+      <h2><span class="section-num">1</span>Introduction &amp; Scope</h2>
+      <p>PGpilots ("we", "us", or "our") is committed to protecting the privacy and security of your personal information. This Privacy Policy explains how we collect, use, store, share, and protect information when you use our platform.</p>
+      <p>This Policy applies to:</p>
+      <ul>
+        <li><strong>PG Owners</strong> — individuals who register and manage PG properties on our platform</li>
+        <li><strong>Tenant Data</strong> — personal information about tenants entered by PG owners</li>
+        <li><strong>Visitors</strong> — individuals who visit our website without registering</li>
+      </ul>
+      <p>By using PGpilots, you consent to the data practices described in this Policy. If you do not agree, please discontinue use of the Service.</p>
+      <div class="info-box">
+        ℹ️ This Policy is compliant with India's <strong>Information Technology Act, 2000</strong> and the <strong>Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011</strong>.
+      </div>
+    </div>
+
+    <!-- Section 2 -->
+    <div class="section" id="p2">
+      <h2><span class="section-num">2</span>Information We Collect</h2>
+      <p>We collect the following categories of information:</p>
+
+      <p><strong>A. Account Registration Data (PG Owner)</strong></p>
+      <table>
+        <tr><th>Data</th><th>Purpose</th><th>Required?</th></tr>
+        <tr><td>Full Name</td><td>Account identification</td><td>Yes</td></tr>
+        <tr><td>Mobile Number</td><td>OTP verification, login</td><td>Yes</td></tr>
+        <tr><td>Email Address</td><td>Account recovery, notifications</td><td>Optional</td></tr>
+        <tr><td>PG Name &amp; Address</td><td>Property identification</td><td>Yes</td></tr>
+        <tr><td>City &amp; State</td><td>Regional settings</td><td>Yes</td></tr>
+        <tr><td>Password (hashed)</td><td>Authentication</td><td>Yes</td></tr>
+      </table>
+
+      <p><strong>B. Tenant Data (entered by PG Owners)</strong></p>
+      <table>
+        <tr><th>Data</th><th>Purpose</th></tr>
+        <tr><td>Tenant Name, Phone, Email</td><td>Tenant identification &amp; communication</td></tr>
+        <tr><td>ID Type &amp; Number (Aadhaar, PAN, etc.)</td><td>Verification as required by tenancy laws</td></tr>
+        <tr><td>Address &amp; Company/College</td><td>Tenant profile</td></tr>
+        <tr><td>Check-in Date, Room &amp; Bed Number</td><td>Occupancy management</td></tr>
+        <tr><td>Monthly Rent &amp; Deposit Amount</td><td>Payment tracking</td></tr>
+        <tr><td>Emergency Contact Details</td><td>Safety purposes</td></tr>
+      </table>
+
+      <p><strong>C. Usage &amp; Technical Data</strong></p>
+      <ul>
+        <li>Device type, browser type, and operating system</li>
+        <li>IP address and approximate location (city level)</li>
+        <li>Pages visited, features used, and session duration</li>
+        <li>Error logs and crash reports (for debugging)</li>
+      </ul>
+    </div>
+
+    <!-- Section 3 -->
+    <div class="section" id="p3">
+      <h2><span class="section-num">3</span>How We Use Your Information</h2>
+      <p>We use the information we collect for the following purposes:</p>
+      <ul>
+        <li><strong>Service Delivery</strong> — Providing, maintaining, and improving the PGpilots platform</li>
+        <li><strong>Authentication</strong> — Verifying your identity via OTP and password login</li>
+        <li><strong>Account Management</strong> — Managing your subscription, plan limits, and account settings</li>
+        <li><strong>Communications</strong> — Sending service-related notifications, OTPs, and support responses</li>
+        <li><strong>Security</strong> — Detecting and preventing fraud, abuse, and unauthorized access</li>
+        <li><strong>Analytics</strong> — Understanding how features are used to improve the product (aggregated, not individual tracking)</li>
+        <li><strong>Legal Compliance</strong> — Complying with applicable laws, court orders, or regulatory requirements</li>
+      </ul>
+      <div class="green-box">
+        ✅ We do NOT use your data for targeted advertising. We do NOT sell your data to third parties. We do NOT share your data with advertisers.
+      </div>
+    </div>
+
+    <!-- Section 4 -->
+    <div class="section" id="p4">
+      <h2><span class="section-num">4</span>Information Sharing &amp; Disclosure</h2>
+      <p>We do not sell, rent, or trade your personal information. We may share your information only in the following limited circumstances:</p>
+      <ul>
+        <li><strong>Service Providers</strong> — We use Google Firebase (authentication, database, hosting) to operate the platform. Firebase processes data in accordance with Google's Privacy Policy and our Data Processing Agreement.</li>
+        <li><strong>Legal Requirements</strong> — We may disclose information if required by law, court order, or government authority under Indian law.</li>
+        <li><strong>Business Transfers</strong> — In the event of a merger, acquisition, or sale of assets, user data may be transferred. We will notify you via the app or registered contact before such transfer.</li>
+        <li><strong>Safety</strong> — If we believe disclosure is necessary to prevent harm to any person or to protect our rights.</li>
+        <li><strong>With Your Consent</strong> — We may share data for other purposes with your explicit consent.</li>
+      </ul>
+      <div class="info-box">
+        ℹ️ <strong>Firebase Data Processing:</strong> All data is stored on Google Firebase servers. Google acts as a data processor on our behalf and is contractually bound to protect your data. See <a href="https://firebase.google.com/support/privacy" style="color:#0891b2">Firebase Privacy</a>.
+      </div>
+    </div>
+
+    <!-- Section 5 -->
+    <div class="section" id="p5">
+      <h2><span class="section-num">5</span>Data Storage &amp; Security</h2>
+      <p>We implement the following security measures to protect your data:</p>
+      <ul>
+        <li><strong>Encryption in Transit</strong> — All data transmitted between your device and our servers is encrypted using HTTPS/TLS</li>
+        <li><strong>Encryption at Rest</strong> — Data stored in Firebase Firestore is encrypted at rest by Google</li>
+        <li><strong>Authentication</strong> — Phone OTP + password authentication with Firebase Auth</li>
+        <li><strong>Access Controls</strong> — Firestore security rules ensure each PG owner can only access their own data</li>
+        <li><strong>Password Security</strong> — Passwords are never stored in plain text; they are managed securely by Firebase Authentication</li>
+        <li><strong>Security Rules</strong> — Database-level rules prevent unauthorized cross-account data access</li>
+      </ul>
+      <div class="warning-box">
+        ⚠️ While we implement strong security measures, no system is 100% secure. We encourage you to use a strong, unique password and keep your PG Code confidential. Report any suspected security breach to us immediately.
+      </div>
+      <p><strong>Data Location:</strong> Your data is stored on Google Firebase servers, which may be located in the United States, Europe, or Asia. All processing is subject to Google's enterprise-grade security standards.</p>
+    </div>
+
+    <!-- Section 6 -->
+    <div class="section" id="p6">
+      <h2><span class="section-num">6</span>Tenant Data &amp; PG Owner Responsibilities</h2>
+      <p>PG owners enter tenant personal data (including sensitive data like ID numbers) into the platform. With respect to this data:</p>
+      <ul>
+        <li>The <strong>PG owner is the data controller</strong> for tenant data. PGpilots acts as a data processor/service provider.</li>
+        <li>PG owners are responsible for obtaining proper consent from tenants before entering their data</li>
+        <li>PG owners must inform tenants that their data is being stored digitally in a cloud-based management system</li>
+        <li>PG owners are responsible for complying with any tenant requests to access or delete their data</li>
+        <li>Tenant ID data (Aadhaar, PAN numbers) must be collected only as permitted by applicable law</li>
+      </ul>
+      <div class="highlight-box">
+        🔴 PGpilots does not share tenant data with any third party other than our infrastructure provider (Firebase/Google). Tenants' personal information is never used for marketing or advertising.
+      </div>
+      <p>If a tenant contacts PGpilots directly regarding their data, we will refer them to the respective PG owner as the data controller, while assisting within our capacity as a processor.</p>
+    </div>
+
+    <!-- Section 7 -->
+    <div class="section" id="p7">
+      <h2><span class="section-num">7</span>Cookies &amp; Tracking Technologies</h2>
+      <p>PGpilots uses the following types of cookies and storage:</p>
+      <table>
+        <tr><th>Type</th><th>Purpose</th><th>Can Opt Out?</th></tr>
+        <tr><td>Session Storage</td><td>Keeps you logged in during your browser session</td><td>No (essential)</td></tr>
+        <tr><td>Local Storage</td><td>Remember your login if "Remember Me" is selected</td><td>Yes (don't check "Remember Me")</td></tr>
+        <tr><td>Firebase Auth Cookies</td><td>Authentication token management</td><td>No (essential)</td></tr>
+        <tr><td>Analytics (if enabled)</td><td>Aggregated usage statistics</td><td>Yes (contact us)</td></tr>
+      </table>
+      <p>We do not use third-party advertising cookies. We do not use Facebook Pixel, Google Ads tracking, or any marketing tracking tools.</p>
+    </div>
+
+    <!-- Section 8 -->
+    <div class="section" id="p8">
+      <h2><span class="section-num">8</span>Data Retention</h2>
+      <p>We retain your data for the following periods:</p>
+      <table>
+        <tr><th>Data Type</th><th>Retention Period</th></tr>
+        <tr><td>Active account data</td><td>As long as your account is active</td></tr>
+        <tr><td>Payment &amp; rent history</td><td>7 years (for financial record requirements under Indian law)</td></tr>
+        <tr><td>Deleted tenant records</td><td>Soft-deleted; permanently deleted after 90 days</td></tr>
+        <tr><td>After account deletion</td><td>30 days for export, then permanently deleted</td></tr>
+        <tr><td>Usage logs &amp; technical data</td><td>90 days</td></tr>
+        <tr><td>Security logs</td><td>1 year</td></tr>
+      </table>
+      <p>After the retention period expires, data is permanently and irreversibly deleted from our systems and backups within 30 days.</p>
+    </div>
+
+    <!-- Section 9 -->
+    <div class="section" id="p9">
+      <h2><span class="section-num">9</span>Your Privacy Rights</h2>
+      <p>As a user of PGpilots, you have the following rights regarding your personal data:</p>
+      <div class="rights-grid">
+        <div class="right-card">
+          <div class="right-card-icon">👁️</div>
+          <div class="right-card-title">Right to Access</div>
+          <div class="right-card-desc">Request a copy of all personal data we hold about you</div>
+        </div>
+        <div class="right-card">
+          <div class="right-card-icon">✏️</div>
+          <div class="right-card-title">Right to Rectify</div>
+          <div class="right-card-desc">Correct inaccurate or incomplete personal data</div>
+        </div>
+        <div class="right-card">
+          <div class="right-card-icon">🗑️</div>
+          <div class="right-card-title">Right to Delete</div>
+          <div class="right-card-desc">Request deletion of your account and associated data</div>
+        </div>
+        <div class="right-card">
+          <div class="right-card-icon">📦</div>
+          <div class="right-card-title">Right to Portability</div>
+          <div class="right-card-desc">Export your data in a readable format (PDF/CSV via Reports)</div>
+        </div>
+        <div class="right-card">
+          <div class="right-card-icon">🚫</div>
+          <div class="right-card-title">Right to Object</div>
+          <div class="right-card-desc">Object to processing of your data for analytics purposes</div>
+        </div>
+        <div class="right-card">
+          <div class="right-card-icon">⏸️</div>
+          <div class="right-card-title">Right to Restrict</div>
+          <div class="right-card-desc">Request restriction of processing under certain circumstances</div>
+        </div>
+      </div>
+      <p>To exercise any of these rights, contact us at <strong>privacy@PGpilots.app</strong> with the subject line "Privacy Rights Request." We will respond within <strong>30 days</strong>.</p>
+    </div>
+
+    <!-- Section 10 -->
+    <div class="section" id="p10">
+      <h2><span class="section-num">10</span>Children's Privacy</h2>
+      <p>PGpilots is designed for use by adults (18 years and above) who operate PG accommodation businesses. We do not knowingly collect personal information from children under the age of 18.</p>
+      <p>If we become aware that a user under 18 has created an account, we will take steps to terminate that account and delete associated data promptly.</p>
+      <p>If you believe a minor has provided us with personal information, please contact us immediately at <strong>privacy@pgpilots.app</strong>.</p>
+    </div>
+
+    <!-- Section 11 -->
+    <div class="section" id="p11">
+      <h2><span class="section-num">11</span>Third-Party Services</h2>
+      <p>PGpilots integrates with the following third-party services:</p>
+      <table>
+        <tr><th>Service</th><th>Purpose</th><th>Privacy Policy</th></tr>
+        <tr><td>Google Firebase</td><td>Authentication, database, hosting</td><td>firebase.google.com/support/privacy</td></tr>
+        <tr><td>Google reCAPTCHA</td><td>Bot prevention during OTP verification</td><td>policies.google.com/privacy</td></tr>
+        <tr><td>Vercel</td><td>Web hosting &amp; deployment</td><td>vercel.com/legal/privacy-policy</td></tr>
+      </table>
+      <p>Each third-party service has its own Privacy Policy. We encourage you to review them. PGpilots is not responsible for the privacy practices of third-party services.</p>
+      <p>We do not integrate with social media platforms, advertising networks, or data brokers.</p>
+    </div>
+
+    <!-- Section 12 -->
+    <div class="section" id="p12">
+      <h2><span class="section-num">12</span>International Data Transfers</h2>
+      <p>PGpilots stores data on Google Firebase servers. Google operates data centers globally, and your data may be processed in countries outside India, including the United States and European Union countries.</p>
+      <p>Google Firebase complies with applicable data protection frameworks including:</p>
+      <ul>
+        <li>EU-U.S. Data Privacy Framework</li>
+        <li>Standard Contractual Clauses (SCCs) for international data transfers</li>
+        <li>Google Cloud's comprehensive data processing terms</li>
+      </ul>
+      <p>By using PGpilots, you consent to the transfer of your data to these jurisdictions as necessary to provide the Service.</p>
+    </div>
+
+    <!-- Section 13 -->
+    <div class="section" id="p13">
+      <h2><span class="section-num">13</span>Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time to reflect changes in our practices, technology, or legal requirements. When we make significant changes:</p>
+      <ul>
+        <li>We will update the "Last Updated" date at the top of this Policy</li>
+        <li>We will notify registered users via the app or their registered contact</li>
+        <li>For material changes affecting your rights, we will seek your re-consent where required by law</li>
+      </ul>
+      <p>We encourage you to review this Policy periodically. Your continued use of the Service after changes are posted constitutes acceptance of the updated Policy.</p>
+    </div>
+
+    <!-- Section 14 -->
+    <div class="section" id="p14">
+      <h2><span class="section-num">14</span>Contact &amp; Grievance Officer</h2>
+      <p>As required under Indian IT Rules 2011, we have designated a <strong>Grievance Officer</strong> to address your privacy concerns:</p>
+      <div class="contact-card">
+        <h3>🔒 Privacy &amp; Grievance Contact</h3>
+        <div class="contact-item">👤 <span><strong>Grievance Officer:</strong> Anbuselvan J </span></div>
+        <div class="contact-item">📧 <span><strong>Privacy Email:</strong> privacy@pgpilots.com</span></div>
+        <div class="contact-item">📧 <span><strong>Support Email:</strong> support@pgpilots.com</span></div>
+        <div class="contact-item">🌐 <span><strong>Website:</strong> pgpilots.com</span></div>
+        <div class="contact-item">📍 <span><strong>Address:</strong> Arumbakkam, Chennai, 600106, Tamilnadu, India</span></div>
+        <div class="contact-item">⏰ <span><strong>Response Time:</strong> Within 30 days of receipt of grievance</span></div>
+      </div>
+      <div class="info-box" style="margin-top:16px;">
+        ℹ️ If you are not satisfied with our response to your privacy grievance, you may escalate the matter to the relevant data protection authority or seek remedies under the Information Technology Act, 2000.
+      </div>
+    </div>
+
+  </div>
+
+  <div class="doc-footer">
+    © 2026 PGpilots. All rights reserved. &nbsp;|&nbsp; <a href="terms-and-conditions.html" style="color:#0891b2">Terms &amp; Conditions</a>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Terms & Conditions — PGpilots</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.8; }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+      padding: 48px 24px 56px; text-align: center; position: relative; overflow: hidden;
+    }
+    .header::after {
+      content: ''; position: absolute; width: 300px; height: 300px; border-radius: 50%;
+      background: rgba(233,69,96,0.12); top: -80px; right: -60px; pointer-events: none;
+    }
+    .header-brand { color: #e94560; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+    .header h1 { color: white; font-size: clamp(26px, 5vw, 38px); font-weight: 800; margin-bottom: 10px; position: relative; z-index: 1; }
+    .header-sub { color: rgba(255,255,255,0.55); font-size: 14px; }
+    .header-meta {
+      display: inline-flex; gap: 20px; margin-top: 20px;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px; padding: 8px 20px; font-size: 13px; color: rgba(255,255,255,0.7);
+    }
+
+    /* Layout */
+    .container { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    /* TOC */
+    .toc {
+      background: white; border-radius: 16px; padding: 24px 28px;
+      margin-bottom: 36px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      border-left: 4px solid #e94560;
+    }
+    .toc-title { font-size: 14px; font-weight: 800; color: #e94560; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+    .toc ol { padding-left: 20px; }
+    .toc li { margin-bottom: 6px; }
+    .toc a { color: #0f3460; font-size: 14px; font-weight: 500; text-decoration: none; }
+    .toc a:hover { color: #e94560; }
+
+    /* Sections */
+    .section { background: white; border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+    .section-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; background: #e94560; color: white;
+      border-radius: 8px; font-size: 13px; font-weight: 800; margin-right: 10px; flex-shrink: 0;
+    }
+    .section h2 { font-size: 17px; font-weight: 800; color: #1a1a2e; margin-bottom: 16px; display: flex; align-items: center; }
+    .section p { font-size: 14px; color: #475569; margin-bottom: 12px; line-height: 1.8; }
+    .section p:last-child { margin-bottom: 0; }
+    .section ul, .section ol { padding-left: 20px; margin-bottom: 12px; }
+    .section li { font-size: 14px; color: #475569; margin-bottom: 8px; line-height: 1.7; }
+
+    /* Highlight box */
+    .highlight-box {
+      background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px;
+      padding: 16px 20px; margin: 16px 0; font-size: 14px; color: #dc2626; font-weight: 600;
+    }
+    .info-box {
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px;
+      padding: 16px 20px; margin: 16px 0; font-size: 14px; color: #1d4ed8;
+    }
+    .warning-box {
+      background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
+      padding: 16px 20px; margin: 16px 0; font-size: 14px; color: #92400e;
+    }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+    th { background: #1a1a2e; color: white; padding: 10px 14px; text-align: left; font-weight: 700; }
+    td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; color: #475569; }
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    /* Contact card */
+    .contact-card {
+      background: linear-gradient(135deg, #1a1a2e, #0f3460);
+      border-radius: 16px; padding: 28px 32px; color: white; margin-top: 8px;
+    }
+    .contact-card h3 { font-size: 16px; font-weight: 800; margin-bottom: 14px; }
+    .contact-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 14px; color: rgba(255,255,255,0.8); }
+    .contact-item strong { color: white; }
+
+    /* Footer */
+    .doc-footer { text-align: center; padding: 24px; font-size: 13px; color: #94a3b8; }
+
+    @media (max-width: 600px) {
+      .section { padding: 20px 18px; }
+      .container { padding: 24px 16px 60px; }
+      .header-meta { flex-direction: column; gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-brand">🏠 PGpilots</div>
+    <h1>Terms &amp; Conditions</h1>
+    <p class="header-sub">Please read these terms carefully before using our platform</p>
+    <div class="header-meta">
+      <span>📅 Effective: March 2026</span>
+      <span>🔄 Last Updated: March 2026</span>
+      <span>📍 Jurisdiction: India</span>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- TOC -->
+    <div class="toc">
+      <div class="toc-title">📋 Table of Contents</div>
+      <ol>
+        <li><a href="#s1">Acceptance of Terms</a></li>
+        <li><a href="#s2">Description of Service</a></li>
+        <li><a href="#s3">User Eligibility &amp; Registration</a></li>
+        <li><a href="#s4">PG Code &amp; Account Security</a></li>
+        <li><a href="#s5">Subscription Plans &amp; Billing</a></li>
+        <li><a href="#s6">User Responsibilities</a></li>
+        <li><a href="#s7">Data Ownership &amp; Content</a></li>
+        <li><a href="#s8">Prohibited Activities</a></li>
+        <li><a href="#s9">Service Availability &amp; Limitations</a></li>
+        <li><a href="#s10">Intellectual Property</a></li>
+        <li><a href="#s11">Disclaimer of Warranties</a></li>
+        <li><a href="#s12">Limitation of Liability</a></li>
+        <li><a href="#s13">Account Termination</a></li>
+        <li><a href="#s14">Governing Law &amp; Disputes</a></li>
+        <li><a href="#s15">Changes to Terms</a></li>
+        <li><a href="#s16">Contact Information</a></li>
+      </ol>
+    </div>
+
+    <div class="highlight-box">
+      ⚠️ By accessing or using PGpilots, you agree to be bound by these Terms & Conditions. If you do not agree, please do not use the platform.
+    </div>
+
+    <!-- Section 1 -->
+    <div class="section" id="s1">
+      <h2><span class="section-num">1</span>Acceptance of Terms</h2>
+      <p>These Terms and Conditions ("Terms") constitute a legally binding agreement between you ("User", "PGpilots", or "you") and PGpilots ("we", "us", or "our") governing your access to and use of the PGpilots platform, including all associated websites, mobile applications, and services (collectively, the "Service").</p>
+      <p>By creating an account, accessing the Service, or clicking "I Agree," you acknowledge that you have read, understood, and agree to be bound by these Terms. If you are using the Service on behalf of an organization, you represent that you have the authority to bind that organization to these Terms.</p>
+      <p>These Terms apply to all visitors, registered users, and others who access or use the Service.</p>
+    </div>
+
+    <!-- Section 2 -->
+    <div class="section" id="s2">
+      <h2><span class="section-num">2</span>Description of Service</h2>
+      <p>PGpilots is a cloud-based property management Software-as-a-Service (SaaS) platform designed specifically for Paying Guest (PG) accommodation owners and operators in India. The Service provides:</p>
+      <ul>
+        <li><strong>Tenant Management</strong> — Add, edit, and manage tenant profiles including personal details, ID proofs, and emergency contacts</li>
+        <li><strong>Room Management</strong> — Track rooms, bed occupancy, and availability in real time</li>
+        <li><strong>Rent Collection</strong> — Record, track, and manage rent payments with support for partial payments and late penalty configuration</li>
+        <li><strong>Electricity Billing</strong> — Add monthly electricity bills and split them among room tenants</li>
+        <li><strong>Reports &amp; Analytics</strong> — Generate rent collection, occupancy, and tenant history reports with PDF download</li>
+        <li><strong>Notifications</strong> — Alerts for overdue payments and upcoming due dates</li>
+      </ul>
+      <div class="info-box">
+        ℹ️ PGpilots is a management tool only. We do not facilitate, process, or hold any financial transactions between PG owners and tenants. All payments are managed directly between the parties.
+      </div>
+    </div>
+
+    <!-- Section 3 -->
+    <div class="section" id="s3">
+      <h2><span class="section-num">3</span>User Eligibility &amp; Registration</h2>
+      <p>To use PGpilots, you must meet the following requirements:</p>
+      <ul>
+        <li>Be at least <strong>18 years of age</strong></li>
+        <li>Be a resident or business operator in <strong>India</strong></li>
+        <li>Provide a valid Indian mobile number for OTP verification</li>
+        <li>Have lawful authority to manage the PG property you register</li>
+        <li>Not be prohibited from using the Service under applicable law</li>
+      </ul>
+      <p>During registration, you will receive a unique <strong>PG Code</strong> (e.g., SUN847). This code identifies your account and is required for login. You are responsible for keeping this code confidential.</p>
+      <p>You agree to provide accurate, current, and complete information during registration and to update such information to keep it accurate and current.</p>
+    </div>
+
+    <!-- Section 4 -->
+    <div class="section" id="s4">
+      <h2><span class="section-num">4</span>PG Code &amp; Account Security</h2>
+      <p>Your PG Code is a unique identifier generated at registration. It is used as a login credential alongside your password. You are solely responsible for:</p>
+      <ul>
+        <li>Maintaining the confidentiality of your PG Code and password</li>
+        <li>All activities that occur under your account</li>
+        <li>Immediately notifying us if you suspect unauthorized access</li>
+        <li>Not sharing your credentials with unauthorized persons</li>
+      </ul>
+      <div class="warning-box">
+        ⚠️ PGpilots will never ask for your password via email, phone, or any communication channel. Never share your password with anyone claiming to be PGpilots support.
+      </div>
+      <p>We reserve the right to disable any account at our discretion if we believe security has been compromised or these Terms have been violated.</p>
+    </div>
+
+    <!-- Section 5 -->
+    <div class="section" id="s5">
+      <h2><span class="section-num">5</span>Subscription Plans &amp; Billing</h2>
+      <p>PGpilots offers the following subscription tiers:</p>
+      <table>
+        <tr><th>Plan</th><th>Duration</th><th>Features</th><th>Price</th></tr>
+        <tr><td><strong>Trial</strong></td><td>14 days</td><td>All features, up to 50 tenants</td><td>Free</td></tr>
+        <tr><td><strong>Basic</strong></td><td>Monthly/Annual</td><td>Core features</td><td>As listed on pricing page</td></tr>
+        <tr><td><strong>Pro</strong></td><td>Monthly/Annual</td><td>All features, priority support</td><td>As listed on pricing page</td></tr>
+      </table>
+      <ul>
+        <li>Trial accounts automatically expire after 14 days. No credit card is required for the trial.</li>
+        <li>Paid subscriptions are billed in advance on a monthly or annual basis.</li>
+        <li>All prices are in Indian Rupees (INR) and inclusive of applicable GST.</li>
+        <li>Subscription fees are <strong>non-refundable</strong> except as required by applicable law or at our sole discretion.</li>
+        <li>We reserve the right to modify pricing with 30 days advance notice.</li>
+        <li>Failure to pay may result in service suspension or account termination.</li>
+      </ul>
+    </div>
+
+    <!-- Section 6 -->
+    <div class="section" id="s6">
+      <h2><span class="section-num">6</span>User Responsibilities</h2>
+      <p>As a user of PGpilots, you agree to:</p>
+      <ul>
+        <li>Use the Service only for lawful purposes related to legitimate PG property management</li>
+        <li>Obtain proper consent from tenants before entering their personal data into the platform</li>
+        <li>Comply with all applicable Indian laws including the <strong>Information Technology Act, 2000</strong>, personal data protection regulations, and rental/tenancy laws applicable to your state</li>
+        <li>Ensure that tenant ID documents and personal information uploaded to the platform are obtained lawfully</li>
+        <li>Not use the Service to harass, discriminate against, or harm any tenant or third party</li>
+        <li>Maintain accurate records and not enter false or misleading information</li>
+        <li>Regularly back up your data as PGpilots is not liable for data loss</li>
+      </ul>
+      <div class="highlight-box">
+        🔴 You are solely responsible for ensuring your use of PGpilots complies with tenancy laws in your state. PGpilots does not provide legal advice.
+      </div>
+    </div>
+
+    <!-- Section 7 -->
+    <div class="section" id="s7">
+      <h2><span class="section-num">7</span>Data Ownership &amp; Content</h2>
+      <p><strong>Your Data:</strong> All data you enter into PGpilots — tenant records, payment history, room details, and reports — remains your property. We do not claim ownership of your data.</p>
+      <p><strong>License to Us:</strong> By using the Service, you grant PGpilots a limited, non-exclusive license to store, process, and display your data solely for the purpose of providing the Service to you.</p>
+      <p><strong>Data Export:</strong> You may export your data at any time via the Reports section. Upon account termination, you have 30 days to export your data before it is deleted.</p>
+      <p><strong>Tenant Data:</strong> You warrant that you have the legal right and proper consent to enter tenant personal data (name, phone, ID details, etc.) into the platform. You indemnify PGpilots against any claims arising from unauthorized data entry.</p>
+    </div>
+
+    <!-- Section 8 -->
+    <div class="section" id="s8">
+      <h2><span class="section-num">8</span>Prohibited Activities</h2>
+      <p>You must not use PGpilots to:</p>
+      <ul>
+        <li>Enter false, fabricated, or fraudulent tenant or payment records</li>
+        <li>Circumvent, disable, or interfere with security features of the Service</li>
+        <li>Attempt to gain unauthorized access to other users' accounts or data</li>
+        <li>Use automated bots, scrapers, or scripts to access the platform</li>
+        <li>Reverse engineer, decompile, or attempt to extract source code</li>
+        <li>Resell, sublicense, or commercially redistribute the Service without written permission</li>
+        <li>Upload malicious code, viruses, or any software intended to damage systems</li>
+        <li>Use the platform for any purpose other than PG/hostel management</li>
+        <li>Impersonate another person or organization</li>
+        <li>Violate any applicable law or regulation</li>
+      </ul>
+      <p>Violation of any prohibited activity may result in immediate account suspension without refund and may be reported to law enforcement authorities.</p>
+    </div>
+
+    <!-- Section 9 -->
+    <div class="section" id="s9">
+      <h2><span class="section-num">9</span>Service Availability &amp; Limitations</h2>
+      <p>We strive to provide 99% uptime but do not guarantee uninterrupted availability. The Service may be unavailable due to:</p>
+      <ul>
+        <li>Scheduled maintenance (communicated in advance where possible)</li>
+        <li>Emergency maintenance or security patches</li>
+        <li>Third-party service disruptions (Firebase, hosting providers)</li>
+        <li>Force majeure events beyond our reasonable control</li>
+      </ul>
+      <p>Subscription plans include usage limits (maximum tenants, rooms, reports per month). Exceeding limits may require a plan upgrade. We reserve the right to enforce these limits at any time.</p>
+      <div class="info-box">
+        ℹ️ PGpilots is built on Google Firebase infrastructure. Service availability is also subject to Firebase's terms of service and availability at cloud.google.com/terms.
+      </div>
+    </div>
+
+    <!-- Section 10 -->
+    <div class="section" id="s10">
+      <h2><span class="section-num">10</span>Intellectual Property</h2>
+      <p>All intellectual property rights in and to the PGpilots platform — including but not limited to software code, design, user interface, logos, trademarks, and documentation — are owned exclusively by PGpilots and its licensors.</p>
+      <p>Nothing in these Terms grants you any right, title, or interest in the platform's intellectual property other than the limited right to use the Service as described herein.</p>
+      <p>The PGpilots name, logo, and branding are trademarks of PGpilots. You may not use our trademarks without prior written consent.</p>
+    </div>
+
+    <!-- Section 11 -->
+    <div class="section" id="s11">
+      <h2><span class="section-num">11</span>Disclaimer of Warranties</h2>
+      <p>THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO:</p>
+      <ul>
+        <li>Warranties of merchantability, fitness for a particular purpose, or non-infringement</li>
+        <li>Warranties that the Service will be uninterrupted, error-free, or secure</li>
+        <li>Warranties regarding the accuracy or reliability of any data or reports generated</li>
+        <li>Warranties that defects will be corrected within any specific timeframe</li>
+      </ul>
+      <p>PGpilots does not warrant that the platform is suitable for any specific legal, financial, or regulatory compliance purpose. Users should seek independent professional advice for such matters.</p>
+    </div>
+
+    <!-- Section 12 -->
+    <div class="section" id="s12">
+      <h2><span class="section-num">12</span>Limitation of Liability</h2>
+      <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, PGPILOTS SHALL NOT BE LIABLE FOR:</p>
+      <ul>
+        <li>Any indirect, incidental, special, consequential, or punitive damages</li>
+        <li>Loss of profits, revenue, data, goodwill, or business opportunities</li>
+        <li>Damages arising from unauthorized access to or alteration of your data</li>
+        <li>Damages arising from your failure to comply with tenant data protection obligations</li>
+        <li>Any loss resulting from disputes between you and your tenants</li>
+      </ul>
+      <p>In no event shall PGpilots's total cumulative liability to you exceed the amount you paid for the Service in the 3 months immediately preceding the claim.</p>
+      <div class="highlight-box">
+        🔴 PGpilots is a management tool. Any financial disputes, tenancy disagreements, or legal matters between PG owners and tenants are entirely outside our scope and responsibility.
+      </div>
+    </div>
+
+    <!-- Section 13 -->
+    <div class="section" id="s13">
+      <h2><span class="section-num">13</span>Account Termination</h2>
+      <p><strong>By You:</strong> You may delete your account at any time from the Settings page. Upon deletion, your data will be retained for 30 days before permanent deletion to allow for data export.</p>
+      <p><strong>By Us:</strong> We may suspend or terminate your account immediately, without prior notice or liability, if you:</p>
+      <ul>
+        <li>Violate these Terms or our Privacy Policy</li>
+        <li>Engage in fraudulent or illegal activity</li>
+        <li>Fail to pay subscription fees after reasonable notice</li>
+        <li>Cause harm to other users, tenants, or third parties</li>
+      </ul>
+      <p><strong>Effect of Termination:</strong> Upon termination, your right to access the Service ceases immediately. Subscription fees paid are non-refundable. Data export requests made within 30 days of termination will be honored.</p>
+    </div>
+
+    <!-- Section 14 -->
+    <div class="section" id="s14">
+      <h2><span class="section-num">14</span>Governing Law &amp; Disputes</h2>
+      <p>These Terms shall be governed by and construed in accordance with the laws of <strong>India</strong>, without regard to conflict of law principles.</p>
+      <p>Any dispute, claim, or controversy arising out of or relating to these Terms or the Service shall first be attempted to be resolved through good-faith negotiation between the parties.</p>
+      <p>If negotiation fails, disputes shall be subject to the exclusive jurisdiction of the courts located in <strong>[Your City, State], India</strong>.</p>
+      <p>Nothing in this section shall prevent either party from seeking urgent injunctive or equitable relief in any competent court.</p>
+    </div>
+
+    <!-- Section 15 -->
+    <div class="section" id="s15">
+      <h2><span class="section-num">15</span>Changes to Terms</h2>
+      <p>We reserve the right to modify these Terms at any time. When we make material changes, we will:</p>
+      <ul>
+        <li>Update the "Last Updated" date at the top of this document</li>
+        <li>Send a notification to your registered mobile number or email</li>
+        <li>Display a banner in the app notifying you of the changes</li>
+      </ul>
+      <p>Your continued use of the Service after the effective date of revised Terms constitutes your acceptance of the changes. If you do not agree with the modified Terms, you must stop using the Service.</p>
+      <p>We recommend reviewing these Terms periodically to stay informed of any updates.</p>
+    </div>
+
+    <!-- Section 16 -->
+    <div class="section" id="s16">
+      <h2><span class="section-num">16</span>Contact Information</h2>
+      <div class="contact-card">
+        <h3>📬 Get In Touch</h3>
+        <div class="contact-item">📧 <span><strong>Email:</strong> support@pgpilots.com</span></div>
+        <div class="contact-item">🌐 <span><strong>Website:</strong> pgpilots.com</span></div>
+        <div class="contact-item">📍 <span><strong>Address:</strong> Arumbakkam, Chennai, 600106, Tamilnadu, India</span></div>
+        <div class="contact-item">⏰ <span><strong>Support Hours:</strong> Monday – Saturday, 9:00 AM – 6:00 PM IST</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="doc-footer">
+    © 2026 PGpilots. All rights reserved. &nbsp;|&nbsp; <a href="privacy-policy.html" style="color:#e94560">Privacy Policy</a>
+  </div>
+
+</body>
+</html>

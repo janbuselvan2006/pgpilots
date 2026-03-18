@@ -395,7 +395,7 @@ export default function Dashboard() {
           <button className="db-hamburger" onClick={()=>setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? '✕' : '☰'}
           </button>
-          <div className="db-mobile-logo">🏠 PG Manager</div>
+          <div className="db-mobile-logo">🏠 PGpilots</div>
           <div className="db-plan-badge">⭐ Basic</div>
         </div>
 
@@ -405,7 +405,7 @@ export default function Dashboard() {
         {/* ── Sidebar ── */}
         <div className={`db-sidebar${sidebarOpen?' open':''}`}>
           <div className="db-sidebar-top">
-            <div className="db-sidebar-logo">🏠 PG Manager</div>
+            <div className="db-sidebar-logo">🏠 PGpilots</div>
             {pgOwner && (
               <div className="db-owner-box">
                 <div className="db-owner-avatar">

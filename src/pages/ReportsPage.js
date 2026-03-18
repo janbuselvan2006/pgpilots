@@ -411,7 +411,7 @@ export default function ReportsPage() {
     const period = getPeriodLabel();
     pdf.setFillColor(233,69,96); pdf.rect(0,0,210,35,'F');
     pdf.setTextColor(255,255,255); pdf.setFontSize(20); pdf.setFont('helvetica','bold');
-    pdf.text('PG Manager',14,15); pdf.setFontSize(12); pdf.setFont('helvetica','normal');
+    pdf.text('PGpilots',14,15); pdf.setFontSize(12); pdf.setFont('helvetica','normal');
     pdf.text(`${type} Report — ${period}`,14,25); pdf.setTextColor(0,0,0);
     let y=45;
 
@@ -478,7 +478,7 @@ export default function ReportsPage() {
     const pc=pdf.internal.getNumberOfPages();
     for(let i=1;i<=pc;i++){
       pdf.setPage(i); pdf.setFontSize(8); pdf.setTextColor(150,150,150);
-      pdf.text(`PG Manager • ${new Date().toLocaleDateString('en-IN')} • Page ${i}/${pc}`,14,pdf.internal.pageSize.height-10);
+      pdf.text(`PGpilots • ${new Date().toLocaleDateString('en-IN')} • Page ${i}/${pc}`,14,pdf.internal.pageSize.height-10);
     }
     pdf.save(`${type}-${period}.pdf`);
   };
