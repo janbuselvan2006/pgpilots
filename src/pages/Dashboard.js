@@ -33,7 +33,7 @@ const css = `
     position: fixed;
     height: 100vh;
     overflow-y: auto;
-    z-index: 200;
+    z-index: 400;
     transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
     flex-shrink: 0;
   }
@@ -87,7 +87,7 @@ const css = `
     height: 56px;
     background: linear-gradient(135deg,#1a1a2e,#0f3460);
     align-items: center; justify-content: space-between;
-    padding: 0 16px; z-index: 300;
+    padding: 0 16px; z-index: 500;
     box-shadow: 0 2px 12px rgba(0,0,0,0.3);
   }
   .db-hamburger {
@@ -110,7 +110,7 @@ const css = `
     display: none;
     position: fixed; inset: 0;
     background: rgba(15,20,40,0.6);
-    z-index: 250; backdrop-filter: blur(2px);
+    z-index: 350; backdrop-filter: blur(2px);
     animation: dbFade 0.2s ease;
   }
   @keyframes dbFade { from{opacity:0}to{opacity:1} }
