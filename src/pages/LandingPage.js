@@ -284,7 +284,7 @@ function LandingPage() {
           <div className="float-badge float-2"><div className="dot" />3 rent reminders sent automatically</div>
           <div className="float-badge float-3"><div className="dot" />Room B5 — Vacant bed filled today</div>
 
-          <div className="hero-badge">🇮🇳 Built for Indian PG Owners</div>
+          <div className="hero-badge">IN Built for Indian PG Owners</div>
           <h1>
             Stop losing rent money.<br />
             <span className="accent">Start managing smarter.</span>

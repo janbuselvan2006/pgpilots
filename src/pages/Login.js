@@ -267,11 +267,11 @@ const css = `
     .lg-hero-title { font-size: 40px; margin-bottom: 20px; }
     .lg-hero-brand { font-size: 20px; margin-bottom: 40px; }
     .lg-hero-sub {
-      color: rgba(255,255,255,0.6);
+      color: rgb(255, 255, 255);
       font-size: 16px; line-height: 1.7; margin-bottom: 32px;
     }
     .lg-hero-features { display: flex; flex-direction: column; gap: 12px; }
-    .lg-hero-feature  { color: rgba(255,255,255,0.85); font-size: 15px; }
+    .lg-hero-feature  { color: rgb(255, 255, 255); font-size: 15px; }
     /* Hide mobile stats on desktop */
     .lg-stats { display: none; }
 
@@ -285,7 +285,7 @@ const css = `
     .lg-card {
       border-radius: 20px;
       margin-top: 0;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+      box-shadow: 0 8px 40px rgb(255, 255, 255);
       width: 100%; max-width: 400px;
       padding: 36px 32px 40px;
       flex: none;
