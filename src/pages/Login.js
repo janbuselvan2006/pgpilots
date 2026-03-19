@@ -1,338 +1,613 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { auth, db } from '../firebase';
 import {
-  signInWithEmailAndPassword, sendPasswordResetEmail,
-  signInWithPhoneNumber, RecaptchaVerifier,
-  browserSessionPersistence, browserLocalPersistence, setPersistence,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  browserSessionPersistence,
+  browserLocalPersistence,
+  setPersistence,
 } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 
-// ── Inject mobile CSS once
 const css = `
-  .login-page { display:flex; min-height:100vh; font-family:'Segoe UI',sans-serif; background:white; }
-  .login-left  { flex:1; background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%); display:flex; align-items:center; justify-content:center; padding:60px; }
-  .login-right { flex:1; background:#f8f9ff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 40px; min-height:100vh; }
-  .login-mobile-brand { display:none; text-align:center; margin-bottom:28px; }
-  .login-box   { width:100%; max-width:400px; }
-  .login-toggle-btn { flex:1; padding:9px 4px; border-radius:8px; border:none; font-size:12px; font-weight:600; cursor:pointer; background:transparent; color:#64748b; transition:all 0.2s; }
-  @media (max-width:768px) {
-    .login-left  { display:none !important; }
-    .login-right { padding:32px 24px !important; justify-content:flex-start !important; padding-top:48px !important; }
-    .login-mobile-brand { display:block !important; }
-    .login-box   { max-width:100% !important; }
-    .login-toggle-btn { font-size:11px; padding:8px 2px; }
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .lg-root {
+    min-height: 100dvh;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #f5f6fa;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── HERO (mobile: compact banner, desktop: left sidebar) ─── */
+  .lg-hero {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 55%, #0f3460 100%);
+    padding: 28px 24px 32px;
+    position: relative; overflow: hidden;
+    flex-shrink: 0;
+  }
+  .lg-hero::after {
+    content: ''; position: absolute;
+    width: 260px; height: 260px; border-radius: 50%;
+    background: rgba(233,69,96,0.12);
+    top: -70px; right: -50px; pointer-events: none;
+  }
+  .lg-hero-inner { position: relative; z-index: 1; }
+  .lg-hero-brand {
+    font-size: 15px; font-weight: 800; color: #e94560;
+    margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+  }
+  .lg-hero-title {
+    font-size: clamp(22px, 6vw, 30px);
+    font-weight: 800; color: white;
+    line-height: 1.25; margin-bottom: 18px;
+  }
+  /* Stats strip — mobile only */
+  .lg-stats {
+    display: flex; gap: 0;
+    border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .lg-stat {
+    flex: 1; text-align: center;
+    padding: 12px 6px;
+    background: rgba(255,255,255,0.05);
+    border-right: 1px solid rgba(255,255,255,0.08);
+  }
+  .lg-stat:last-child { border-right: none; }
+  .lg-stat-num   { font-size: 15px; font-weight: 800; color: #e94560; line-height: 1; }
+  .lg-stat-label { font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* ─── CARD (slides up from hero on mobile) ─── */
+  .lg-card {
+    background: white;
+    border-radius: 24px 24px 0 0;
+    flex: 1;
+    padding: 28px 24px 48px;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.07);
+    margin-top: -10px;
+    position: relative; z-index: 1;
+  }
+
+  /* ─── TABS ─── */
+  .lg-tabs {
+    display: flex; background: #f1f5f9;
+    border-radius: 12px; padding: 4px; gap: 3px;
+    margin-bottom: 24px;
+  }
+  .lg-tab {
+    flex: 1; padding: 10px 4px;
+    border: none; border-radius: 9px;
+    font-size: 12px; font-weight: 700;
+    cursor: pointer; background: transparent;
+    color: #94a3b8; font-family: inherit;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
+  }
+  .lg-tab.active {
+    background: white; color: #e94560;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+
+  /* ─── ALERTS ─── */
+  .lg-error {
+    background: #fff5f5; color: #c53030;
+    border: 1px solid #fed7d7; border-radius: 10px;
+    padding: 11px 14px; font-size: 13px;
+    margin-bottom: 16px; font-weight: 500;
+  }
+  .lg-success {
+    background: #f0fdf4; color: #15803d;
+    border: 1px solid #bbf7d0; border-radius: 10px;
+    padding: 11px 14px; font-size: 13px;
+    margin-bottom: 16px; font-weight: 600;
+  }
+
+  /* ─── FORM ELEMENTS ─── */
+  .lg-title { font-size: 22px; font-weight: 800; color: #1a1a2e; margin-bottom: 6px; }
+  .lg-sub   { font-size: 13px; color: #94a3b8; margin-bottom: 22px; line-height: 1.5; }
+
+  .lg-field { margin-bottom: 14px; }
+  .lg-label {
+    display: block; font-size: 12px; font-weight: 700;
+    color: #475569; margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .lg-input {
+    width: 100%; padding: 13px 16px;
+    border: 1.5px solid #e2e8f0; border-radius: 12px;
+    font-size: 15px; font-family: inherit;
+    color: #1a1a2e; background: #fafbff;
+    outline: none; box-sizing: border-box;
+    -webkit-appearance: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .lg-input:focus {
+    border-color: #e94560;
+    box-shadow: 0 0 0 3px rgba(233,69,96,0.1);
+    background: #fff;
+  }
+
+  /* PG Code special styling */
+  .lg-pgcode-input {
+    width: 100%; padding: 13px 16px;
+    border: 1.5px solid #e2e8f0; border-radius: 12px;
+    font-size: 22px; font-weight: 800;
+    letter-spacing: 8px; text-align: center;
+    font-family: inherit; color: #1a1a2e;
+    background: #fafbff; outline: none;
+    box-sizing: border-box; -webkit-appearance: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .lg-pgcode-input:focus {
+    border-color: #e94560;
+    box-shadow: 0 0 0 3px rgba(233,69,96,0.1);
+    background: #fff;
+  }
+
+  /* Phone row — FIXED: no dynamic state changes that cause re-render focus loss */
+  .lg-phone-row {
+    display: flex; gap: 8px; align-items: stretch;
+  }
+  .lg-prefix {
+    width: 60px; flex-shrink: 0;
+    padding: 13px 0; border: 1.5px solid #e2e8f0;
+    border-radius: 12px; font-size: 15px; font-weight: 700;
+    color: #475569; background: #f8fafc; text-align: center;
+  }
+  .lg-phone-input {
+    flex: 1; padding: 13px 16px;
+    border: 1.5px solid #e2e8f0; border-radius: 12px;
+    font-size: 15px; font-family: inherit;
+    color: #1a1a2e; background: #fafbff;
+    outline: none; box-sizing: border-box;
+    -webkit-appearance: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .lg-phone-input:focus {
+    border-color: #e94560;
+    box-shadow: 0 0 0 3px rgba(233,69,96,0.1);
+    background: #fff;
+  }
+
+  /* Password wrapper */
+  .lg-pass-wrap { position: relative; }
+  .lg-pass-input {
+    width: 100%; padding: 13px 48px 13px 16px;
+    border: 1.5px solid #e2e8f0; border-radius: 12px;
+    font-size: 15px; font-family: inherit;
+    color: #1a1a2e; background: #fafbff;
+    outline: none; box-sizing: border-box;
+    -webkit-appearance: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .lg-pass-input:focus {
+    border-color: #e94560;
+    box-shadow: 0 0 0 3px rgba(233,69,96,0.1);
+    background: #fff;
+  }
+  .lg-eye {
+    position: absolute; right: 14px; top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer; font-size: 18px;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Forgot row */
+  .lg-forgot-row {
+    display: flex; justify-content: space-between;
+    align-items: center; margin-bottom: 6px;
+  }
+  .lg-forgot {
+    font-size: 12px; color: #e94560; font-weight: 700;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Remember me */
+  .lg-remember {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 16px;
+  }
+  .lg-remember input {
+    width: 16px; height: 16px;
+    cursor: pointer; accent-color: #e94560; flex-shrink: 0;
+  }
+  .lg-remember label {
+    font-size: 13px; color: #475569;
+    cursor: pointer; font-weight: 500;
+  }
+
+  /* Sign in button */
+  .lg-btn {
+    width: 100%; padding: 15px;
+    background: linear-gradient(135deg, #e94560 0%, #c1253f 100%);
+    color: white; border: none; border-radius: 14px;
+    font-size: 15px; font-weight: 700; font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(233,69,96,0.35);
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.2s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .lg-btn:active { transform: scale(0.98); opacity: 0.92; }
+  .lg-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .lg-switch {
+    text-align: center; margin-top: 20px;
+    color: #94a3b8; font-size: 13px;
+  }
+  .lg-switch a { color: #e94560; font-weight: 700; text-decoration: none; }
+
+  .lg-back {
+    display: inline-block; margin-top: 16px;
+    font-size: 13px; color: #e94560;
+    font-weight: 700; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ─── DESKTOP: sidebar layout ─── */
+  @media (min-width: 769px) {
+    .lg-root {
+      flex-direction: row;
+      background: #fff;
+    }
+    /* Left hero sidebar */
+    .lg-hero {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px;
+    }
+    .lg-hero-inner { max-width: 440px; width: 100%; }
+    .lg-hero-title { font-size: 40px; margin-bottom: 20px; }
+    .lg-hero-brand { font-size: 20px; margin-bottom: 40px; }
+    .lg-hero-sub {
+      color: rgba(255,255,255,0.6);
+      font-size: 16px; line-height: 1.7; margin-bottom: 32px;
+    }
+    .lg-hero-features { display: flex; flex-direction: column; gap: 12px; }
+    .lg-hero-feature  { color: rgba(255,255,255,0.85); font-size: 15px; }
+    /* Hide mobile stats on desktop */
+    .lg-stats { display: none; }
+
+    /* Right form panel */
+    .lg-card-panel {
+      width: 500px; flex-shrink: 0;
+      background: #f8f9ff;
+      display: flex; align-items: center; justify-content: center;
+      padding: 40px; overflow-y: auto;
+    }
+    .lg-card {
+      border-radius: 20px;
+      margin-top: 0;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+      width: 100%; max-width: 400px;
+      padding: 36px 32px 40px;
+      flex: none;
+    }
   }
 `;
-if (!document.getElementById('login-css')) {
-  const el = document.createElement('style');
-  el.id = 'login-css';
-  el.innerHTML = css;
-  document.head.appendChild(el);
-}
 
-function Login() {
-  const [loginType, setLoginType]   = useState('email');
+export default function Login() {
+  const [loginType, setLoginType]   = useState('pgcode');
   const [emailInput, setEmailInput] = useState('');
   const [mobile, setMobile]         = useState('');
   const [pgCode, setPgCode]         = useState('');
   const [password, setPassword]     = useState('');
   const [showPass, setShowPass]     = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [otpStep, setOtpStep]       = useState(false);
-  const [otp, setOtp]               = useState('');
-  const [confirmResult, setConfirmResult] = useState(null);
-  const [resendTimer, setResendTimer]     = useState(0);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotInput, setForgotInput] = useState('');
-  const [forgotSent, setForgotSent] = useState(false);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
-  const [success, setSuccess]       = useState('');
+  const [forgotSent, setForgotSent]   = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [success, setSuccess]   = useState('');
   const navigate = useNavigate();
-
-  useEffect(() => { setPersistence(auth, browserSessionPersistence).catch(console.error); }, []);
-  useEffect(() => {
-    if (resendTimer <= 0) return;
-    const t = setInterval(() => setResendTimer(p => p - 1), 1000);
-    return () => clearInterval(t);
-  }, [resendTimer]);
 
   const showErr = msg => { setError(msg); setSuccess(''); };
   const showOk  = msg => { setSuccess(msg); setError(''); };
+  const persist = () => rememberMe ? browserLocalPersistence : browserSessionPersistence;
 
-  const setupRecaptcha = () => {
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size:'invisible', callback:()=>{} });
-    }
-  };
-
+  // ── Email login ──
   const handleEmailLogin = async () => {
     if (!emailInput.trim()) return showErr('Enter your email address.');
     if (!password)          return showErr('Enter your password.');
     setLoading(true);
     try {
-      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      await setPersistence(auth, persist());
       await signInWithEmailAndPassword(auth, emailInput.trim(), password);
       navigate('/dashboard');
-    } catch (err) { showErr('❌ Invalid email or password.'); }
+    } catch { showErr('❌ Invalid email or password.'); }
     setLoading(false);
   };
 
+  // ── PG Code login ──
   const handlePGCodeLogin = async () => {
-  if (!pgCode.trim()) return showErr('Enter your PG Code.');
-  if (!password)      return showErr('Enter your password.');
-  setLoading(true);
-  try {
-    await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-    const snap = await getDocs(query(collection(db,'pgOwners'), where('pgCode','==',pgCode.toUpperCase().trim())));
-    if (snap.empty) { setLoading(false); return showErr('❌ PG Code not found.'); }
-    
-    const data = snap.docs[0].data();
-    const userEmail = data.email; // this is now phone@pgmanager.app or real email
-    if (!userEmail) { setLoading(false); return showErr('❌ No email linked to this PG Code.'); }
-    
-    await signInWithEmailAndPassword(auth, userEmail, password);
-    navigate('/dashboard');
-  } catch (err) {
-    console.error(err);
-    showErr('❌ Invalid PG Code or password.');
-  }
-  setLoading(false);
-};
-
-  const handleSendOTP = async () => {
-    if (!mobile || mobile.length < 10) return showErr('Enter a valid 10-digit number.');
+    if (!pgCode.trim()) return showErr('Enter your PG Code.');
+    if (!password)      return showErr('Enter your password.');
     setLoading(true);
     try {
-      setupRecaptcha();
-      const result = await signInWithPhoneNumber(auth, `+91${mobile}`, window.recaptchaVerifier);
-      setConfirmResult(result); setOtpStep(true); setResendTimer(30);
-      showOk('OTP sent to +91 ' + mobile);
-    } catch (err) {
-      showErr('Failed to send OTP.');
-      if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; }
-    }
-    setLoading(false);
-  };
-
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) return showErr('Enter the 6-digit OTP.');
-    setLoading(true);
-    try {
-      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-      await confirmResult.confirm(otp);
+      await setPersistence(auth, persist());
+      const snap = await getDocs(query(collection(db,'pgOwners'), where('pgCode','==',pgCode.toUpperCase().trim())));
+      if (snap.empty) { setLoading(false); return showErr('❌ PG Code not found.'); }
+      const data = snap.docs[0].data();
+      const userEmail = data.email || `${data.phone}@pgmanager.app`;
+      await signInWithEmailAndPassword(auth, userEmail, password);
       navigate('/dashboard');
-    } catch (err) { showErr('Invalid OTP.'); }
+    } catch(e) { console.error(e); showErr('❌ Invalid PG Code or password.'); }
     setLoading(false);
   };
 
-  const handleForgotPassword = async () => {
-    if (!forgotInput.trim()) return showErr('Enter your email or PG Code.');
+  // ── Mobile + Password login ──
+  const handlePhoneLogin = async () => {
+    if (!mobile || mobile.length < 10) return showErr('Enter a valid 10-digit mobile number.');
+    if (!password)                      return showErr('Enter your password.');
+    setLoading(true);
+    try {
+      await setPersistence(auth, persist());
+      const snap = await getDocs(query(collection(db,'pgOwners'), where('phone','==',mobile.trim())));
+      if (snap.empty) { setLoading(false); return showErr('❌ No account found for this mobile number.'); }
+      const data = snap.docs[0].data();
+      const userEmail = data.email || `${data.phone}@pgmanager.app`;
+      await signInWithEmailAndPassword(auth, userEmail, password);
+      navigate('/dashboard');
+    } catch(e) { console.error(e); showErr('❌ Invalid mobile number or password.'); }
+    setLoading(false);
+  };
+
+  // ── Forgot password ──
+  const handleForgot = async () => {
+    if (!forgotInput.trim()) return showErr('Enter your email, PG Code, or mobile number.');
     setLoading(true);
     try {
       let email = forgotInput.trim();
-      if (!forgotInput.includes('@')) {
+      const cleaned = forgotInput.replace(/\D/g,'');
+      if (cleaned.length >= 10) {
+        // Mobile number
+        const snap = await getDocs(query(collection(db,'pgOwners'), where('phone','==',cleaned)));
+        if (snap.empty) { setLoading(false); return showErr('No account found for this number.'); }
+        email = snap.docs[0].data().email || `${cleaned}@pgmanager.app`;
+      } else if (!forgotInput.includes('@')) {
+        // PG Code
         const snap = await getDocs(query(collection(db,'pgOwners'), where('pgCode','==',forgotInput.toUpperCase().trim())));
         if (snap.empty) { setLoading(false); return showErr('PG Code not found.'); }
-        email = snap.docs[0].data().email;
-        if (!email) { setLoading(false); return showErr('No email linked.'); }
+        email = snap.docs[0].data().email || `${snap.docs[0].data().phone}@pgmanager.app`;
       }
       await sendPasswordResetEmail(auth, email);
-      setForgotSent(true); showOk(`✅ Reset email sent to ${email}`);
-    } catch (err) { showErr('Failed to send reset email.'); }
+      setForgotSent(true);
+      showOk(`✅ Reset link sent to ${email}`);
+    } catch { showErr('Failed to send reset link. Try again.'); }
     setLoading(false);
   };
 
-  const RememberMe = ({ id }) => (
-    <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px' }}>
-      <input type="checkbox" id={id} checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} style={{ cursor:'pointer', width:'16px', height:'16px' }} />
-      <label htmlFor={id} style={{ fontSize:'13px', color:'#475569', cursor:'pointer' }}>Remember me — stay logged in</label>
+  const switchTab = (id) => {
+    setLoginType(id);
+    setError('');
+    setPassword('');
+  };
+
+  // ── password field JSX (inline, not a component — avoids focus loss on re-render) ──
+  const passwordField = (onEnter) => (
+    <div className="lg-field">
+      <div className="lg-forgot-row">
+        <label className="lg-label">Password</label>
+        <span className="lg-forgot" onClick={() => { setShowForgot(true); setError(''); }}>
+          Forgot password?
+        </span>
+      </div>
+      <div className="lg-pass-wrap">
+        <input
+          className="lg-pass-input"
+          type={showPass ? 'text' : 'password'}
+          placeholder="Enter your password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && onEnter()}
+          autoComplete="current-password"
+        />
+        <span className="lg-eye" onClick={() => setShowPass(p => !p)}>
+          {showPass ? '🙈' : '👁️'}
+        </span>
+      </div>
     </div>
   );
 
-  if (showForgot) return (
-    <div className="login-page">
-      <div id="recaptcha-container" />
-      <div className="login-left">
-        <div><div style={s.brand}>🏠 PGpilots</div><h1 style={s.heroTitle}>Reset your<br/>password</h1><p style={s.heroSub}>We'll send a reset link to your email.</p></div>
-      </div>
-      <div className="login-right">
-        <div className="login-mobile-brand"><div style={s.mobileBrandText}>🏠 PGpilots</div></div>
-        <div className="login-box">
-          <h2 style={s.formTitle}>Forgot Password?</h2>
-          <p style={s.formSub}>Enter your email or PG Code</p>
-          {error   && <div style={s.error}>{error}</div>}
-          {success && <div style={s.successMsg}>{success}</div>}
-          {!forgotSent ? (
-            <>
-              <div style={s.field}>
-                <label style={s.label}>Email or PG Code</label>
-                <input style={s.input} type="text" placeholder="you@email.com or ABC123" value={forgotInput} onChange={e => setForgotInput(e.target.value)} />
-              </div>
-              <button style={s.btn} onClick={handleForgotPassword} disabled={loading}>{loading ? 'Sending...' : 'Send Reset Link →'}</button>
-            </>
-          ) : (
-            <div style={{ textAlign:'center', padding:'20px 0' }}>
-              <div style={{ fontSize:'48px', marginBottom:'16px' }}>📧</div>
-              <p style={{ color:'#64748b' }}>Check your email for the reset link.</p>
-            </div>
-          )}
-          <p style={{ textAlign:'center', marginTop:'20px', fontSize:'13px' }}>
-            <span style={{ color:'#e94560', fontWeight:'700', cursor:'pointer' }}
-              onClick={() => { setShowForgot(false); setForgotSent(false); setForgotInput(''); setError(''); setSuccess(''); }}>
-              ← Back to Login
-            </span>
-          </p>
-        </div>
-      </div>
+  // ── remember me JSX (inline, not a component) ──
+  const rememberField = (id) => (
+    <div className="lg-remember">
+      <input type="checkbox" id={id} checked={rememberMe}
+        onChange={e => setRememberMe(e.target.checked)} />
+      <label htmlFor={id}>Remember me — stay logged in</label>
     </div>
+  );
+
+  // ── Form content ──
+  const formContent = showForgot ? (
+    <>
+      <h2 className="lg-title">Reset Password</h2>
+      <p className="lg-sub">Enter your Email, PG Code, or Mobile number</p>
+      {error   && <div className="lg-error">{error}</div>}
+      {success && <div className="lg-success">{success}</div>}
+      {!forgotSent ? (
+        <>
+          <div className="lg-field">
+            <label className="lg-label">Email / PG Code / Mobile</label>
+            <input className="lg-input" type="text"
+              placeholder="you@email.com  or  ABC123  or  9876543210"
+              value={forgotInput}
+              onChange={e => setForgotInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleForgot()} />
+          </div>
+          <button className="lg-btn" onClick={handleForgot} disabled={loading}>
+            {loading ? 'Sending…' : 'Send Reset Link →'}
+          </button>
+        </>
+      ) : (
+        <div style={{textAlign:'center',padding:'20px 0'}}>
+          <div style={{fontSize:'52px',marginBottom:'14px'}}>📧</div>
+          <p style={{color:'#64748b',fontSize:'14px'}}>Check your email for the reset link.</p>
+        </div>
+      )}
+      <div className="lg-back"
+        onClick={() => { setShowForgot(false); setForgotSent(false); setForgotInput(''); setError(''); setSuccess(''); }}>
+        ← Back to Login
+      </div>
+    </>
+  ) : (
+    <>
+      <h2 className="lg-title">Welcome back</h2>
+      <p className="lg-sub">Sign in to your account</p>
+
+      {error   && <div className="lg-error">{error}</div>}
+      {success && <div className="lg-success">{success}</div>}
+
+      {/* Tabs */}
+      <div className="lg-tabs">
+        {[
+          {id:'pgcode', label:'🔑 PG Code'},
+          {id:'mobile', label:'📱 Mobile'},
+          {id:'email',  label:'📧 Email'},
+        ].map(({id,label}) => (
+          <button key={id}
+            className={`lg-tab${loginType===id?' active':''}`}
+            onClick={() => switchTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* PG Code */}
+      {loginType === 'pgcode' && (
+        <>
+          <div className="lg-field">
+            <label className="lg-label">PG Code</label>
+            <input
+              className="lg-pgcode-input"
+              type="text"
+              placeholder="ABC123"
+              maxLength={6}
+              value={pgCode}
+              onChange={e => setPgCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,''))}
+              onKeyDown={e => e.key === 'Enter' && handlePGCodeLogin()}
+              autoCorrect="off"
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck="false"
+              inputMode="text"
+            />
+          </div>
+          {passwordField(handlePGCodeLogin)}
+          {rememberField("rm-pg")}
+          <button className="lg-btn" onClick={handlePGCodeLogin} disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign In →'}
+          </button>
+        </>
+      )}
+
+      {/* Mobile + Password — FIXED: separate input element, no rerender on change */}
+      {loginType === 'mobile' && (
+        <>
+          <div className="lg-field">
+            <label className="lg-label">Mobile Number</label>
+            <div className="lg-phone-row">
+              <div className="lg-prefix">+91</div>
+              <input
+                className="lg-phone-input"
+                type="tel"
+                inputMode="numeric"
+                placeholder="9876543210"
+                maxLength={10}
+                value={mobile}
+                onChange={e => setMobile(e.target.value.replace(/\D/g,''))}
+                onKeyDown={e => e.key === 'Enter' && handlePhoneLogin()}
+                autoComplete="tel"
+              />
+            </div>
+          </div>
+          {passwordField(handlePhoneLogin)}
+          {rememberField("rm-mob")}
+          <button className="lg-btn" onClick={handlePhoneLogin} disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign In →'}
+          </button>
+        </>
+      )}
+
+      {/* Email */}
+      {loginType === 'email' && (
+        <>
+          <div className="lg-field">
+            <label className="lg-label">Email Address</label>
+            <input
+              className="lg-input"
+              type="email"
+              placeholder="you@example.com"
+              value={emailInput}
+              onChange={e => setEmailInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleEmailLogin()}
+              autoComplete="email"
+            />
+          </div>
+          {passwordField(handleEmailLogin)}
+          {rememberField("rm-em")}
+          <button className="lg-btn" onClick={handleEmailLogin} disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign In →'}
+          </button>
+        </>
+      )}
+
+      <p className="lg-switch">
+        Don't have an account?{' '}
+        <Link to="/signup">Create one free</Link>
+      </p>
+    </>
   );
 
   return (
-    <div className="login-page">
-      <div id="recaptcha-container" />
+    <>
+      <style>{css}</style>
+      <div className="lg-root">
 
-      <div className="login-left">
-        <div style={s.leftContent}>
-          <div style={s.brand}>🏠 PGpilots</div>
-          <h1 style={s.heroTitle}>Manage your PG<br/>like a Pro</h1>
-          <p style={s.heroSub}>All-in-one platform for PG owners to manage tenants, rooms, rent and more.</p>
-          <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-            {['✅ Tenant Management','✅ Rent Tracking','✅ Electricity Bills','✅ Automated Reminders'].map(f => (
-              <div key={f} style={{ color:'rgba(255,255,255,0.85)', fontSize:'15px' }}>{f}</div>
-            ))}
+        {/* ── Hero / Left panel ── */}
+        <div className="lg-hero">
+          <div className="lg-hero-inner">
+            <div className="lg-hero-brand">🏠 PGpilots</div>
+            <h1 className="lg-hero-title">Manage your PG<br/>like a Pro</h1>
+
+            {/* Desktop features list */}
+            <p className="lg-hero-sub">
+              All-in-one platform for PG owners to manage tenants, rooms, rent and more.
+            </p>
+            <div className="lg-hero-features">
+              {['✅ Tenant Management','✅ Rent Tracking','✅ Electricity Bills','✅ Automated Reminders'].map(f=>(
+                <div key={f} className="lg-hero-feature">{f}</div>
+              ))}
+            </div>
+
+            {/* Mobile stats strip */}
+            <div className="lg-stats">
+              {[['500+','PG Owners'],['10k+','Tenants'],['₹1Cr+','Collected']].map(([num,label])=>(
+                <div key={label} className="lg-stat">
+                  <div className="lg-stat-num">{num}</div>
+                  <div className="lg-stat-label">{label}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="login-right">
-        {/* Mobile brand — shown only on mobile via CSS */}
-        <div className="login-mobile-brand">
-          <div style={s.mobileBrandText}>🏠 PGpilots</div>
-          <div style={s.mobileBrandSub}>Manage your PG smarter</div>
-        </div>
-
-        <div className="login-box">
-          <h2 style={s.formTitle}>Welcome back</h2>
-          <p style={s.formSub}>Sign in to your account</p>
-
-          {error   && <div style={s.error}>{error}</div>}
-          {success && <div style={s.successMsg}>{success}</div>}
-
-          {/* Tabs */}
-          <div style={{ display:'flex', background:'#e2e8f0', borderRadius:'10px', padding:'4px', marginBottom:'24px', gap:'4px' }}>
-            {[{id:'email',label:'📧 Email'},{id:'pgcode',label:'🔑 PG Code'},{id:'mobile',label:'📱 Mobile'}].map(({id,label}) => (
-              <button key={id} className="login-toggle-btn"
-                style={{ background: loginType===id ? 'white' : 'transparent', color: loginType===id ? '#e94560' : '#64748b', boxShadow: loginType===id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-                onClick={() => { setLoginType(id); setError(''); setOtpStep(false); setOtp(''); }}>
-                {label}
-              </button>
-            ))}
+        {/* ── Form card ── */}
+        <div className="lg-card-panel">
+          <div className="lg-card">
+            {formContent}
           </div>
-
-          {/* Email */}
-          {loginType==='email' && (
-            <>
-              <div style={s.field}>
-                <label style={s.label}>Email Address</label>
-                <input style={s.input} type="email" placeholder="you@example.com" value={emailInput} onChange={e => setEmailInput(e.target.value)} onKeyDown={e => e.key==='Enter' && handleEmailLogin()} />
-              </div>
-              <div style={s.field}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'6px' }}>
-                  <label style={s.label}>Password</label>
-                  <span style={s.forgotLink} onClick={() => setShowForgot(true)}>Forgot password?</span>
-                </div>
-                <div style={{ position:'relative' }}>
-                  <input style={{ ...s.input, paddingRight:'44px' }} type={showPass?'text':'password'} placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key==='Enter' && handleEmailLogin()} />
-                  <span style={s.eyeBtn} onClick={() => setShowPass(!showPass)}>{showPass?'🙈':'👁️'}</span>
-                </div>
-              </div>
-              <RememberMe id="rm0" />
-              <button style={s.btn} onClick={handleEmailLogin} disabled={loading}>{loading ? 'Signing in...' : 'Sign In →'}</button>
-            </>
-          )}
-
-          {/* PG Code */}
-          {loginType==='pgcode' && (
-            <>
-              <div style={s.field}>
-                <label style={s.label}>PG Code</label>
-                <input style={{ ...s.input, textTransform:'uppercase', letterSpacing:'6px', fontWeight:'800', fontSize:'20px', textAlign:'center' }} type="text" placeholder="ABC123" maxLength={6} value={pgCode} onChange={e => setPgCode(e.target.value.toUpperCase())} onKeyDown={e => e.key==='Enter' && handlePGCodeLogin()} />
-              </div>
-              <div style={s.field}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'6px' }}>
-                  <label style={s.label}>Password</label>
-                  <span style={s.forgotLink} onClick={() => setShowForgot(true)}>Forgot password?</span>
-                </div>
-                <div style={{ position:'relative' }}>
-                  <input style={{ ...s.input, paddingRight:'44px' }} type={showPass?'text':'password'} placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key==='Enter' && handlePGCodeLogin()} />
-                  <span style={s.eyeBtn} onClick={() => setShowPass(!showPass)}>{showPass?'🙈':'👁️'}</span>
-                </div>
-              </div>
-              <RememberMe id="rm2" />
-              <button style={s.btn} onClick={handlePGCodeLogin} disabled={loading}>{loading ? 'Signing in...' : 'Sign In →'}</button>
-            </>
-          )}
-
-          {/* Mobile OTP */}
-          {loginType==='mobile' && !otpStep && (
-            <>
-              <div style={s.field}>
-                <label style={s.label}>Mobile Number</label>
-                <div style={{ display:'flex', gap:'8px' }}>
-                  <div style={{ ...s.input, width:'60px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'700', color:'#475569', flexShrink:0 }}>+91</div>
-                  <input style={{ ...s.input, flex:1 }} type="tel" placeholder="9876543210" maxLength={10} value={mobile} onChange={e => setMobile(e.target.value.replace(/\D/g,''))} onKeyDown={e => e.key==='Enter' && handleSendOTP()} />
-                </div>
-              </div>
-              <button style={s.btn} onClick={handleSendOTP} disabled={loading}>{loading ? 'Sending OTP...' : 'Send OTP →'}</button>
-            </>
-          )}
-
-          {loginType==='mobile' && otpStep && (
-            <>
-              <div style={s.field}>
-                <label style={s.label}>OTP sent to +91 {mobile}</label>
-                <input style={{ ...s.input, fontSize:'24px', fontWeight:'700', letterSpacing:'10px', textAlign:'center' }} type="text" placeholder="------" maxLength={6} value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g,''))} />
-              </div>
-              <RememberMe id="rm1" />
-              <button style={s.btn} onClick={handleVerifyOTP} disabled={loading}>{loading ? 'Verifying...' : 'Login →'}</button>
-              <div style={{ textAlign:'center', marginTop:'12px', fontSize:'13px', color:'#94a3b8' }}>
-                {resendTimer > 0 ? <span>Resend in <strong style={{ color:'#e94560' }}>{resendTimer}s</strong></span>
-                  : <span style={{ color:'#e94560', cursor:'pointer', fontWeight:'700' }} onClick={() => { setOtpStep(false); setOtp(''); }}>Resend OTP</span>}
-                {' • '}
-                <span style={{ cursor:'pointer' }} onClick={() => { setOtpStep(false); setMobile(''); setOtp(''); }}>← Change</span>
-              </div>
-            </>
-          )}
-
-          <p style={{ textAlign:'center', marginTop:'24px', color:'#888', fontSize:'14px' }}>
-            Don't have an account?{' '}
-            <Link to="/signup" style={{ color:'#e94560', fontWeight:'700', textDecoration:'none' }}>Create one free</Link>
-          </p>
         </div>
+
       </div>
-    </div>
+    </>
   );
 }
-
-const s = {
-  leftContent:    { maxWidth:'480px' },
-  brand:          { color:'#e94560', fontSize:'22px', fontWeight:'700', marginBottom:'40px' },
-  heroTitle:      { color:'white', fontSize:'42px', fontWeight:'800', lineHeight:'1.2', marginBottom:'20px' },
-  heroSub:        { color:'rgba(255,255,255,0.6)', fontSize:'16px', lineHeight:'1.7', marginBottom:'32px' },
-  formTitle:      { fontSize:'26px', fontWeight:'800', color:'#1a1a2e', marginBottom:'8px', marginTop:0 },
-  formSub:        { color:'#888', fontSize:'14px', marginBottom:'24px' },
-  error:          { background:'#fff0f0', color:'#e74c3c', padding:'12px 16px', borderRadius:'10px', marginBottom:'16px', fontSize:'13px', border:'1px solid #ffd0d0' },
-  successMsg:     { background:'#f0fdf4', color:'#059669', padding:'12px 16px', borderRadius:'10px', marginBottom:'16px', fontSize:'13px', border:'1px solid #bbf7d0', fontWeight:'600' },
-  field:          { marginBottom:'18px' },
-  label:          { display:'block', fontSize:'13px', fontWeight:'600', color:'#444', marginBottom:'6px' },
-  input:          { width:'100%', padding:'13px 16px', borderRadius:'10px', border:'1.5px solid #e0e0e0', fontSize:'16px', outline:'none', boxSizing:'border-box', background:'white' },
-  eyeBtn:         { position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', cursor:'pointer', fontSize:'16px', userSelect:'none' },
-  forgotLink:     { fontSize:'12px', color:'#e94560', fontWeight:'600', cursor:'pointer' },
-  btn:            { width:'100%', padding:'14px', background:'linear-gradient(135deg,#e94560,#0f3460)', color:'white', border:'none', borderRadius:'10px', fontSize:'16px', fontWeight:'700', cursor:'pointer' },
-  mobileBrandText:{ fontSize:'24px', fontWeight:'800', color:'#1a1a2e' },
-  mobileBrandSub: { fontSize:'13px', color:'#94a3b8', marginTop:'4px', marginBottom:'0' },
-};
-
-export default Login;
