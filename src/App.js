@@ -9,46 +9,67 @@ import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 import AdminRoute from './AdminRoute';
 
-function ProtectedRoute({ children }) {
-  const [user, loading] = useAuthState(auth);
-  if (loading) return (
+// ── Loading spinner shown while Firebase checks auth state ──
+function LoadingScreen() {
+  return (
     <div style={{
-      display: 'flex', alignItems: 'center',
-      justifyContent: 'center', height: '100vh',
-      fontSize: '16px', color: '#94a3b8',
-      fontFamily: 'Segoe UI, sans-serif'
+      display:'flex', alignItems:'center', justifyContent:'center',
+      height:'100vh', flexDirection:'column', gap:'14px',
+      background:'#f0f2f8', fontFamily:'DM Sans, Segoe UI, sans-serif',
     }}>
-      Loading...
+      <div style={{
+        width:'36px', height:'36px',
+        border:'3px solid #e2e8f0',
+        borderTopColor:'#e94560',
+        borderRadius:'50%',
+        animation:'appspin 0.7s linear infinite',
+      }}/>
+      <style>{`@keyframes appspin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{fontSize:'14px', color:'#94a3b8', fontWeight:'600'}}>
+        🏠 PG Manager
+      </div>
     </div>
   );
-  return user ? children : <Navigate to="/login" />;
+}
+
+// ── PublicRoute: if already logged in → go to dashboard ──
+// Prevents logged-in users from seeing login/signup again
+function PublicRoute({ children }) {
+  const [user, loading] = useAuthState(auth);
+  if (loading) return <LoadingScreen />;
+  return user ? <Navigate to="/dashboard" replace /> : children;
+}
+
+// ── ProtectedRoute: if not logged in → go to login ──
+function ProtectedRoute({ children }) {
+  const [user, loading] = useAuthState(auth);
+  if (loading) return <LoadingScreen />;
+  return user ? children : <Navigate to="/login" replace />;
 }
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Landing page — home route */}
-        <Route path="/"        element={<LandingPage />} />
+        {/* Landing page — shown to everyone */}
+        <Route path="/" element={<LandingPage />} />
 
-        {/* Auth routes */}
-        <Route path="/login"   element={<Login />} />
-        <Route path="/signup"  element={<Signup />} />
+        {/* Auth routes — redirect to dashboard if already logged in */}
+        <Route path="/login"
+          element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/signup"
+          element={<PublicRoute><Signup /></PublicRoute>} />
 
-        {/* Protected routes */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin" element={
-          <AdminRoute>
-            <AdminPanel />
-          </AdminRoute>
-        } />
+        {/* Protected routes — redirect to login if not logged in */}
+        <Route path="/dashboard"
+          element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+
+        {/* Admin route */}
+        <Route path="/admin"
+          element={<AdminRoute><AdminPanel /></AdminRoute>} />
 
         {/* Catch all → landing page */}
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

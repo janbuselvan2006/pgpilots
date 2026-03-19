@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { auth, db } from '../firebase';
 import {
   signInWithEmailAndPassword,
@@ -43,8 +43,15 @@ const css = `
   .lg-hero-title {
     font-size: clamp(22px, 6vw, 30px);
     font-weight: 800; color: white;
-    line-height: 1.25; margin-bottom: 18px;
+    line-height: 1.25; margin-bottom: 14px;
   }
+  /* Features visible on mobile too */
+  .lg-hero-sub {
+    color: rgba(255,255,255,0.6); font-size: 13px;
+    line-height: 1.6; margin-bottom: 14px;
+  }
+  .lg-hero-features { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .lg-hero-feature  { color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 500; }
   /* Stats strip — mobile only */
   .lg-stats {
     display: flex; gap: 0;
@@ -267,11 +274,11 @@ const css = `
     .lg-hero-title { font-size: 40px; margin-bottom: 20px; }
     .lg-hero-brand { font-size: 20px; margin-bottom: 40px; }
     .lg-hero-sub {
-      color: rgb(255, 255, 255);
+      color: rgba(255,255,255,0.6);
       font-size: 16px; line-height: 1.7; margin-bottom: 32px;
     }
-    .lg-hero-features { display: flex; flex-direction: column; gap: 12px; }
-    .lg-hero-feature  { color: rgb(255, 255, 255); font-size: 15px; }
+    .lg-hero-features { gap: 12px; margin-bottom: 0; }
+    .lg-hero-feature  { font-size: 15px; }
     /* Hide mobile stats on desktop */
     .lg-stats { display: none; }
 
@@ -285,7 +292,7 @@ const css = `
     .lg-card {
       border-radius: 20px;
       margin-top: 0;
-      box-shadow: 0 8px 40px rgb(255, 255, 255);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.08);
       width: 100%; max-width: 400px;
       padding: 36px 32px 40px;
       flex: none;
@@ -301,6 +308,12 @@ export default function Login() {
   const [password, setPassword]     = useState('');
   const [showPass, setShowPass]     = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  // Use ref so login handlers always read latest value (avoids stale closure)
+  const rememberMeRef = useRef(false);
+  const handleRememberChange = (val) => {
+    setRememberMe(val);
+    rememberMeRef.current = val;
+  };
   const [showForgot, setShowForgot] = useState(false);
   const [forgotInput, setForgotInput] = useState('');
   const [forgotSent, setForgotSent]   = useState(false);
@@ -311,7 +324,8 @@ export default function Login() {
 
   const showErr = msg => { setError(msg); setSuccess(''); };
   const showOk  = msg => { setSuccess(msg); setError(''); };
-  const persist = () => rememberMe ? browserLocalPersistence : browserSessionPersistence;
+  // Always reads latest rememberMe value via ref — avoids stale closure bug
+  const persist = () => rememberMeRef.current ? browserLocalPersistence : browserSessionPersistence;
 
   // ── Email login ──
   const handleEmailLogin = async () => {
@@ -321,7 +335,7 @@ export default function Login() {
     try {
       await setPersistence(auth, persist());
       await signInWithEmailAndPassword(auth, emailInput.trim(), password);
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch { showErr('❌ Invalid email or password.'); }
     setLoading(false);
   };
@@ -338,7 +352,7 @@ export default function Login() {
       const data = snap.docs[0].data();
       const userEmail = data.email || `${data.phone}@pgmanager.app`;
       await signInWithEmailAndPassword(auth, userEmail, password);
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch(e) { console.error(e); showErr('❌ Invalid PG Code or password.'); }
     setLoading(false);
   };
@@ -355,7 +369,7 @@ export default function Login() {
       const data = snap.docs[0].data();
       const userEmail = data.email || `${data.phone}@pgmanager.app`;
       await signInWithEmailAndPassword(auth, userEmail, password);
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch(e) { console.error(e); showErr('❌ Invalid mobile number or password.'); }
     setLoading(false);
   };
@@ -419,10 +433,17 @@ export default function Login() {
 
   // ── remember me JSX (inline, not a component) ──
   const rememberField = (id) => (
-    <div className="lg-remember">
-      <input type="checkbox" id={id} checked={rememberMe}
-        onChange={e => setRememberMe(e.target.checked)} />
-      <label htmlFor={id}>Remember me — stay logged in</label>
+    <div style={{marginBottom:'16px'}}>
+      <div className="lg-remember">
+        <input type="checkbox" id={id} checked={rememberMe}
+          onChange={e => handleRememberChange(e.target.checked)} />
+        <label htmlFor={id}>Stay logged in on this device</label>
+      </div>
+      <div style={{fontSize:'11px',color:'#94a3b8',marginLeft:'24px',marginTop:'-8px'}}>
+        {rememberMe
+          ? '✅ You won\'t need to log in again on this device'
+          : 'You\'ll be logged out when you close the browser'}
+      </div>
     </div>
   );
 
@@ -575,7 +596,7 @@ export default function Login() {
         {/* ── Hero / Left panel ── */}
         <div className="lg-hero">
           <div className="lg-hero-inner">
-            <div className="lg-hero-brand">🏠 PGpilots</div>
+            <div className="lg-hero-brand">🏠 PG Manager</div>
             <h1 className="lg-hero-title">Manage your PG<br/>like a Pro</h1>
 
             {/* Desktop features list */}
