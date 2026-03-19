@@ -316,7 +316,7 @@ function LandingPage() {
             <p className="section-sub">We talked to 200+ PG owners across Tamil Nadu. These are their exact words.</p>
             <div className="pain-grid reveal">
               {[
-                ['01','I forgot who paid and who didn\'t. My <b>notebook got lost</b> and I lost ₹40,000.','PG Manager tracks every rupee, automatically'],
+                ['01','I forgot who paid and who didn\'t. My <b>notebook got lost</b> and I lost ₹40,000.','PGpilots tracks every rupee, automatically'],
                 ['02','Tenant says he paid but I have <b>no proof.</b> No receipt. Nothing.','Digital receipts with date, time & method recorded'],
                 ['03','I have 20 tenants. I don\'t know whose <b>rent is due today</b> without calling everyone.','Auto-sorted: Today Due → Overdue → Upcoming'],
                 ['04','Tenant left without paying last month. I lost <b>₹6,500 just like that.</b>','Exit checklist shows all pending dues before leaving'],

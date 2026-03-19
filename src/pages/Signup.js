@@ -658,7 +658,7 @@ export default function Signup() {
         {/* ── Hero ── */}
         <div className="pg-hero">
           <div className="pg-hero-inner">
-            <div className="pg-hero-brand">🏠 PG Manager</div>
+            <div className="pg-hero-brand">🏠 PGpilots</div>
             <h1 className="pg-hero-title">Start managing<br />smarter today</h1>
             {/* desktop only sub */}
             <p className="pg-hero-sub" style={{ display: 'none' }}>

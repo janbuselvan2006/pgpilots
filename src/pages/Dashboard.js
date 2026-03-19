@@ -32,7 +32,7 @@ const css = `
     flex-direction: column;
     position: fixed;
     height: 100vh;
-    overflow: hidden;
+    overflow-y: auto;
     z-index: 400;
     transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
     flex-shrink: 0;
@@ -437,8 +437,8 @@ export default function Dashboard() {
           <button className="db-hamburger" onClick={()=>setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? '✕' : '☰'}
           </button>
-          <div className="db-mobile-logo">🏠 PG Manager</div>
-          <div className="db-plan-badge">⭐ Basic</div>
+          <div className="db-mobile-logo">🏠 PGpilots</div>
+          <div className="db-plan-badge">⭐ {pgOwner?.plan ? pgOwner.plan.charAt(0).toUpperCase() + pgOwner.plan.slice(1) : 'Basic'}</div>
         </div>
 
         {/* ── Overlay ── */}
@@ -447,7 +447,7 @@ export default function Dashboard() {
         {/* ── Sidebar ── */}
         <div className={`db-sidebar${sidebarOpen?' open':''}`}>
           <div className="db-sidebar-top">
-            <div className="db-sidebar-logo">🏠 PG Manager</div>
+            <div className="db-sidebar-logo">🏠 PGpilots</div>
             {pgOwner && (
               <div className="db-owner-box">
                 <div className="db-owner-avatar">
@@ -486,7 +486,7 @@ export default function Dashboard() {
                 {new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
               </div>
             </div>
-            <div className="db-desktop-badge">⭐ Basic Plan</div>
+            <div className="db-desktop-badge">⭐ {pgOwner?.plan ? pgOwner.plan.charAt(0).toUpperCase() + pgOwner.plan.slice(1) : 'Basic'} Plan</div>
           </div>
 
           {/* Page content wrapper */}
