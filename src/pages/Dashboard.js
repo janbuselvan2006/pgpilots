@@ -32,7 +32,7 @@ const css = `
     flex-direction: column;
     position: fixed;
     height: 100vh;
-    overflow-y: auto;
+    overflow: hidden;
     z-index: 400;
     transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
     flex-shrink: 0;
@@ -57,7 +57,11 @@ const css = `
   .db-owner-name { color: white; font-size: 14px; font-weight: 700; }
   .db-owner-pg   { color: rgba(255,255,255,0.45); font-size: 11px; margin-top: 2px; }
 
-  .db-nav { padding: 14px 10px; flex: 1; }
+  .db-nav {
+    padding: 14px 10px; flex: 1;
+    overflow-y: auto; scrollbar-width: none;
+  }
+  .db-nav::-webkit-scrollbar { display: none; }
   .db-nav-item {
     display: flex; align-items: center; gap: 12px;
     padding: 11px 14px; border-radius: 12px;
@@ -71,8 +75,9 @@ const css = `
   .db-nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
 
   .db-logout-btn {
-    margin: 8px 12px 16px;
-    padding: 13px;
+    margin: 0 12px;
+    margin-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+    padding: 14px;
     background: rgba(233,69,96,0.15);
     color: #e94560;
     border: 1px solid rgba(233,69,96,0.3);
@@ -86,8 +91,10 @@ const css = `
     align-items: center;
     justify-content: center;
     gap: 8px;
+    flex-shrink: 0;
   }
   .db-logout-btn:hover { background: rgba(233,69,96,0.25); }
+  .db-logout-btn:active { background: rgba(233,69,96,0.35); }
 
   /* ─────────────────────────────────────────
      MOBILE HEADER
