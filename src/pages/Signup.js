@@ -806,11 +806,11 @@ export default function Signup() {
                 <h2 className="pg-form-title">Your PG Details</h2>
                 <p className="pg-form-sub">Tell us about your property</p>
                 {[
-                  { label: 'Owner Full Name *',  val: ownerName, set: setOwnerName, ph: 'John Doe',       type: 'text'  },
+                  { label: 'Owner Full Name *',  val: ownerName, set: setOwnerName, ph: 'Anbuselvan J',       type: 'text'  },
                   { label: 'PG / Hostel Name *', val: pgName,    set: setPgName,    ph: 'Sunrise PG',     type: 'text'  },
                   { label: 'City *',             val: city,       set: setCity,      ph: 'Chennai',        type: 'text'  },
                   { label: 'State *',            val: pgState,    set: setPgState,   ph: 'Tamil Nadu',     type: 'text'  },
-                  { label: 'Email (optional)',   val: email,      set: setEmail,     ph: 'you@email.com',  type: 'email' },
+                  { label: 'Email *',   val: email,      set: setEmail,     ph: 'you@email.com',  type: 'email' },
                 ].map(({ label, val, set, ph, type }) => (
                   <div key={label} className="pg-field">
                     <label className="pg-label">{label}</label>

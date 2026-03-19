@@ -291,6 +291,30 @@ export default function Dashboard() {
   const [dashStats, setDashStats] = useState({ totalTenants:0, vacantBeds:0, monthlyRevenue:0, pendingRents:0 });
   const navigate = useNavigate();
 
+  // ── Intercept browser back button ──
+  // First back press → go to Dashboard tab
+  // Only leaves dashboard if user is already on Dashboard tab and presses back again
+  useEffect(() => {
+    // Push an extra history entry so first back press stays in dashboard
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      if (activeMenu !== 'Dashboard') {
+        // Not on Dashboard tab → go back to Dashboard tab
+        setActiveMenu('Dashboard');
+        setSidebarOpen(false);
+        // Push state again to keep catching next back press
+        window.history.pushState(null, '', window.location.href);
+      } else {
+        // Already on Dashboard tab → allow leaving (go to landing/login)
+        navigate('/', { replace: true });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeMenu]);
+
   const fetchStats = async () => {
     const user = auth.currentUser;
     if (!user) return;
