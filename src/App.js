@@ -26,7 +26,7 @@ function LoadingScreen() {
       }}/>
       <style>{`@keyframes appspin { to { transform: rotate(360deg); } }`}</style>
       <div style={{fontSize:'14px', color:'#94a3b8', fontWeight:'600'}}>
-        🏠 PG Manager
+        🏠 PGpilots
       </div>
     </div>
   );

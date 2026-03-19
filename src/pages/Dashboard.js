@@ -71,12 +71,23 @@ const css = `
   .db-nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
 
   .db-logout-btn {
-    margin: 12px; padding: 12px; background: rgba(255,255,255,0.06);
-    color: rgba(255,255,255,0.55); border: none; border-radius: 12px;
-    cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit;
+    margin: 8px 12px 16px;
+    padding: 13px;
+    background: rgba(233,69,96,0.15);
+    color: #e94560;
+    border: 1px solid rgba(233,69,96,0.3);
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
     transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
-  .db-logout-btn:hover { background: rgba(255,255,255,0.1); }
+  .db-logout-btn:hover { background: rgba(233,69,96,0.25); }
 
   /* ─────────────────────────────────────────
      MOBILE HEADER
@@ -419,7 +430,7 @@ export default function Dashboard() {
           <button className="db-hamburger" onClick={()=>setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? '✕' : '☰'}
           </button>
-          <div className="db-mobile-logo">🏠 PGpilots</div>
+          <div className="db-mobile-logo">🏠 PG Manager</div>
           <div className="db-plan-badge">⭐ Basic</div>
         </div>
 
@@ -429,7 +440,7 @@ export default function Dashboard() {
         {/* ── Sidebar ── */}
         <div className={`db-sidebar${sidebarOpen?' open':''}`}>
           <div className="db-sidebar-top">
-            <div className="db-sidebar-logo">🏠 PGpilots</div>
+            <div className="db-sidebar-logo">🏠 PG Manager</div>
             {pgOwner && (
               <div className="db-owner-box">
                 <div className="db-owner-avatar">
@@ -452,7 +463,9 @@ export default function Dashboard() {
               </div>
             ))}
           </nav>
-          <button className="db-logout-btn" onClick={handleLogout}>🚪 Logout</button>
+          <button className="db-logout-btn" onClick={handleLogout}>
+            🚪 Logout
+          </button>
         </div>
 
         {/* ── Main ── */}
@@ -546,7 +559,8 @@ export default function Dashboard() {
 
         {/* ── Mobile Bottom Nav ── */}
         <div className="db-bottom-nav">
-          {menuItems.slice(0,5).map(({icon,label})=>(
+          {/* Show first 4 menu items */}
+          {menuItems.slice(0,4).map(({icon,label})=>(
             <button key={label}
               className={`db-bottom-btn${activeMenu===label?' active':''}`}
               onClick={()=>handleMenu(label)}>
@@ -554,6 +568,14 @@ export default function Dashboard() {
               <span className="db-bottom-label">{label}</span>
             </button>
           ))}
+
+          {/* More button — opens sidebar */}
+          <button
+            className={`db-bottom-btn${sidebarOpen?' active':''}`}
+            onClick={()=>setSidebarOpen(!sidebarOpen)}>
+            <span className="db-bottom-icon">⋯</span>
+            <span className="db-bottom-label">More</span>
+          </button>
         </div>
 
       </div>
