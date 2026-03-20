@@ -415,7 +415,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="st-email-info">
-                    📧 {user?.email || `${pgOwner?.phone}@pgpilots.com`} &nbsp;·&nbsp; Cannot be changed
+                    📧 {user?.email || `${pgOwner?.phone}@pgpilots.in`} &nbsp;·&nbsp; Cannot be changed
                   </div>
 
                   <button className="st-save-btn" onClick={handleSaveProfile} disabled={saving}>
@@ -598,7 +598,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="st-support">
-                    📞 To upgrade, contact us at <strong>support@pgpilots.com</strong>
+                    📞 To upgrade, contact us at <strong>support@pgpilots.in</strong>
                   </div>
                 </div>
               )}

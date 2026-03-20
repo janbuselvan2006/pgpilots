@@ -350,7 +350,7 @@ export default function Login() {
       const snap = await getDocs(query(collection(db,'pgOwners'), where('pgCode','==',pgCode.toUpperCase().trim())));
       if (snap.empty) { setLoading(false); return showErr('❌ PG Code not found.'); }
       const data = snap.docs[0].data();
-      const userEmail = data.email || `${data.phone}@pgpilots.com`;
+      const userEmail = data.email || `${data.phone}@pgpilots.in`;
       await signInWithEmailAndPassword(auth, userEmail, password);
       navigate('/dashboard', { replace: true });
     } catch(e) { console.error(e); showErr('❌ Invalid PG Code or password.'); }
@@ -367,7 +367,7 @@ export default function Login() {
       const snap = await getDocs(query(collection(db,'pgOwners'), where('phone','==',mobile.trim())));
       if (snap.empty) { setLoading(false); return showErr('❌ No account found for this mobile number.'); }
       const data = snap.docs[0].data();
-      const userEmail = data.email || `${data.phone}@pgpilots.com`;
+      const userEmail = data.email || `${data.phone}@pgpilots.in`;
       await signInWithEmailAndPassword(auth, userEmail, password);
       navigate('/dashboard', { replace: true });
     } catch(e) { console.error(e); showErr('❌ Invalid mobile number or password.'); }
@@ -385,12 +385,12 @@ export default function Login() {
         // Mobile number
         const snap = await getDocs(query(collection(db,'pgOwners'), where('phone','==',cleaned)));
         if (snap.empty) { setLoading(false); return showErr('No account found for this number.'); }
-        email = snap.docs[0].data().email || `${cleaned}@pgpilots.com`;
+        email = snap.docs[0].data().email || `${cleaned}@pgpilots.in`;
       } else if (!forgotInput.includes('@')) {
         // PG Code
         const snap = await getDocs(query(collection(db,'pgOwners'), where('pgCode','==',forgotInput.toUpperCase().trim())));
         if (snap.empty) { setLoading(false); return showErr('PG Code not found.'); }
-        email = snap.docs[0].data().email || `${snap.docs[0].data().phone}@pgpilots.com`;
+        email = snap.docs[0].data().email || `${snap.docs[0].data().phone}@pgpilots.in`;
       }
       await sendPasswordResetEmail(auth, email);
       setForgotSent(true);
