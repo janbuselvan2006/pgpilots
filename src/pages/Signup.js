@@ -9,15 +9,15 @@ import { useNavigate, Link } from 'react-router-dom';
 // ─────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────
-const OTP_SEND_LIMIT      = 3;   // max OTP sends per 30 min
-const OTP_FAIL_LIMIT      = 5;   // wrong OTPs before block
-const PASS_FAIL_LIMIT     = 5;   // wrong passwords before block
-const RATE_WINDOW_MS      = 30 * 60 * 1000; // 30 minutes
+const OTP_SEND_LIMIT  = 3;
+const OTP_FAIL_LIMIT  = 5;
+const PASS_FAIL_LIMIT = 5;
+const RATE_WINDOW_MS  = 30 * 60 * 1000;
 
 // ─────────────────────────────────────────────
-// Firestore rate-limit doc helpers
+// Firestore rate-limit helpers
 // ─────────────────────────────────────────────
-const rlRef = (phone) => doc(db, 'signupRateLimits', `+91${phone.replace(/\D/g,'')}`);
+const rlRef = (phone) => doc(db, 'signupRateLimits', `+91${phone.replace(/\D/g, '')}`);
 
 const getRLData = async (phone) => {
   const ref  = rlRef(phone);
@@ -25,24 +25,24 @@ const getRLData = async (phone) => {
   return { ref, data: snap.exists() ? snap.data() : null };
 };
 
-// Ensure doc exists with defaults
+// ✅ merge:true prevents race condition on first attempt
 const ensureRLDoc = async (phone) => {
-  const { ref, data } = await getRLData(phone);
-  if (!data) {
+  const ref  = rlRef(phone);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
     const defaults = {
-      otpSendCount:   0,
-      otpFailCount:   0,
-      passFailCount:  0,
-      windowStart:    Date.now(),
-      adminBlocked:   false,
+      otpSendCount:  0,
+      otpFailCount:  0,
+      passFailCount: 0,
+      windowStart:   Date.now(),
+      adminBlocked:  false,
     };
-    await setDoc(ref, defaults);
+    await setDoc(ref, defaults, { merge: true });
     return { ref, data: defaults };
   }
-  return { ref, data };
+  return { ref, data: snap.data() };
 };
 
-// Reset window counters if 30-min window has expired
 const maybeResetWindow = async (ref, data) => {
   if (Date.now() - (data.windowStart || 0) > RATE_WINDOW_MS) {
     const reset = {
@@ -50,7 +50,6 @@ const maybeResetWindow = async (ref, data) => {
       otpFailCount:  0,
       passFailCount: 0,
       windowStart:   Date.now(),
-      // adminBlocked stays — only admin can clear it
     };
     await updateDoc(ref, reset);
     return { ...data, ...reset };
@@ -58,14 +57,12 @@ const maybeResetWindow = async (ref, data) => {
   return data;
 };
 
-// ── Check phone already registered (pgOwners collection)
 const isPhoneRegistered = async (phone) => {
-  const q    = query(collection(db, 'pgOwners'), where('phone', '==', phone.replace(/\D/g,'')));
+  const q    = query(collection(db, 'pgOwners'), where('phone', '==', phone.replace(/\D/g, '')));
   const snap = await getDocs(q);
   return !snap.empty;
 };
 
-// ── OTP Send rate limit
 const checkOtpSendAllowed = async (phone) => {
   let { ref, data } = await ensureRLDoc(phone);
   data = await maybeResetWindow(ref, data);
@@ -78,7 +75,6 @@ const checkOtpSendAllowed = async (phone) => {
   return { allowed: true };
 };
 
-// ── Wrong OTP increment → auto-block at limit
 const recordOtpFail = async (phone) => {
   let { ref, data } = await ensureRLDoc(phone);
   data = await maybeResetWindow(ref, data);
@@ -90,7 +86,6 @@ const recordOtpFail = async (phone) => {
   return { blocked: false, remaining: OTP_FAIL_LIMIT - newCount };
 };
 
-// ── Wrong password increment → auto-block at limit
 const recordPassFail = async (phone) => {
   let { ref, data } = await ensureRLDoc(phone);
   data = await maybeResetWindow(ref, data);
@@ -102,7 +97,6 @@ const recordPassFail = async (phone) => {
   return { blocked: false, remaining: PASS_FAIL_LIMIT - newCount };
 };
 
-// ── Check if currently admin-blocked
 const isAdminBlocked = async (phone) => {
   const { data } = await getRLData(phone);
   return data?.adminBlocked === true;
@@ -112,33 +106,39 @@ const isAdminBlocked = async (phone) => {
 // PG Code helpers
 // ─────────────────────────────────────────────
 const generatePGCode = (pgName) => {
-  const letters = pgName.replace(/\s+/g,'').toUpperCase().slice(0,3).padEnd(3,'X');
+  const letters = pgName.replace(/\s+/g, '').toUpperCase().slice(0, 3).padEnd(3, 'X');
   const digits  = Math.floor(100 + Math.random() * 900);
   return `${letters}${digits}`;
 };
+
 const isPGCodeUnique = async (code) => {
   const q    = query(collection(db, 'pgOwners'), where('pgCode', '==', code));
   const snap = await getDocs(q);
   return snap.empty;
 };
+
 const createUniquePGCode = async (pgName) => {
   let code, unique = false, attempts = 0;
-  while (!unique && attempts < 10) { code = generatePGCode(pgName); unique = await isPGCodeUnique(code); attempts++; }
+  while (!unique && attempts < 10) {
+    code   = generatePGCode(pgName);
+    unique = await isPGCodeUnique(code);
+    attempts++;
+  }
   return code;
 };
 
 // ─────────────────────────────────────────────
-// Password validator — all 5 rules must pass
+// Password validator
 // ─────────────────────────────────────────────
 const PW_RULES = [
-  { id: 'len',  test: /.{8,}/,         label: 'At least 8 characters'          },
-  { id: 'up',   test: /[A-Z]/,         label: 'One uppercase letter (A–Z)'      },
-  { id: 'low',  test: /[a-z]/,         label: 'One lowercase letter (a–z)'      },
-  { id: 'num',  test: /[0-9]/,         label: 'One number (0–9)'                },
-  { id: 'sym',  test: /[^A-Za-z0-9]/,  label: 'One special character (!@#$...)' },
+  { id: 'len', test: /.{8,}/,        label: 'At least 8 characters'          },
+  { id: 'up',  test: /[A-Z]/,        label: 'One uppercase letter (A–Z)'      },
+  { id: 'low', test: /[a-z]/,        label: 'One lowercase letter (a–z)'      },
+  { id: 'num', test: /[0-9]/,        label: 'One number (0–9)'                },
+  { id: 'sym', test: /[^A-Za-z0-9]/, label: 'One special character (!@#$...)' },
 ];
-const checkRules  = (pw) => PW_RULES.map(r => ({ ...r, passed: r.test.test(pw) }));
-const isStrongPw  = (pw) => PW_RULES.every(r => r.test.test(pw));
+const checkRules = (pw) => PW_RULES.map(r => ({ ...r, passed: r.test.test(pw) }));
+const isStrongPw = (pw) => PW_RULES.every(r => r.test.test(pw));
 
 // ─────────────────────────────────────────────
 // CSS
@@ -193,7 +193,6 @@ const css = `
 
   .pg-error   { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; border-radius: 10px; padding: 11px 14px; font-size: 13px; margin-bottom: 16px; font-weight: 500; }
   .pg-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 10px; padding: 11px 14px; font-size: 13px; margin-bottom: 16px; font-weight: 600; }
-  .pg-blocked { background: #1a1a2e; color: #e94560; border: 2px solid #e94560; border-radius: 12px; padding: 16px; font-size: 13px; margin-bottom: 16px; font-weight: 700; text-align: center; line-height: 1.6; }
 
   .pg-form-title { font-size: 22px; font-weight: 800; color: #1a1a2e; margin-bottom: 6px; }
   .pg-form-sub   { font-size: 13px; color: #94a3b8; margin-bottom: 22px; line-height: 1.5; }
@@ -217,7 +216,6 @@ const css = `
   .pg-pass-wrap { position: relative; }
   .pg-eye { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 18px; user-select: none; -webkit-tap-highlight-color: transparent; }
 
-  /* Password rules checklist */
   .pg-pw-rules { background: #f8faff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
   .pg-pw-rule  { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; padding: 3px 0; transition: color 0.2s; }
   .pg-pw-rule.pass { color: #059669; }
@@ -234,7 +232,6 @@ const css = `
   .pg-otp-box:focus  { border-color: #e94560; background: #fff; }
   .pg-otp-box.filled { border-color: #e94560; }
 
-  /* fail count warning */
   .pg-fail-warn { font-size: 12px; color: #d97706; font-weight: 600; text-align: center; margin-top: 8px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 12px; }
 
   .pg-btn {
@@ -303,13 +300,13 @@ const css = `
 // Component
 // ─────────────────────────────────────────────
 export default function Signup() {
-  const [step, setStep]                     = useState(1);
-  const [phone, setPhone]                   = useState('');
-  const [phoneBlocked, setPhoneBlocked]     = useState(false); // permanent within session
-  const [otp, setOtp]                       = useState(['','','','','','']);
-  const [confirmResult, setConfirmResult]   = useState(null);
-  const [resendTimer, setResendTimer]       = useState(0);
-  const [agreedToTerms, setAgreedToTerms]   = useState(false);
+  const [step, setStep]                   = useState(1);
+  const [phone, setPhone]                 = useState('');
+  const [phoneBlocked, setPhoneBlocked]   = useState(false);
+  const [otp, setOtp]                     = useState(['', '', '', '', '', '']);
+  const [confirmResult, setConfirmResult] = useState(null);
+  const [resendTimer, setResendTimer]     = useState(0);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const [ownerName, setOwnerName] = useState('');
   const [pgName, setPgName]       = useState('');
@@ -317,19 +314,19 @@ export default function Signup() {
   const [pgState, setPgState]     = useState('');
   const [email, setEmail]         = useState('');
 
-  const [password, setPassword]           = useState('');
-  const [confirmPass, setConfirmPass]     = useState('');
-  const [showPass, setShowPass]           = useState(false);
-  const [showConfirm, setShowConfirm]     = useState(false);
-  const [pwFocused, setPwFocused]         = useState(false);
+  const [password, setPassword]       = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [showPass, setShowPass]       = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pwFocused, setPwFocused]     = useState(false);
 
-  const [pgCode, setPgCode]   = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const [success, setSuccess] = useState('');
-  const [failWarn, setFailWarn] = useState(''); // inline warning for remaining attempts
+  const [pgCode, setPgCode]     = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [success, setSuccess]   = useState('');
+  const [failWarn, setFailWarn] = useState('');
 
-  const otpRefs = useRef([]);
+  const otpRefs  = useRef([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -359,16 +356,14 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      // 1. Check if phone already registered
       const alreadyExists = await isPhoneRegistered(phone);
       if (alreadyExists) {
-        setPhoneBlocked(true); // lock this session permanently
+        setPhoneBlocked(true);
         setError('🚫 This number is already registered. Please sign in instead.');
         setLoading(false);
         return;
       }
 
-      // 2. Rate limit check
       const rl = await checkOtpSendAllowed(phone);
       if (!rl.allowed) {
         if (rl.reason === 'admin_blocked') {
@@ -381,7 +376,6 @@ export default function Signup() {
         return;
       }
 
-      // 3. Send OTP
       setupRecaptcha();
       const formatted = `+91${phone.replace(/\D/g, '')}`;
       const result    = await signInWithPhoneNumber(auth, formatted, window.recaptchaVerifier);
@@ -391,7 +385,7 @@ export default function Signup() {
       setSuccess('OTP sent to +91 ' + phone);
     } catch (err) {
       console.error(err);
-      setError('Failed to send OTP. Check the number and try again.');
+      setError('Failed to send OTP. Check the number and try again or Contact our support team at support@pgpilots.in');
       if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; }
     }
     setLoading(false);
@@ -416,7 +410,6 @@ export default function Signup() {
     const code = otp.join('');
     if (code.length !== 6) return setError('Enter the complete 6-digit OTP.');
 
-    // Check if blocked before attempting
     if (await isAdminBlocked(phone)) {
       setError('🔒 This number has been blocked due to too many failed attempts. Contact support.');
       return;
@@ -424,11 +417,14 @@ export default function Signup() {
 
     setLoading(true);
     try {
+      // ✅ Set flag BEFORE confirming so PublicRoute doesn't redirect mid-signup
+      sessionStorage.setItem('signingUp', 'true');
       await confirmResult.confirm(code);
       setStep(3);
       setSuccess('✅ Phone verified!');
     } catch {
-      // Wrong OTP — increment fail counter
+      // ✅ Clean up flag on OTP failure
+      sessionStorage.removeItem('signingUp');
       const result = await recordOtpFail(phone);
       if (result.blocked) {
         setError('🔒 Too many wrong OTP attempts. Your number has been blocked. Contact admin to unblock.');
@@ -451,14 +447,13 @@ export default function Signup() {
     setStep(4);
   };
 
-  // ── Step 4: Create Account with password validation + rate limiting
+  // ── Step 4: Create Account
   const handleCreateAccount = async () => {
     setError(''); setFailWarn('');
 
-    if (!password)            return setError('Please enter a password.');
+    if (!password)             return setError('Please enter a password.');
     if (!isStrongPw(password)) return setError('Password does not meet all requirements. Please check the rules below.');
     if (password !== confirmPass) {
-      // Count password mismatch as a fail
       const result = await recordPassFail(phone);
       if (result.blocked) {
         setError('🔒 Too many incorrect password attempts. Your account has been blocked. Contact admin.');
@@ -469,7 +464,6 @@ export default function Signup() {
       return;
     }
 
-    // Check block status before proceeding
     if (await isAdminBlocked(phone)) {
       setError('🔒 This account has been blocked. Contact admin to unblock.');
       return;
@@ -482,23 +476,51 @@ export default function Signup() {
       const trialEnd = new Date();
       trialEnd.setDate(trialEnd.getDate() + 14);
 
+      // ✅ Resolve email — use real email or fallback to phone-based email
+      const resolvedEmail = email.trim()
+        ? email.trim()
+        : `${phone.replace(/\D/g, '')}@pgpilots.in`;
+
+      // ✅ Save to Firestore with resolved email
       await setDoc(doc(db, 'pgOwners', user.uid), {
-        ownerName, pgName, city, state: pgState,
-        email: email || '', phone: phone.replace(/\D/g,''), pgCode: code,
-        plan: 'trial', isActive: true,
+        ownerName,
+        pgName,
+        city,
+        state: pgState,
+        email: resolvedEmail,
+        phone: phone.replace(/\D/g, ''),
+        pgCode: code,
+        plan: 'trial',
+        isActive: true,
         trialEnd: trialEnd.toISOString().split('T')[0],
         createdAt: new Date(),
         features: { electricity: true, payments: true, rooms: true, tenants: true, reports: true },
         limits: { maxTenants: 50, maxRooms: 20, maxReportsPerMonth: 5 },
       });
 
-      const { updatePassword } = await import('firebase/auth');
-      await updatePassword(user, password);
+      // ✅ Link email+password to phone auth user so all 3 login methods work
+      const { updatePassword, linkWithCredential, EmailAuthProvider } = await import('firebase/auth');
+      const emailCredential = EmailAuthProvider.credential(resolvedEmail, password);
+      try {
+        await linkWithCredential(user, emailCredential);
+      } catch (linkErr) {
+        // If already linked, just update the password
+        if (
+          linkErr.code === 'auth/provider-already-linked' ||
+          linkErr.code === 'auth/email-already-in-use'
+        ) {
+          await updatePassword(user, password);
+        } else {
+          throw linkErr;
+        }
+      }
+
+      // ✅ Signup fully complete — remove flag so dashboard redirect works normally
+      sessionStorage.removeItem('signingUp');
       setPgCode(code);
       setStep(5);
     } catch (err) {
       console.error(err);
-      // Count unexpected failures too
       const result = await recordPassFail(phone);
       if (result.blocked) {
         setError('🔒 Too many failed attempts. Your account has been blocked. Contact admin.');
@@ -515,7 +537,14 @@ export default function Signup() {
     setTimeout(() => setSuccess(''), 2000);
   };
 
-  const resetToStep1 = () => { setStep(1); setOtp(['','','','','','']); setError(''); setFailWarn(''); };
+  // ✅ Clean up flag when user goes back to step 1
+  const resetToStep1 = () => {
+    sessionStorage.removeItem('signingUp');
+    setStep(1);
+    setOtp(['', '', '', '', '', '']);
+    setError('');
+    setFailWarn('');
+  };
 
   const stepLabels = ['Phone', 'Verify', 'Details', 'Password'];
   const pwRules    = checkRules(password);
@@ -535,7 +564,7 @@ export default function Signup() {
               Join hundreds of PG owners who save time and earn more.
             </p>
             <div className="pg-hero-stats">
-              {[['500+','PG Owners'],['10,000+','Tenants'],['₹1Cr+','Collected']].map(([num, label]) => (
+              {[['500+', 'PG Owners'], ['10,000+', 'Tenants'], ['₹1Cr+', 'Collected']].map(([num, label]) => (
                 <div key={label} className="pg-stat">
                   <div className="pg-stat-num">{num}</div>
                   <div className="pg-stat-label">{label}</div>
@@ -556,7 +585,7 @@ export default function Signup() {
                   const status = step === num ? 'active' : step > num ? 'done' : 'pending';
                   return (
                     <React.Fragment key={label}>
-                      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'3px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                         <div className={`pg-step-dot ${status}`}>{status === 'done' ? '✓' : num}</div>
                         <span className={`pg-step-label ${status}`}>{label}</span>
                       </div>
@@ -584,17 +613,17 @@ export default function Signup() {
                       type="tel" inputMode="numeric"
                       placeholder="9876543210" maxLength={10}
                       value={phone}
-                      onChange={e => { setPhone(e.target.value.replace(/\D/g,'')); setPhoneBlocked(false); setError(''); }}
+                      onChange={e => { setPhone(e.target.value.replace(/\D/g, '')); setPhoneBlocked(false); setError(''); }}
                       onKeyDown={e => e.key === 'Enter' && handleSendOTP()}
                     />
                   </div>
                 </div>
                 <div
-                  className={`pg-terms-row${agreedToTerms?' checked':''}`}
+                  className={`pg-terms-row${agreedToTerms ? ' checked' : ''}`}
                   onClick={() => setAgreedToTerms(!agreedToTerms)}
                 >
-                  <div className={`pg-terms-checkbox${agreedToTerms?' checked':''}`}>
-                    {agreedToTerms && <span style={{color:'white',fontSize:'13px',fontWeight:'800',lineHeight:1}}>✓</span>}
+                  <div className={`pg-terms-checkbox${agreedToTerms ? ' checked' : ''}`}>
+                    {agreedToTerms && <span style={{ color: 'white', fontSize: '13px', fontWeight: '800', lineHeight: 1 }}>✓</span>}
                   </div>
                   <div className="pg-terms-text">
                     I agree to the{' '}
@@ -622,7 +651,7 @@ export default function Signup() {
                   {otp.map((digit, i) => (
                     <input key={i}
                       ref={el => otpRefs.current[i] = el}
-                      className={`pg-otp-box${digit?' filled':''}`}
+                      className={`pg-otp-box${digit ? ' filled' : ''}`}
                       type="text" inputMode="numeric" maxLength={1}
                       value={digit}
                       onChange={e => handleOtpChange(i, e.target.value)}
@@ -636,7 +665,7 @@ export default function Signup() {
                 </button>
                 <div className="pg-resend">
                   {resendTimer > 0
-                    ? <span>Resend in <strong style={{color:'#e94560'}}>{resendTimer}s</strong></span>
+                    ? <span>Resend in <strong style={{ color: '#e94560' }}>{resendTimer}s</strong></span>
                     : <span>Didn't receive? <span className="pg-resend-link" onClick={resetToStep1}>Resend OTP</span></span>
                   }
                 </div>
@@ -650,11 +679,11 @@ export default function Signup() {
                 <h2 className="pg-form-title">Your PG Details</h2>
                 <p className="pg-form-sub">Tell us about your property</p>
                 {[
-                  { label:'Owner Full Name *', val:ownerName, set:setOwnerName, ph:'Anbuselvan J',    type:'text'  },
-                  { label:'PG / Hostel Name *', val:pgName,   set:setPgName,    ph:'Sunrise PG',      type:'text'  },
-                  { label:'City *',             val:city,      set:setCity,      ph:'Chennai',         type:'text'  },
-                  { label:'State *',            val:pgState,   set:setPgState,   ph:'Tamil Nadu',      type:'text'  },
-                  { label:'Email *',            val:email,     set:setEmail,     ph:'you@email.com',   type:'email' },
+                  { label: 'Owner Full Name *',  val: ownerName, set: setOwnerName, ph: 'Anbuselvan J',  type: 'text'  },
+                  { label: 'PG / Hostel Name *', val: pgName,    set: setPgName,    ph: 'Sunrise PG',    type: 'text'  },
+                  { label: 'City *',             val: city,      set: setCity,      ph: 'Chennai',       type: 'text'  },
+                  { label: 'State *',            val: pgState,   set: setPgState,   ph: 'Tamil Nadu',    type: 'text'  },
+                  { label: 'Email *',            val: email,     set: setEmail,     ph: 'you@email.com', type: 'email' },
                 ].map(({ label, val, set, ph, type }) => (
                   <div key={label} className="pg-field">
                     <label className="pg-label">{label}</label>
@@ -675,7 +704,7 @@ export default function Signup() {
                 <div className="pg-field">
                   <label className="pg-label">Password *</label>
                   <div className="pg-pass-wrap">
-                    <input className="pg-input" style={{paddingRight:'48px'}}
+                    <input className="pg-input" style={{ paddingRight: '48px' }}
                       type={showPass ? 'text' : 'password'}
                       placeholder="Create a strong password"
                       value={password}
@@ -688,7 +717,6 @@ export default function Signup() {
                   </div>
                 </div>
 
-                {/* Live password rules checklist */}
                 {(pwFocused || password) && (
                   <div className="pg-pw-rules">
                     {pwRules.map(r => (
@@ -703,7 +731,7 @@ export default function Signup() {
                 <div className="pg-field">
                   <label className="pg-label">Confirm Password *</label>
                   <div className="pg-pass-wrap">
-                    <input className="pg-input" style={{paddingRight:'48px'}}
+                    <input className="pg-input" style={{ paddingRight: '48px' }}
                       type={showConfirm ? 'text' : 'password'}
                       placeholder="Re-enter password"
                       value={confirmPass}
@@ -713,10 +741,9 @@ export default function Signup() {
                       {showConfirm ? '🙈' : '👁️'}
                     </span>
                   </div>
-                  {/* Match indicator */}
                   {confirmPass && (
-                    <div style={{fontSize:'12px', marginTop:'6px', fontWeight:'600',
-                      color: password === confirmPass ? '#059669' : '#dc2626'}}>
+                    <div style={{ fontSize: '12px', marginTop: '6px', fontWeight: '600',
+                      color: password === confirmPass ? '#059669' : '#dc2626' }}>
                       {password === confirmPass ? '✅ Passwords match' : '❌ Passwords do not match'}
                     </div>
                   )}
@@ -729,13 +756,13 @@ export default function Signup() {
                   <button className="pg-btn"
                     onClick={handleCreateAccount}
                     disabled={loading || !isStrongPw(password)}
-                    style={{flex:1}}>
+                    style={{ flex: 1 }}>
                     {loading ? 'Creating Account…' : 'Create Account →'}
                   </button>
                 </div>
 
                 {!isStrongPw(password) && password && (
-                  <div style={{fontSize:'12px', color:'#94a3b8', textAlign:'center', marginTop:'10px'}}>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', textAlign: 'center', marginTop: '10px' }}>
                     Complete all password requirements to continue
                   </div>
                 )}
@@ -745,9 +772,9 @@ export default function Signup() {
             {/* ── Step 5: Success ── */}
             {step === 5 && (
               <div className="pg-success-step">
-                <div style={{fontSize:'60px', marginBottom:'12px'}}>🎉</div>
-                <h2 className="pg-form-title" style={{textAlign:'center'}}>Account Created!</h2>
-                <p style={{fontSize:'14px', color:'#64748b', margin:'8px 0 4px'}}>
+                <div style={{ fontSize: '60px', marginBottom: '12px' }}>🎉</div>
+                <h2 className="pg-form-title" style={{ textAlign: 'center' }}>Account Created!</h2>
+                <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0 4px' }}>
                   Welcome, <strong>{ownerName}</strong>! Your PG code:
                 </p>
                 <div className="pg-code-card">

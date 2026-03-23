@@ -9,7 +9,6 @@ import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 import AdminRoute from './AdminRoute';
 
-// ── Loading spinner shown while Firebase checks auth state ──
 function LoadingScreen() {
   return (
     <div style={{
@@ -32,15 +31,15 @@ function LoadingScreen() {
   );
 }
 
-// ── PublicRoute: if already logged in → go to dashboard ──
-// Prevents logged-in users from seeing login/signup again
+// ✅ FIXED: Don't redirect if user is mid-signup
 function PublicRoute({ children }) {
   const [user, loading] = useAuthState(auth);
   if (loading) return <LoadingScreen />;
+  const isSigningUp = sessionStorage.getItem('signingUp') === 'true';
+  if (isSigningUp) return children;
   return user ? <Navigate to="/dashboard" replace /> : children;
 }
 
-// ── ProtectedRoute: if not logged in → go to login ──
 function ProtectedRoute({ children }) {
   const [user, loading] = useAuthState(auth);
   if (loading) return <LoadingScreen />;
@@ -51,24 +50,15 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Landing page — shown to everyone */}
         <Route path="/" element={<LandingPage />} />
-
-        {/* Auth routes — redirect to dashboard if already logged in */}
         <Route path="/login"
           element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/signup"
           element={<PublicRoute><Signup /></PublicRoute>} />
-
-        {/* Protected routes — redirect to login if not logged in */}
         <Route path="/dashboard"
           element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-
-        {/* Admin route */}
         <Route path="/admin"
           element={<AdminRoute><AdminPanel /></AdminRoute>} />
-
-        {/* Catch all → landing page */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

@@ -12,12 +12,20 @@ const FEATURES = [
   { key: 'reports',     label: 'Reports / Analytics', icon: '📊', desc: 'Revenue reports & analytics' },
 ];
 const DEFAULT_FEATURES = { electricity: true, payments: true, rooms: true, tenants: true, reports: true };
-const DEFAULT_LIMITS   = { maxTenants: 50, maxRooms: 20, maxReportsPerMonth: 5 };
+
+// ✅ Added maxPGs to defaults
+const DEFAULT_LIMITS = { maxTenants: 50, maxRooms: 20, maxReportsPerMonth: 5, maxPGs: 1 };
+
+// ✅ Added maxPGs to limit fields
 const LIMIT_FIELDS = [
-  { key: 'maxTenants',         label: 'Max Tenants',              icon: '👥', desc: 'Total tenants owner can add',          unit: 'tenants',      min: 1, max: 500, step: 5  },
-  { key: 'maxRooms',           label: 'Max Rooms',                icon: '🛏️', desc: 'Total rooms owner can create',         unit: 'rooms',        min: 1, max: 200, step: 5  },
-  { key: 'maxReportsPerMonth', label: 'Report Downloads / Month', icon: '📊', desc: 'Report downloads allowed per month',   unit: 'downloads/mo', min: 1, max: 100, step: 1  },
+  { key: 'maxTenants',         label: 'Max Tenants',              icon: '👥', desc: 'Total tenants owner can add',          unit: 'tenants',      min: 1,  max: 500, step: 5  },
+  { key: 'maxRooms',           label: 'Max Rooms',                icon: '🛏️', desc: 'Total rooms owner can create',         unit: 'rooms',        min: 1,  max: 200, step: 5  },
+  { key: 'maxPGs',             label: 'Max PGs',                  icon: '🏠', desc: 'How many PGs this owner can add',      unit: 'PGs',          min: 1,  max: 20,  step: 1  },
+  { key: 'maxReportsPerMonth', label: 'Report Downloads / Month', icon: '📊', desc: 'Report downloads allowed per month',   unit: 'downloads/mo', min: 1,  max: 100, step: 1  },
 ];
+
+// ✅ Plan-based default PG limits
+const PLAN_PG_LIMITS = { trial: 1, basic: 1, starter: 1, growth: 3, pro: 999, premium: 5, standard: 3 };
 
 function AdminPanel() {
   const [owners, setOwners]           = useState([]);
@@ -51,12 +59,12 @@ function AdminPanel() {
   };
   useEffect(() => { fetchData(); }, []);
 
-  const showSuccess = msg => { setSuccessMsg(msg); setErrorMsg(''); setTimeout(() => setSuccessMsg(''), 3000); };
-  const showError   = msg => { setErrorMsg(msg); setSuccessMsg(''); setTimeout(() => setErrorMsg(''), 3000); };
+  const showSuccess = msg => { setSuccessMsg(msg); setErrorMsg('');   setTimeout(() => setSuccessMsg(''), 3000); };
+  const showError   = msg => { setErrorMsg(msg);   setSuccessMsg(''); setTimeout(() => setErrorMsg(''),   3000); };
 
-  const getOwnerFeatures = owner => ({ ...DEFAULT_FEATURES, ...(owner.features || {}) });
-  const getOwnerLimits   = owner => ({ ...DEFAULT_LIMITS,   ...(owner.limits   || {}) });
-  const getEditingLimits = owner => editingLimits[owner.id] || getOwnerLimits(owner);
+  const getOwnerFeatures  = owner => ({ ...DEFAULT_FEATURES, ...(owner.features || {}) });
+  const getOwnerLimits    = owner => ({ ...DEFAULT_LIMITS,   ...(owner.limits   || {}) });
+  const getEditingLimits  = owner => editingLimits[owner.id] || getOwnerLimits(owner);
 
   const setLimitField = (ownerId, key, value) => {
     const owner = owners.find(o => o.id === ownerId);
@@ -92,7 +100,7 @@ function AdminPanel() {
   const toggleFeature = async (ownerId, featureKey, currentValue) => {
     setTogglingFeature(featureKey + ownerId);
     try {
-      const owner = owners.find(o => o.id === ownerId);
+      const owner       = owners.find(o => o.id === ownerId);
       const newFeatures = { ...getOwnerFeatures(owner), [featureKey]: !currentValue };
       await updateDoc(doc(db, 'pgOwners', ownerId), { features: newFeatures });
       setOwners(prev => prev.map(o => o.id === ownerId ? { ...o, features: newFeatures } : o));
@@ -125,13 +133,25 @@ function AdminPanel() {
     setSaving(false);
   };
 
+  // ✅ When plan changes, auto-update maxPGs limit to match plan
+  const updatePlan = async (ownerId, plan) => {
+    const owner      = owners.find(o => o.id === ownerId);
+    const curLimits  = getOwnerLimits(owner);
+    const newMaxPGs  = PLAN_PG_LIMITS[plan] ?? 1;
+    const newLimits  = { ...curLimits, maxPGs: newMaxPGs };
+    await updateDoc(doc(db, 'pgOwners', ownerId), { plan, limits: newLimits });
+    showSuccess(`✅ Plan updated to ${plan}! Max PGs set to ${newMaxPGs}.`);
+    setOwners(prev => prev.map(o => o.id === ownerId ? { ...o, plan, limits: newLimits } : o));
+    if (selectedOwner?.id === ownerId) setSelectedOwner(prev => ({ ...prev, plan, limits: newLimits }));
+  };
+
   const deleteOwner = async owner => {
     if (!window.confirm(`DELETE ${owner.name}?\n\nThis cannot be undone.`)) return;
     if (!window.confirm(`FINAL WARNING: All data will be deleted. OK?`)) return;
     setSaving(true);
     try {
-      for (const col of ['rooms','tenants','payments','electricityBills']) {
-        const snap = await getDocs(query(collection(db, col), where('ownerId','==',owner.id)));
+      for (const col of ['rooms', 'tenants', 'payments', 'electricityBills']) {
+        const snap = await getDocs(query(collection(db, col), where('ownerId', '==', owner.id)));
         for (const d of snap.docs) await deleteDoc(doc(db, col, d.id));
       }
       await deleteDoc(doc(db, 'pgOwners', owner.id));
@@ -158,17 +178,17 @@ function AdminPanel() {
   const thisYear       = new Date().getFullYear().toString();
   const monthlyRevenue = allPayments.filter(p => p.month === thisMonth && p.year === thisYear).reduce((a, p) => a + (p.amount || 0), 0);
   const planCounts     = { trial: nonAdmin.filter(o => o.plan==='trial').length, basic: nonAdmin.filter(o => o.plan==='basic').length, standard: nonAdmin.filter(o => o.plan==='standard').length, premium: nonAdmin.filter(o => o.plan==='premium').length };
-  const planColors     = { trial: '#d97706', basic: '#4f46e5', standard: '#059669', premium: '#dc2626' };
+  const planColors     = { trial: '#d97706', basic: '#4f46e5', standard: '#059669', premium: '#dc2626', starter: '#4f46e5', growth: '#059669', pro: '#dc2626' };
 
   const filteredOwners = nonAdmin.filter(o => {
-    const ms = !search || o.name?.toLowerCase().includes(search.toLowerCase()) || o.pgName?.toLowerCase().includes(search.toLowerCase()) || o.email?.toLowerCase().includes(search.toLowerCase());
+    const ms = !search       || o.name?.toLowerCase().includes(search.toLowerCase()) || o.pgName?.toLowerCase().includes(search.toLowerCase()) || o.email?.toLowerCase().includes(search.toLowerCase());
     const mp = !filterPlan   || o.plan === filterPlan;
     const mx = !filterStatus || (filterStatus==='active' && o.isActive!==false) || (filterStatus==='blocked' && o.isActive===false);
     return ms && mp && mx;
   });
 
   const getOwnerTenants = id => allTenants.filter(t => t.ownerId === id);
-  const getOwnerRevenue = id => allPayments.filter(p => p.ownerId===id && p.month===thisMonth && p.year===thisYear).reduce((a,p) => a+(p.amount||0), 0);
+  const getOwnerRevenue = id => allPayments.filter(p => p.ownerId===id && p.month===thisMonth && p.year===thisYear).reduce((a, p) => a + (p.amount || 0), 0);
   const enabledCount    = owner => { const f = getOwnerFeatures(owner); return FEATURES.filter(ft => f[ft.key]).length; };
 
   const handleLogout = async () => { await signOut(auth); navigate('/login'); };
@@ -185,7 +205,7 @@ function AdminPanel() {
   );
 
   const UsageBar = ({ used, max }) => {
-    const pct = max > 0 ? Math.min((used/max)*100, 100) : 0;
+    const pct   = max > 0 ? Math.min((used/max)*100, 100) : 0;
     const color = pct >= 90 ? '#dc2626' : pct >= 70 ? '#d97706' : '#4f46e5';
     return (
       <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
@@ -241,7 +261,7 @@ function AdminPanel() {
         {loading ? <div style={s.loading}>Loading...</div> : <>
 
           {/* ── DASHBOARD ── */}
-          {activeTab==='dashboard' && (
+          {activeTab === 'dashboard' && (
             <div>
               <div style={s.statsGrid}>
                 {[
@@ -265,7 +285,7 @@ function AdminPanel() {
                 </div>
                 <div style={s.card}>
                   <h2 style={s.cardTitle}>📊 Plan Breakdown</h2>
-                  {Object.entries(planCounts).map(([plan,count]) => (
+                  {Object.entries(planCounts).map(([plan, count]) => (
                     <div key={plan} style={s.planRow}>
                       <div style={s.planRowLeft}><div style={{ ...s.planDot, background:planColors[plan] }}/><span style={s.planRowName}>{plan.charAt(0).toUpperCase()+plan.slice(1)}</span></div>
                       <div style={s.planRowRight}>
@@ -297,25 +317,25 @@ function AdminPanel() {
           )}
 
           {/* ── OWNERS ── */}
-          {activeTab==='owners' && (
+          {activeTab === 'owners' && (
             <div>
               <div style={s.filterRow}>
-                <input style={s.searchInput} type="text" placeholder="🔍 Search..." value={search} onChange={e=>setSearch(e.target.value)}/>
-                <select style={s.filterSelect} value={filterPlan} onChange={e=>setFilterPlan(e.target.value)}>
+                <input style={s.searchInput} type="text" placeholder="🔍 Search..." value={search} onChange={e => setSearch(e.target.value)}/>
+                <select style={s.filterSelect} value={filterPlan} onChange={e => setFilterPlan(e.target.value)}>
                   <option value="">All Plans</option>
-                  <option value="trial">Trial</option><option value="basic">Basic</option>
-                  <option value="standard">Standard</option><option value="premium">Premium</option>
+                  <option value="trial">Trial</option><option value="starter">Starter</option>
+                  <option value="growth">Growth</option><option value="pro">Pro</option>
                 </select>
-                <select style={s.filterSelect} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
+                <select style={s.filterSelect} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                   <option value="">All Status</option>
                   <option value="active">Active</option><option value="blocked">Blocked</option>
                 </select>
-                {(search||filterPlan||filterStatus) && <button style={s.clearBtn} onClick={()=>{setSearch('');setFilterPlan('');setFilterStatus('');}}>✕ Clear</button>}
+                {(search||filterPlan||filterStatus) && <button style={s.clearBtn} onClick={() => { setSearch(''); setFilterPlan(''); setFilterStatus(''); }}>✕ Clear</button>}
               </div>
               <div style={s.resultCount}>{filteredOwners.length} owners found</div>
               <div style={s.ownersList}>
                 {filteredOwners.map(owner => {
-                  const isBlocked = owner.isActive===false;
+                  const isBlocked = owner.isActive === false;
                   const features  = getOwnerFeatures(owner);
                   const limits    = getOwnerLimits(owner);
                   const tc        = getOwnerTenants(owner.id).length;
@@ -336,7 +356,7 @@ function AdminPanel() {
                             </div>
                             <div style={{ display:'flex', gap:'12px', marginTop:'6px', fontSize:'11px', color:'#94a3b8' }}>
                               <span>👥 {tc}/{limits.maxTenants} tenants</span>
-                              <span>📊 {limits.maxReportsPerMonth} reports/mo</span>
+                              <span>🏠 max {limits.maxPGs} PGs</span>
                               <span>🛏️ max {limits.maxRooms} rooms</span>
                             </div>
                           </div>
@@ -349,14 +369,18 @@ function AdminPanel() {
                         </div>
                       </div>
                       <div style={s.ownerActions}>
-                        <button style={s.viewBtn} onClick={()=>setSelectedOwner(owner)}>👁️ View Details</button>
-                        {isBlocked ? <button style={s.activateBtn} onClick={()=>updateOwner(owner.id,{isActive:true})}>✅ Unblock</button>
-                                   : <button style={s.blockBtn}    onClick={()=>updateOwner(owner.id,{isActive:false})}>🔴 Block</button>}
-                        <select style={s.planSelect} value={owner.plan||'trial'} onChange={e=>updateOwner(owner.id,{plan:e.target.value})}>
-                          <option value="trial">Trial</option><option value="basic">Basic</option>
-                          <option value="standard">Standard</option><option value="premium">Premium</option>
+                        <button style={s.viewBtn} onClick={() => setSelectedOwner(owner)}>👁️ View Details</button>
+                        {isBlocked
+                          ? <button style={s.activateBtn} onClick={() => updateOwner(owner.id, { isActive:true })}>✅ Unblock</button>
+                          : <button style={s.blockBtn}    onClick={() => updateOwner(owner.id, { isActive:false })}>🔴 Block</button>}
+                        {/* ✅ Plan change now auto-updates maxPGs */}
+                        <select style={s.planSelect} value={owner.plan||'trial'} onChange={e => updatePlan(owner.id, e.target.value)}>
+                          <option value="trial">Trial (1 PG)</option>
+                          <option value="starter">Starter (1 PG)</option>
+                          <option value="growth">Growth (3 PGs)</option>
+                          <option value="pro">Pro (Unlimited)</option>
                         </select>
-                        <button style={s.deleteBtn} onClick={()=>deleteOwner(owner)}>🗑️ Delete</button>
+                        <button style={s.deleteBtn} onClick={() => deleteOwner(owner)}>🗑️ Delete</button>
                       </div>
                     </div>
                   );
@@ -366,7 +390,7 @@ function AdminPanel() {
           )}
 
           {/* ── FEATURE CONTROL ── */}
-          {activeTab==='features' && (
+          {activeTab === 'features' && (
             <div>
               <div style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'12px', padding:'14px 18px', marginBottom:'20px', display:'flex', gap:'12px' }}>
                 <span style={{ fontSize:'18px' }}>💡</span>
@@ -375,11 +399,11 @@ function AdminPanel() {
                   <div style={{ fontSize:'13px', color:'#3b82f6' }}>Toggle ON/OFF per owner. When disabled, the owner sees a locked screen. Changes are instant.</div>
                 </div>
               </div>
-              <input style={{ ...s.searchInput, marginBottom:'16px', maxWidth:'400px', display:'block' }} type="text" placeholder="🔍 Search owner..." value={search} onChange={e=>setSearch(e.target.value)}/>
+              <input style={{ ...s.searchInput, marginBottom:'16px', maxWidth:'400px', display:'block' }} type="text" placeholder="🔍 Search owner..." value={search} onChange={e => setSearch(e.target.value)}/>
               <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
                 {filteredOwners.map(owner => {
                   const features  = getOwnerFeatures(owner);
-                  const isBlocked = owner.isActive===false;
+                  const isBlocked = owner.isActive === false;
                   return (
                     <div key={owner.id} style={{ background:'white', borderRadius:'14px', padding:'20px', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderLeft:`4px solid ${planColors[owner.plan]||'#94a3b8'}`, opacity:isBlocked?0.75:1 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', flexWrap:'wrap', gap:'10px' }}>
@@ -393,14 +417,14 @@ function AdminPanel() {
                         <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
                           <div style={{ ...s.planBadge, background:planColors[owner.plan]||'#94a3b8' }}>{(owner.plan||'trial').toUpperCase()}</div>
                           <span style={{ fontSize:'12px', color:'#94a3b8' }}>{enabledCount(owner)}/{FEATURES.length} on</span>
-                          <button style={{ padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer', background:'#ecfdf5', color:'#059669', border:'1px solid #bbf7d0' }} disabled={saving} onClick={()=>setAllFeatures(owner.id,true)}>✅ All On</button>
-                          <button style={{ padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer', background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca' }} disabled={saving} onClick={()=>setAllFeatures(owner.id,false)}>🔴 All Off</button>
+                          <button style={{ padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer', background:'#ecfdf5', color:'#059669', border:'1px solid #bbf7d0' }} disabled={saving} onClick={() => setAllFeatures(owner.id, true)}>✅ All On</button>
+                          <button style={{ padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer', background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca' }} disabled={saving} onClick={() => setAllFeatures(owner.id, false)}>🔴 All Off</button>
                         </div>
                       </div>
                       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:'10px' }}>
                         {FEATURES.map(feature => {
                           const isOn      = features[feature.key];
-                          const isLoading = togglingFeature===feature.key+owner.id;
+                          const isLoading = togglingFeature === feature.key + owner.id;
                           return (
                             <div key={feature.key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', borderRadius:'10px', gap:'10px', background:isOn?'#f0fdf4':'#fff', border:`1px solid ${isOn?'#bbf7d0':'#e2e8f0'}`, transition:'background 0.2s' }}>
                               <div style={{ display:'flex', alignItems:'center', gap:'10px', flex:1 }}>
@@ -410,7 +434,7 @@ function AdminPanel() {
                                   <div style={{ fontSize:'11px', color:'#94a3b8' }}>{feature.desc}</div>
                                 </div>
                               </div>
-                              <ToggleSwitch isOn={isOn} isLoading={isLoading} onToggle={()=>toggleFeature(owner.id,feature.key,isOn)}/>
+                              <ToggleSwitch isOn={isOn} isLoading={isLoading} onToggle={() => toggleFeature(owner.id, feature.key, isOn)}/>
                             </div>
                           );
                         })}
@@ -423,28 +447,27 @@ function AdminPanel() {
           )}
 
           {/* ── USAGE LIMITS ── */}
-          {activeTab==='limits' && (
+          {activeTab === 'limits' && (
             <div>
               <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'12px', padding:'14px 18px', marginBottom:'20px', display:'flex', gap:'12px' }}>
                 <span style={{ fontSize:'18px' }}>📏</span>
                 <div>
                   <div style={{ fontSize:'14px', fontWeight:'700', color:'#92400e', marginBottom:'4px' }}>How Usage Limits Work</div>
-                  <div style={{ fontSize:'13px', color:'#b45309' }}>Set custom limits per owner. When they hit the limit, they cannot add more. Bar turns red at 90%+ usage.</div>
+                  <div style={{ fontSize:'13px', color:'#b45309' }}>Set custom limits per owner. <strong>maxPGs</strong> controls how many PGs they can add. Auto-updates when you change their plan.</div>
                 </div>
               </div>
-              <input style={{ ...s.searchInput, marginBottom:'16px', maxWidth:'400px', display:'block' }} type="text" placeholder="🔍 Search owner..." value={search} onChange={e=>setSearch(e.target.value)}/>
+              <input style={{ ...s.searchInput, marginBottom:'16px', maxWidth:'400px', display:'block' }} type="text" placeholder="🔍 Search owner..." value={search} onChange={e => setSearch(e.target.value)}/>
               <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
                 {filteredOwners.map(owner => {
                   const limits    = getOwnerLimits(owner);
                   const editing   = getEditingLimits(owner);
                   const isSaving  = savingLimits[owner.id];
                   const isDirty   = !!editingLimits[owner.id];
-                  const isBlocked = owner.isActive===false;
+                  const isBlocked = owner.isActive === false;
                   const tc        = getOwnerTenants(owner.id).length;
-                  const usageMap  = { maxTenants:tc, maxRooms:0, maxReportsPerMonth: owner.reportsDownloadedThisMonth||0 };
+                  const usageMap  = { maxTenants: tc, maxRooms: 0, maxPGs: owner.pgCount || 0, maxReportsPerMonth: owner.reportsDownloadedThisMonth || 0 };
                   return (
                     <div key={owner.id} style={{ background:'white', borderRadius:'14px', padding:'24px', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderLeft:`4px solid ${planColors[owner.plan]||'#94a3b8'}`, opacity:isBlocked?0.75:1 }}>
-                      {/* Header */}
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', flexWrap:'wrap', gap:'10px' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
                           <div style={{ ...s.ownerAvatar, width:'40px', height:'40px', fontSize:'16px', background:'linear-gradient(135deg,#e94560,#0f3460)', flexShrink:0 }}>{owner.name?.charAt(0).toUpperCase()}</div>
@@ -458,18 +481,17 @@ function AdminPanel() {
                           {isDirty && <span style={{ fontSize:'11px', color:'#d97706', fontWeight:'600' }}>● Unsaved changes</span>}
                         </div>
                       </div>
-                      {/* Limit fields */}
                       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px', marginBottom:'16px' }}>
                         {LIMIT_FIELDS.map(field => {
                           const currentVal = editing[field.key];
-                          const usedVal    = usageMap[field.key]||0;
+                          const usedVal    = usageMap[field.key] || 0;
                           const changed    = isDirty && editing[field.key] !== limits[field.key];
                           return (
-                            <div key={field.key} style={{ background:'#f8fafc', borderRadius:'12px', padding:'16px', border:'1px solid #e2e8f0' }}>
+                            <div key={field.key} style={{ background: field.key==='maxPGs'?'#eff6ff':'#f8fafc', borderRadius:'12px', padding:'16px', border:`1px solid ${field.key==='maxPGs'?'#bfdbfe':'#e2e8f0'}` }}>
                               <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
                                 <span style={{ fontSize:'18px' }}>{field.icon}</span>
                                 <div>
-                                  <div style={{ fontSize:'13px', fontWeight:'700', color:'#1e293b' }}>{field.label}</div>
+                                  <div style={{ fontSize:'13px', fontWeight:'700', color:'#1e293b' }}>{field.label}{field.key==='maxPGs'&&<span style={{ fontSize:'10px', background:'#dbeafe', color:'#1e40af', padding:'2px 6px', borderRadius:'4px', marginLeft:'6px', fontWeight:'600' }}>NEW</span>}</div>
                                   <div style={{ fontSize:'11px', color:'#94a3b8' }}>{field.desc}</div>
                                 </div>
                               </div>
@@ -481,7 +503,7 @@ function AdminPanel() {
                                 <span style={{ fontSize:'12px', color:'#64748b', fontWeight:'600', minWidth:'36px' }}>Limit:</span>
                                 <input
                                   type="number" min={field.min} max={field.max} step={field.step} value={currentVal}
-                                  onChange={e=>setLimitField(owner.id,field.key,e.target.value)}
+                                  onChange={e => setLimitField(owner.id, field.key, e.target.value)}
                                   style={{ width:'80px', padding:'6px 10px', borderRadius:'8px', border:`1.5px solid ${changed?'#f59e0b':'#e2e8f0'}`, fontSize:'14px', fontWeight:'700', color:'#1e293b', background:'white', outline:'none', textAlign:'center' }}
                                 />
                                 <span style={{ fontSize:'12px', color:'#94a3b8' }}>{field.unit}</span>
@@ -490,18 +512,17 @@ function AdminPanel() {
                           );
                         })}
                       </div>
-                      {/* Buttons */}
                       <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
-                        <button onClick={()=>saveLimits(owner.id)} disabled={!isDirty||isSaving}
+                        <button onClick={() => saveLimits(owner.id)} disabled={!isDirty||isSaving}
                           style={{ padding:'10px 20px', borderRadius:'10px', fontSize:'13px', fontWeight:'700', cursor:(!isDirty||isSaving)?'not-allowed':'pointer', background:isDirty?'#4f46e5':'#e2e8f0', color:isDirty?'white':'#94a3b8', border:'none', opacity:isSaving?0.6:1 }}>
-                          {isSaving?'⏳ Saving...':'💾 Save Limits'}
+                          {isSaving ? '⏳ Saving...' : '💾 Save Limits'}
                         </button>
-                        <button onClick={()=>resetLimits(owner.id)} disabled={isSaving}
+                        <button onClick={() => resetLimits(owner.id)} disabled={isSaving}
                           style={{ padding:'10px 16px', borderRadius:'10px', fontSize:'13px', fontWeight:'600', cursor:'pointer', background:'#f1f5f9', color:'#64748b', border:'1px solid #e2e8f0' }}>
                           🔄 Reset Defaults
                         </button>
                         {isDirty && (
-                          <button onClick={()=>setEditingLimits(prev=>{const n={...prev};delete n[owner.id];return n;})}
+                          <button onClick={() => setEditingLimits(prev => { const n = { ...prev }; delete n[owner.id]; return n; })}
                             style={{ padding:'10px 16px', borderRadius:'10px', fontSize:'13px', fontWeight:'600', cursor:'pointer', background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca' }}>
                             ✕ Discard
                           </button>
@@ -515,7 +536,7 @@ function AdminPanel() {
           )}
 
           {/* ── REVENUE ── */}
-          {activeTab==='revenue' && (
+          {activeTab === 'revenue' && (
             <div>
               <div style={s.statsGrid}>
                 {[
@@ -534,8 +555,8 @@ function AdminPanel() {
               <div style={s.card}>
                 <h2 style={s.cardTitle}>💰 Revenue by Owner — {thisMonth} {thisYear}</h2>
                 <div style={s.revenueList}>
-                  {nonAdmin.map(o=>({ ...o, revenue:getOwnerRevenue(o.id), tenants:getOwnerTenants(o.id).length }))
-                    .sort((a,b)=>b.revenue-a.revenue).map(owner => (
+                  {nonAdmin.map(o => ({ ...o, revenue: getOwnerRevenue(o.id), tenants: getOwnerTenants(o.id).length }))
+                    .sort((a, b) => b.revenue - a.revenue).map(owner => (
                     <div key={owner.id} style={s.revenueRow}>
                       <div style={s.revenueLeft}>
                         <div style={s.revenueAvatar}>{owner.name?.charAt(0).toUpperCase()}</div>
@@ -559,7 +580,7 @@ function AdminPanel() {
             <div style={s.modal}>
               <div style={s.modalHeader}>
                 <h3 style={s.modalTitle}>👤 {selectedOwner.name}</h3>
-                <button style={s.closeBtn} onClick={()=>setSelectedOwner(null)}>✕</button>
+                <button style={s.closeBtn} onClick={() => setSelectedOwner(null)}>✕</button>
               </div>
               <div style={s.detailGrid}>
                 <div>
@@ -567,16 +588,15 @@ function AdminPanel() {
                   <div style={s.detailName}>{selectedOwner.name}</div>
                   <div style={s.detailPg}>{selectedOwner.pgName}</div>
                   <div style={s.detailInfo}>
-                    {[['📧',selectedOwner.email],['📱',selectedOwner.phone||'Not set'],['📍',`${selectedOwner.city||'Not set'}, ${selectedOwner.state||''}`],['👥',`${getOwnerTenants(selectedOwner.id).length} tenants`],['💰',`₹${getOwnerRevenue(selectedOwner.id).toLocaleString()} this month`]].map(([icon,val])=>(
+                    {[['📧', selectedOwner.email], ['📱', selectedOwner.phone||'Not set'], ['📍', `${selectedOwner.city||'Not set'}, ${selectedOwner.state||''}`], ['👥', `${getOwnerTenants(selectedOwner.id).length} tenants`], ['💰', `₹${getOwnerRevenue(selectedOwner.id).toLocaleString()} this month`]].map(([icon, val]) => (
                       <div key={icon} style={s.detailRow}><span>{icon}</span><span>{val}</span></div>
                     ))}
                   </div>
-                  {/* Limits in modal */}
                   <div style={{ marginTop:'20px' }}>
                     <div style={{ fontSize:'12px', fontWeight:'700', color:'#64748b', textTransform:'uppercase', marginBottom:'12px' }}>📏 Usage Limits</div>
                     {LIMIT_FIELDS.map(field => {
                       const limits  = getOwnerLimits(selectedOwner);
-                      const usedMap = { maxTenants:getOwnerTenants(selectedOwner.id).length, maxRooms:0, maxReportsPerMonth:selectedOwner.reportsDownloadedThisMonth||0 };
+                      const usedMap = { maxTenants: getOwnerTenants(selectedOwner.id).length, maxRooms: 0, maxPGs: selectedOwner.pgCount||0, maxReportsPerMonth: selectedOwner.reportsDownloadedThisMonth||0 };
                       return (
                         <div key={field.key} style={{ marginBottom:'12px' }}>
                           <div style={{ fontSize:'12px', color:'#64748b', marginBottom:'4px' }}>{field.icon} {field.label}</div>
@@ -585,23 +605,22 @@ function AdminPanel() {
                       );
                     })}
                   </div>
-                  {/* Features in modal */}
                   <div style={{ marginTop:'20px' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' }}>
                       <div style={{ fontSize:'12px', fontWeight:'700', color:'#64748b', textTransform:'uppercase' }}>🎛️ Features</div>
                       <div style={{ display:'flex', gap:'6px' }}>
-                        <button style={{ padding:'4px 10px', borderRadius:'6px', fontSize:'11px', fontWeight:'600', cursor:'pointer', background:'#ecfdf5', color:'#059669', border:'1px solid #bbf7d0' }} onClick={()=>setAllFeatures(selectedOwner.id,true)}>All On</button>
-                        <button style={{ padding:'4px 10px', borderRadius:'6px', fontSize:'11px', fontWeight:'600', cursor:'pointer', background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca' }} onClick={()=>setAllFeatures(selectedOwner.id,false)}>All Off</button>
+                        <button style={{ padding:'4px 10px', borderRadius:'6px', fontSize:'11px', fontWeight:'600', cursor:'pointer', background:'#ecfdf5', color:'#059669', border:'1px solid #bbf7d0' }} onClick={() => setAllFeatures(selectedOwner.id, true)}>All On</button>
+                        <button style={{ padding:'4px 10px', borderRadius:'6px', fontSize:'11px', fontWeight:'600', cursor:'pointer', background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca' }} onClick={() => setAllFeatures(selectedOwner.id, false)}>All Off</button>
                       </div>
                     </div>
                     {FEATURES.map(feature => {
                       const feats     = getOwnerFeatures(selectedOwner);
                       const isOn      = feats[feature.key];
-                      const isLoading = togglingFeature===feature.key+selectedOwner.id;
+                      const isLoading = togglingFeature === feature.key + selectedOwner.id;
                       return (
                         <div key={feature.key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:'10px', marginBottom:'6px', background:isOn?'#f0fdf4':'#fef9f9', border:`1px solid ${isOn?'#bbf7d0':'#fecaca'}` }}>
                           <div style={{ display:'flex', alignItems:'center', gap:'8px' }}><span>{feature.icon}</span><span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{feature.label}</span></div>
-                          <ToggleSwitch isOn={isOn} isLoading={isLoading} onToggle={()=>toggleFeature(selectedOwner.id,feature.key,isOn)}/>
+                          <ToggleSwitch isOn={isOn} isLoading={isLoading} onToggle={() => toggleFeature(selectedOwner.id, feature.key, isOn)}/>
                         </div>
                       );
                     })}
@@ -610,26 +629,32 @@ function AdminPanel() {
                 <div style={s.detailActions}>
                   <div style={s.actionSection}>
                     <div style={s.actionLabel}>📋 Change Plan</div>
-                    <select style={s.actionSelect} value={selectedOwner.plan||'trial'} onChange={e=>updateOwner(selectedOwner.id,{plan:e.target.value})}>
-                      <option value="trial">Trial</option><option value="basic">Basic — ₹499/mo</option>
-                      <option value="standard">Standard — ₹999/mo</option><option value="premium">Premium — ₹1999/mo</option>
+                    {/* ✅ Plan change also updates maxPGs */}
+                    <select style={s.actionSelect} value={selectedOwner.plan||'trial'} onChange={e => updatePlan(selectedOwner.id, e.target.value)}>
+                      <option value="trial">Trial (1 PG)</option>
+                      <option value="starter">Starter (1 PG) — ₹299/mo</option>
+                      <option value="growth">Growth (3 PGs) — ₹599/mo</option>
+                      <option value="pro">Pro (Unlimited) — ₹999/mo</option>
                     </select>
+                    <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'6px' }}>
+                      🏠 Current maxPGs: <strong>{getOwnerLimits(selectedOwner).maxPGs}</strong>
+                    </div>
                   </div>
                   <div style={s.actionSection}>
                     <div style={s.actionLabel}>⏳ Extend Trial</div>
-                    <div style={s.trialExtendRow}>{[7,14,30].map(days=><button key={days} style={s.trialBtn} onClick={()=>extendTrial(selectedOwner,days)}>+{days} days</button>)}</div>
+                    <div style={s.trialExtendRow}>{[7, 14, 30].map(days => <button key={days} style={s.trialBtn} onClick={() => extendTrial(selectedOwner, days)}>+{days} days</button>)}</div>
                     {selectedOwner.trialEnd && <div style={s.trialEndDate}>Ends: {selectedOwner.trialEnd} ({getTrialDaysLeft(selectedOwner)} days left)</div>}
                   </div>
                   <div style={s.actionSection}>
                     <div style={s.actionLabel}>⚡ Account Status</div>
                     <div style={s.statusBtns}>
-                      <button style={s.activateBtn} onClick={()=>updateOwner(selectedOwner.id,{isActive:true})}>✅ Activate</button>
-                      <button style={s.blockBtn}    onClick={()=>updateOwner(selectedOwner.id,{isActive:false})}>🔴 Block</button>
+                      <button style={s.activateBtn} onClick={() => updateOwner(selectedOwner.id, { isActive:true })}>✅ Activate</button>
+                      <button style={s.blockBtn}    onClick={() => updateOwner(selectedOwner.id, { isActive:false })}>🔴 Block</button>
                     </div>
                   </div>
                   <div style={s.actionSection}>
                     <div style={s.actionLabel}>🗑️ Danger Zone</div>
-                    <button style={s.deleteBtnFull} onClick={()=>deleteOwner(selectedOwner)}>🗑️ Delete This Account</button>
+                    <button style={s.deleteBtnFull} onClick={() => deleteOwner(selectedOwner)}>🗑️ Delete This Account</button>
                   </div>
                 </div>
               </div>

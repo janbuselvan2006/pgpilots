@@ -15,7 +15,6 @@ const css = `
     min-height: 100vh;
   }
 
-  /* ── Top bar ── */
   .tn-topbar {
     background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
     padding: 20px 20px 28px;
@@ -42,274 +41,129 @@ const css = `
     -webkit-tap-highlight-color: transparent; flex-shrink: 0;
     transition: transform 0.15s;
   }
-  .tn-add-fab:active { transform: scale(0.92); }
+  .tn-add-fab:active   { transform: scale(0.92); }
   .tn-add-fab:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* ── Stats strip ── */
   .tn-stats {
     display: grid; grid-template-columns: repeat(4,1fr);
     gap: 0; margin: -14px 16px 0;
     background: white; border-radius: 16px; overflow: hidden;
     box-shadow: 0 4px 20px rgba(0,0,0,0.1); position: relative; z-index: 2;
   }
-  .tn-stat {
-    padding: 12px 6px; text-align: center;
-    border-right: 1px solid #f1f5f9;
-  }
+  .tn-stat { padding: 12px 6px; text-align: center; border-right: 1px solid #f1f5f9; }
   .tn-stat:last-child { border-right: none; }
-  .tn-stat-num  { font-size: 17px; font-weight: 800; line-height: 1.1; }
+  .tn-stat-num   { font-size: 17px; font-weight: 800; line-height: 1.1; }
   .tn-stat-label { font-size: 8px; color: #94a3b8; font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
 
-  /* ── Content ── */
   .tn-content { padding: 20px 16px 100px; }
 
-  /* ── Banners ── */
   .tn-banner {
     border-radius: 14px; padding: 12px 16px;
     margin-bottom: 14px; display: flex; align-items: center; gap: 12px;
   }
-  .tn-banner-icon { font-size: 20px; flex-shrink: 0; }
+  .tn-banner-icon  { font-size: 20px; flex-shrink: 0; }
   .tn-banner-title { font-size: 13px; font-weight: 700; }
   .tn-banner-sub   { font-size: 11px; margin-top: 2px; }
 
-  /* ── Search ── */
   .tn-search {
     width: 100%; padding: 13px 16px;
     border: 1.5px solid #e2e8f0; border-radius: 14px;
     font-size: 14px; font-family: inherit;
     background: white; outline: none;
     box-sizing: border-box; margin-bottom: 16px;
-    -webkit-appearance: none;
-    transition: border-color 0.2s;
+    -webkit-appearance: none; transition: border-color 0.2s;
   }
   .tn-search:focus { border-color: #e94560; }
 
-  /* ── Tenant cards ── */
-  .tc {
-    background: white; border-radius: 18px;
-    margin-bottom: 12px; overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-  }
+  .tc { background: white; border-radius: 18px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
   .tc-accent { height: 4px; }
-  .tc-body { padding: 14px; }
-  .tc-header {
-    display: flex; align-items: center;
-    gap: 10px; margin-bottom: 12px;
-  }
+  .tc-body   { padding: 14px; }
+  .tc-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .tc-avatar {
     width: 44px; height: 44px; border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
     color: white; font-weight: 800; font-size: 18px; flex-shrink: 0;
     background: linear-gradient(135deg, #4f46e5, #0891b2);
   }
-  .tc-name  { font-size: 15px; font-weight: 800; color: #1e293b; }
-  .tc-phone { font-size: 12px; color: #94a3b8; margin-top: 2px; }
-  .tc-status-badge {
-    margin-left: auto;
-    font-size: 11px; font-weight: 700;
-    padding: 4px 10px; border-radius: 20px;
-    background: #ecfdf5; color: #059669;
-  }
-  .tc-details {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 8px; margin-bottom: 12px;
-  }
+  .tc-name         { font-size: 15px; font-weight: 800; color: #1e293b; }
+  .tc-phone        { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .tc-status-badge { margin-left: auto; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; background: #ecfdf5; color: #059669; }
+  .tc-details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   .tc-detail-item { display: flex; flex-direction: column; }
-  .tc-detail-key { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
-  .tc-detail-val { font-size: 13px; color: #1e293b; font-weight: 700; margin-top: 2px; }
-  .tc-company {
-    font-size: 12px; color: #64748b;
-    padding: 7px 10px; background: #f8fafc;
-    border-radius: 8px; margin-bottom: 12px;
-  }
-  .tc-footer {
-    display: flex; gap: 8px;
-    padding-top: 12px; border-top: 1px solid #f1f5f9;
-  }
-  .tc-edit-btn {
-    flex: 1; padding: 10px;
-    background: #eef2ff; color: #4f46e5;
-    border: none; border-radius: 10px;
-    font-size: 13px; font-weight: 700;
-    cursor: pointer; font-family: inherit;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .tc-del-btn {
-    flex: 1; padding: 10px;
-    background: #fef2f2; color: #dc2626;
-    border: none; border-radius: 10px;
-    font-size: 13px; font-weight: 700;
-    cursor: pointer; font-family: inherit;
-    -webkit-tap-highlight-color: transparent;
-  }
+  .tc-detail-key  { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+  .tc-detail-val  { font-size: 13px; color: #1e293b; font-weight: 700; margin-top: 2px; }
+  .tc-company { font-size: 12px; color: #64748b; padding: 7px 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 12px; }
+  .tc-footer  { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+  .tc-edit-btn { flex: 1; padding: 10px; background: #eef2ff; color: #4f46e5; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  .tc-del-btn  { flex: 1; padding: 10px; background: #fef2f2; color: #dc2626; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
 
-  /* ── Empty / Loading ── */
-  .tn-empty {
-    text-align: center; padding: 50px 20px;
-    background: white; border-radius: 18px;
-  }
+  .tn-empty       { text-align: center; padding: 50px 20px; background: white; border-radius: 18px; }
   .tn-empty-icon  { font-size: 48px; margin-bottom: 12px; }
   .tn-empty-title { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 6px; }
   .tn-empty-sub   { font-size: 13px; color: #94a3b8; margin: 0 0 24px; }
-  .tn-empty-btn {
-    padding: 13px 28px;
-    background: linear-gradient(135deg, #e94560, #0f3460);
-    color: white; border: none; border-radius: 12px;
-    font-size: 14px; font-weight: 700;
-    cursor: pointer; font-family: inherit;
-  }
-  .tn-loading { text-align: center; padding: 50px; color: #94a3b8; font-size: 14px; }
-  .tn-spinner {
-    width: 30px; height: 30px;
-    border: 3px solid #e2e8f0; border-top-color: #e94560;
-    border-radius: 50%; animation: tnspin 0.7s linear infinite;
-    margin: 0 auto 12px;
-  }
+  .tn-empty-btn   { padding: 13px 28px; background: linear-gradient(135deg, #e94560, #0f3460); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .tn-loading     { text-align: center; padding: 50px; color: #94a3b8; font-size: 14px; }
+  .tn-spinner     { width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top-color: #e94560; border-radius: 50%; animation: tnspin 0.7s linear infinite; margin: 0 auto 12px; }
   @keyframes tnspin { to { transform: rotate(360deg); } }
 
-  /* ── Bottom sheet ── */
-  .bso {
-    position: fixed; inset: 0;
-    background: rgba(15,20,40,0.55); z-index: 100;
-    backdrop-filter: blur(2px);
-    animation: bsFade 0.2s ease;
-  }
+  .tn-no-pg { text-align: center; padding: 60px 20px; background: white; border-radius: 20px; margin: 20px 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+
+  .bso { position: fixed; inset: 0; background: rgba(15,20,40,0.55); z-index: 100; backdrop-filter: blur(2px); animation: bsFade 0.2s ease; }
   @keyframes bsFade { from { opacity:0; } to { opacity:1; } }
   .bs {
     position: fixed; bottom: 0; left: 0; right: 0;
     background: white; border-radius: 24px 24px 0 0;
     z-index: 101; max-height: 94dvh; overflow-y: auto;
     animation: bsUp 0.3s cubic-bezier(0.32,0.72,0,1);
-    padding-bottom: env(safe-area-inset-bottom, 24px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
   }
   @keyframes bsUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
   @media (min-width: 640px) {
-    .bs {
-      left: 50%; right: auto; width: 560px;
-      border-radius: 24px; bottom: 50%;
-      transform: translate(-50%, 50%);
-      animation: bsZoom 0.25s cubic-bezier(0.32,0.72,0,1);
-      max-height: 90vh;
-    }
-    @keyframes bsZoom {
-      from { opacity:0; transform: translate(-50%,50%) scale(0.95); }
-      to   { opacity:1; transform: translate(-50%,50%) scale(1); }
-    }
-    .tn-stats  { margin: -14px 24px 0; }
+    .bs { left: 50%; right: auto; width: 560px; border-radius: 24px; bottom: 50%; transform: translate(-50%, 50%); animation: bsZoom 0.25s cubic-bezier(0.32,0.72,0,1); max-height: 90vh; }
+    @keyframes bsZoom { from { opacity:0; transform: translate(-50%,50%) scale(0.95); } to { opacity:1; transform: translate(-50%,50%) scale(1); } }
+    .tn-stats   { margin: -14px 24px 0; }
     .tn-content { padding: 24px 24px 40px; }
     .tc-details { grid-template-columns: repeat(3,1fr); }
   }
-  .bs-handle {
-    width: 40px; height: 4px; background: #e2e8f0;
-    border-radius: 99px; margin: 12px auto 0;
-  }
-  .bs-header {
-    display: flex; justify-content: space-between;
-    align-items: center; padding: 14px 20px 8px;
-    position: sticky; top: 0; background: white; z-index: 1;
-    border-bottom: 1px solid #f1f5f9;
-  }
-  .bs-title { font-size: 17px; font-weight: 800; color: #1a1a2e; margin: 0; }
-  .bs-close {
-    width: 32px; height: 32px; border-radius: 50%;
-    background: #f1f5f9; border: none; font-size: 14px; color: #64748b;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    font-family: inherit; -webkit-tap-highlight-color: transparent;
-  }
-  .bs-body { padding: 16px 20px 28px; }
+  .bs-handle { width: 40px; height: 4px; background: #e2e8f0; border-radius: 99px; margin: 12px auto 0; }
+  .bs-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px 8px; position: sticky; top: 0; background: white; z-index: 1; border-bottom: 1px solid #f1f5f9; }
+  .bs-title  { font-size: 17px; font-weight: 800; color: #1a1a2e; margin: 0; }
+  .bs-close  { width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; border: none; font-size: 14px; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  .bs-body   { padding: 16px 20px 96px; }
 
-  /* ── Form section ── */
-  .fs-section { margin-bottom: 22px; }
-  .fs-section-title {
-    font-size: 11px; font-weight: 800; color: #4f46e5;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    margin-bottom: 12px; padding-bottom: 8px;
-    border-bottom: 1px solid #eef2ff;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .fs-field { margin-bottom: 12px; }
-  .fs-label {
-    display: block; font-size: 11px; font-weight: 700;
-    color: #64748b; text-transform: uppercase;
-    letter-spacing: 0.4px; margin-bottom: 6px;
-  }
-  .fs-input {
-    width: 100%; padding: 13px 14px;
-    border: 1.5px solid #e2e8f0; border-radius: 12px;
-    font-size: 15px; font-family: inherit;
-    color: #1a1a2e; background: #fafbff;
-    outline: none; box-sizing: border-box;
-    -webkit-appearance: none;
-    transition: border-color 0.2s;
-  }
+  .fs-section       { margin-bottom: 22px; }
+  .fs-section-title { font-size: 11px; font-weight: 800; color: #4f46e5; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eef2ff; display: flex; align-items: center; gap: 6px; }
+  .fs-field  { margin-bottom: 12px; }
+  .fs-label  { display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+  .fs-input  { width: 100%; padding: 13px 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-size: 15px; font-family: inherit; color: #1a1a2e; background: #fafbff; outline: none; box-sizing: border-box; -webkit-appearance: none; transition: border-color 0.2s; }
   .fs-input:focus { border-color: #e94560; background: white; }
-  .fs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .fs-no-bed {
-    padding: 13px 14px; border-radius: 12px;
-    font-size: 13px; font-weight: 600;
-    border: 1.5px solid #fde68a; background: #fffbeb; color: #d97706;
-  }
+  .fs-row    { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .fs-no-bed { padding: 13px 14px; border-radius: 12px; font-size: 13px; font-weight: 600; border: 1.5px solid #fde68a; background: #fffbeb; color: #d97706; }
   .fs-no-bed.error { border-color: #fecaca; background: #fef2f2; color: #dc2626; }
 
-  /* Room preview card */
-  .fs-room-preview {
-    background: #f0fdf4; border: 1px solid #bbf7d0;
-    border-radius: 12px; padding: 12px; margin-top: 10px;
-  }
-  .fs-rp-title { font-size: 10px; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-  .fs-rp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .fs-rp-chip {
-    font-size: 11px; font-weight: 600;
-    padding: 4px 10px; border-radius: 20px;
-    background: white; color: #166534;
-  }
+  .fs-room-preview { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 12px; margin-top: 10px; }
+  .fs-rp-title     { font-size: 10px; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .fs-rp-chips     { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fs-rp-chip      { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; background: white; color: #166534; }
 
-  /* Bed selector grid */
   .fs-bed-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-  .fs-bed-btn {
-    width: 44px; height: 44px; border-radius: 10px;
-    border: 2px solid #e2e8f0; background: #f8fafc;
-    font-size: 14px; font-weight: 800; color: #475569;
-    cursor: pointer; font-family: inherit;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s; -webkit-tap-highlight-color: transparent;
-  }
-  .fs-bed-btn.vacant { border-color: #059669; color: #059669; background: #f0fdf4; }
+  .fs-bed-btn  { width: 44px; height: 44px; border-radius: 10px; border: 2px solid #e2e8f0; background: #f8fafc; font-size: 14px; font-weight: 800; color: #475569; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
+  .fs-bed-btn.vacant   { border-color: #059669; color: #059669; background: #f0fdf4; }
   .fs-bed-btn.selected { background: #059669; color: white; border-color: #059669; }
   .fs-bed-btn.occupied { border-color: #e2e8f0; color: #cbd5e0; background: #f8fafc; cursor: not-allowed; }
 
-  /* ID type segment */
-  .fs-seg { display: flex; background: #f1f5f9; border-radius: 10px; padding: 3px; gap: 3px; flex-wrap: wrap; }
-  .fs-seg-btn {
-    flex: 1; min-width: 60px; padding: 8px 4px;
-    border: none; border-radius: 8px;
-    font-size: 11px; font-weight: 700;
-    cursor: pointer; background: transparent;
-    color: #94a3b8; font-family: inherit;
-    transition: all 0.2s; -webkit-tap-highlight-color: transparent;
-    white-space: nowrap;
-  }
+  .fs-seg     { display: flex; background: #f1f5f9; border-radius: 10px; padding: 3px; gap: 3px; flex-wrap: wrap; }
+  .fs-seg-btn { flex: 1; min-width: 60px; padding: 8px 4px; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: #94a3b8; font-family: inherit; transition: all 0.2s; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
   .fs-seg-btn.active { background: white; color: #4f46e5; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
 
-  /* Save button */
-  .fs-save-btn {
-    width: 100%; padding: 15px;
-    background: linear-gradient(135deg, #e94560, #0f3460);
-    color: white; border: none; border-radius: 14px;
-    font-size: 15px; font-weight: 700; font-family: inherit;
-    cursor: pointer; margin-top: 6px;
-    box-shadow: 0 4px 14px rgba(233,69,96,0.3);
-    -webkit-tap-highlight-color: transparent;
-    transition: opacity 0.2s, transform 0.1s;
-  }
-  .fs-save-btn:active { transform: scale(0.98); opacity: 0.9; }
+  .fs-save-btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #e94560, #0f3460); color: white; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 6px; box-shadow: 0 4px 14px rgba(233,69,96,0.3); -webkit-tap-highlight-color: transparent; transition: opacity 0.2s, transform 0.1s; }
+  .fs-save-btn:active   { transform: scale(0.98); opacity: 0.9; }
   .fs-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-  /* Delete confirm */
-  .del-sheet { padding: 20px 20px 32px; text-align: center; }
-  .del-icon  { font-size: 44px; margin-bottom: 12px; }
-  .del-title { font-size: 17px; font-weight: 800; color: #1e293b; margin: 0 0 6px; }
-  .del-sub   { font-size: 13px; color: #94a3b8; margin: 0 0 24px; line-height: 1.6; }
+  .del-sheet   { padding: 20px 20px 32px; text-align: center; }
+  .del-icon    { font-size: 44px; margin-bottom: 12px; }
+  .del-title   { font-size: 17px; font-weight: 800; color: #1e293b; margin: 0 0 6px; }
+  .del-sub     { font-size: 13px; color: #94a3b8; margin: 0 0 24px; line-height: 1.6; }
   .del-btn-row { display: flex; gap: 10px; }
   .del-cancel  { flex:1; padding:13px; background:#f1f5f9; color:#64748b; border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
   .del-confirm { flex:1; padding:13px; background:#dc2626; color:white; border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
@@ -323,15 +177,16 @@ const css = `
   }
 `;
 
-export default function Tenants() {
-  const [tenants, setTenants]         = useState([]);
-  const [rooms, setRooms]             = useState([]);
-  const [showForm, setShowForm]       = useState(false);
+// ✅ Now accepts pgId prop from Dashboard
+export default function Tenants({ pgId }) {
+  const [tenants, setTenants]           = useState([]);
+  const [rooms, setRooms]               = useState([]);
+  const [showForm, setShowForm]         = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [loading, setLoading]         = useState(true);
-  const [saving, setSaving]           = useState(false);
-  const [search, setSearch]           = useState('');
-  const [editId, setEditId]           = useState(null);
+  const [loading, setLoading]           = useState(true);
+  const [saving, setSaving]             = useState(false);
+  const [search, setSearch]             = useState('');
+  const [editId, setEditId]             = useState(null);
   const [form, setForm] = useState({
     name:'', phone:'', email:'', address:'', company:'',
     roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
@@ -343,41 +198,47 @@ export default function Tenants() {
   const { limits } = useLimitCheck();
 
   const fetchData = async () => {
+    // ✅ Guard: need both user and pgId
+    if (!user || !pgId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const tSnap = await getDocs(query(collection(db,'tenants'), where('ownerId','==',user.uid)));
-      setTenants(tSnap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.status!=='deleted'));
-      const rSnap = await getDocs(query(collection(db,'rooms'), where('ownerId','==',user.uid)));
-      setRooms(rSnap.docs.map(d=>({id:d.id,...d.data()})));
-    } catch(e) { console.error(e); }
+      // ✅ Query by pgId instead of ownerId
+      const tSnap = await getDocs(query(collection(db, 'tenants'), where('pgId', '==', pgId)));
+      setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted'));
+      const rSnap = await getDocs(query(collection(db, 'rooms'), where('pgId', '==', pgId)));
+      setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  // ✅ Re-fetch whenever pgId changes (user switches PG)
+  useEffect(() => { fetchData(); }, [pgId]);
 
   const tenantCount = tenants.length;
   const maxTenants  = limits?.maxTenants ?? 50;
-  const tenantPct   = maxTenants > 0 ? (tenantCount/maxTenants)*100 : 0;
+  const tenantPct   = maxTenants > 0 ? (tenantCount / maxTenants) * 100 : 0;
   const isNearLimit = tenantPct >= 90 && tenantPct < 100;
   const isAtLimit   = tenantCount >= maxTenants;
 
   const getVacantBeds = (roomNumber) => {
     if (!roomNumber) return [];
-    const room = rooms.find(r=>r.roomNumber===roomNumber);
+    const room = rooms.find(r => r.roomNumber === roomNumber);
     if (!room) return [];
     const occupied = tenants
-      .filter(t=>t.roomNumber===roomNumber && t.id!==editId)
-      .map(t=>parseInt(t.bedNumber)).filter(n=>!isNaN(n));
+      .filter(t => t.roomNumber === roomNumber && t.id !== editId)
+      .map(t => parseInt(t.bedNumber)).filter(n => !isNaN(n));
     const all = [];
-    for (let i=1; i<=room.totalBeds; i++) all.push({ num: i, occupied: occupied.includes(i) });
+    for (let i = 1; i <= room.totalBeds; i++) all.push({ num: i, occupied: occupied.includes(i) });
     return all;
   };
 
   const resetForm = () => {
-    setForm({ name:'', phone:'', email:'', address:'', company:'',
+    setForm({
+      name:'', phone:'', email:'', address:'', company:'',
       roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
       checkIn:'', idType:'Aadhaar', idNumber:'',
-      emergencyContact:'', emergencyPhone:'' });
+      emergencyContact:'', emergencyPhone:'',
+    });
     setEditId(null);
     setShowForm(false);
   };
@@ -398,53 +259,85 @@ export default function Tenants() {
 
   const handleSave = async () => {
     if (!editId && isAtLimit) return alert(`🚫 Tenant limit reached! (${tenantCount}/${maxTenants})`);
-    if (!form.name||!form.phone||!form.roomNumber) return alert('Please fill Name, Phone and Room Number!');
+    if (!form.name || !form.phone || !form.roomNumber) return alert('Please fill Name, Phone and Room Number!');
     if (!form.bedNumber) return alert('Please select a Bed Number!');
+    if (!pgId) return alert('No PG selected!');
     setSaving(true);
     try {
-      const data = { ...form, monthlyRent: parseInt(form.monthlyRent)||0, deposit: parseInt(form.deposit)||0 };
+      const data = {
+        ...form,
+        monthlyRent: parseInt(form.monthlyRent) || 0,
+        deposit:     parseInt(form.deposit)     || 0,
+      };
       if (editId) {
-        const old = tenants.find(t=>t.id===editId);
+        const old = tenants.find(t => t.id === editId);
         if (old && old.roomNumber !== form.roomNumber) {
-          const oldRoom = rooms.find(r=>r.roomNumber===old.roomNumber);
-          if (oldRoom) await updateDoc(doc(db,'rooms',oldRoom.id), { occupiedBeds: Math.max(0,(oldRoom.occupiedBeds||0)-1) });
-          const newRoom = rooms.find(r=>r.roomNumber===form.roomNumber);
-          if (newRoom) await updateDoc(doc(db,'rooms',newRoom.id), { occupiedBeds: (newRoom.occupiedBeds||0)+1 });
+          const oldRoom = rooms.find(r => r.roomNumber === old.roomNumber);
+          if (oldRoom) await updateDoc(doc(db, 'rooms', oldRoom.id), { occupiedBeds: Math.max(0, (oldRoom.occupiedBeds || 0) - 1) });
+          const newRoom = rooms.find(r => r.roomNumber === form.roomNumber);
+          if (newRoom) await updateDoc(doc(db, 'rooms', newRoom.id), { occupiedBeds: (newRoom.occupiedBeds || 0) + 1 });
         }
-        await updateDoc(doc(db,'tenants',editId), data);
+        await updateDoc(doc(db, 'tenants', editId), data);
       } else {
-        await addDoc(collection(db,'tenants'), { ...data, ownerId:user.uid, status:'Active', createdAt:new Date() });
-        const room = rooms.find(r=>r.roomNumber===form.roomNumber);
-        if (room) await updateDoc(doc(db,'rooms',room.id), { occupiedBeds:(room.occupiedBeds||0)+1 });
+        // ✅ Save with both ownerId (backward compat) and pgId (multi-PG)
+        await addDoc(collection(db, 'tenants'), {
+          ...data,
+          ownerId:   user.uid,
+          pgId:      pgId,
+          status:    'Active',
+          createdAt: new Date(),
+        });
+        const room = rooms.find(r => r.roomNumber === form.roomNumber);
+        if (room) await updateDoc(doc(db, 'rooms', room.id), { occupiedBeds: (room.occupiedBeds || 0) + 1 });
       }
       resetForm();
       fetchData();
-    } catch(e) { console.error(e); alert('Something went wrong!'); }
+    } catch (e) { console.error(e); alert('Something went wrong!'); }
     setSaving(false);
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await updateDoc(doc(db,'tenants',deleteTarget.id), { status:'deleted', deletedAt: new Date().toISOString() });
-      const rSnap = await getDocs(query(collection(db,'rooms'),
-        where('ownerId','==',user.uid), where('roomNumber','==',deleteTarget.roomNumber)));
+      await updateDoc(doc(db, 'tenants', deleteTarget.id), {
+        status: 'deleted', deletedAt: new Date().toISOString(),
+      });
+      // ✅ Query by pgId to find the right room
+      const rSnap = await getDocs(query(collection(db, 'rooms'),
+        where('pgId', '==', pgId),
+        where('roomNumber', '==', deleteTarget.roomNumber)
+      ));
       if (!rSnap.empty) {
         const rd = rSnap.docs[0];
-        await updateDoc(doc(db,'rooms',rd.id), { occupiedBeds: Math.max(0,(rd.data().occupiedBeds||0)-1) });
+        await updateDoc(doc(db, 'rooms', rd.id), { occupiedBeds: Math.max(0, (rd.data().occupiedBeds || 0) - 1) });
       }
       setDeleteTarget(null);
       fetchData();
-    } catch(e) { console.error(e); }
+    } catch (e) { console.error(e); }
   };
 
-  const filtered = tenants.filter(t=>
+  const filtered = tenants.filter(t =>
     t.name?.toLowerCase().includes(search.toLowerCase()) ||
-    t.phone?.includes(search) || t.roomNumber?.includes(search)
+    t.phone?.includes(search) ||
+    t.roomNumber?.includes(search)
   );
 
-  const beds = getVacantBeds(form.roomNumber);
-  const selectedRoom = rooms.find(r=>r.roomNumber===form.roomNumber);
+  const beds         = getVacantBeds(form.roomNumber);
+  const selectedRoom = rooms.find(r => r.roomNumber === form.roomNumber);
+
+  // ✅ Show warning if no PG selected
+  if (!pgId) {
+    return (
+      <>
+        <style>{css}</style>
+        <div className="tn-no-pg">
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏠</div>
+          <div style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>No PG Selected</div>
+          <div style={{ fontSize: '13px', color: '#94a3b8' }}>Please select a PG from the dashboard.</div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -469,14 +362,13 @@ export default function Tenants() {
         {/* Stats strip */}
         <div className="tn-stats">
           {[
-            { label:'Tenants', value:`${tenantCount}/${maxTenants}`,
-              color: isAtLimit?'#dc2626': isNearLimit?'#d97706':'#4f46e5' },
-            { label:'Active',   value: tenants.filter(t=>t.status==='Active').length, color:'#059669' },
-            { label:'Deposits', value:`₹${(tenants.reduce((a,t)=>a+(t.deposit||0),0)/1000).toFixed(0)}k`, color:'#d97706' },
-            { label:'Revenue',  value:`₹${(tenants.reduce((a,t)=>a+(t.monthlyRent||0),0)/1000).toFixed(0)}k`, color:'#0891b2' },
-          ].map(({label,value,color})=>(
+            { label:'Tenants', value:`${tenantCount}/${maxTenants}`, color: isAtLimit ? '#dc2626' : isNearLimit ? '#d97706' : '#4f46e5' },
+            { label:'Active',   value: tenants.filter(t => t.status === 'Active').length, color:'#059669' },
+            { label:'Deposits', value:`₹${(tenants.reduce((a,t) => a+(t.deposit||0), 0)/1000).toFixed(0)}k`, color:'#d97706' },
+            { label:'Revenue',  value:`₹${(tenants.reduce((a,t) => a+(t.monthlyRent||0), 0)/1000).toFixed(0)}k`, color:'#0891b2' },
+          ].map(({ label, value, color }) => (
             <div key={label} className="tn-stat">
-              <div className="tn-stat-num" style={{color}}>{value}</div>
+              <div className="tn-stat-num" style={{ color }}>{value}</div>
               <div className="tn-stat-label">{label}</div>
             </div>
           ))}
@@ -485,54 +377,51 @@ export default function Tenants() {
         {/* Content */}
         <div className="tn-content">
 
-          {/* Limit banners */}
           {isAtLimit && (
-            <div className="tn-banner" style={{background:'#fef2f2',border:'1.5px solid #fecaca'}}>
+            <div className="tn-banner" style={{ background:'#fef2f2', border:'1.5px solid #fecaca' }}>
               <span className="tn-banner-icon">🚫</span>
               <div>
-                <div className="tn-banner-title" style={{color:'#dc2626'}}>Tenant Limit Reached ({tenantCount}/{maxTenants})</div>
-                <div className="tn-banner-sub" style={{color:'#ef4444'}}>Contact your admin to increase the limit.</div>
+                <div className="tn-banner-title" style={{ color:'#dc2626' }}>Tenant Limit Reached ({tenantCount}/{maxTenants})</div>
+                <div className="tn-banner-sub"   style={{ color:'#ef4444' }}>Contact your admin to increase the limit.</div>
               </div>
             </div>
           )}
           {isNearLimit && (
-            <div className="tn-banner" style={{background:'#fffbeb',border:'1.5px solid #fde68a'}}>
+            <div className="tn-banner" style={{ background:'#fffbeb', border:'1.5px solid #fde68a' }}>
               <span className="tn-banner-icon">⚠️</span>
               <div>
-                <div className="tn-banner-title" style={{color:'#d97706'}}>Approaching Limit ({tenantCount}/{maxTenants})</div>
-                <div className="tn-banner-sub" style={{color:'#f59e0b'}}>Contact your admin soon to increase your limit.</div>
+                <div className="tn-banner-title" style={{ color:'#d97706' }}>Approaching Limit ({tenantCount}/{maxTenants})</div>
+                <div className="tn-banner-sub"   style={{ color:'#f59e0b' }}>Contact your admin soon to increase your limit.</div>
               </div>
             </div>
           )}
 
-          {/* Search */}
           <input className="tn-search" type="text"
             placeholder="🔍 Search by name, phone or room…"
-            value={search} onChange={e=>setSearch(e.target.value)} />
+            value={search} onChange={e => setSearch(e.target.value)} />
 
-          {/* Tenant list */}
           {loading ? (
-            <div className="tn-loading"><div className="tn-spinner"/>Loading tenants…</div>
-          ) : filtered.length===0 ? (
+            <div className="tn-loading"><div className="tn-spinner" />Loading tenants…</div>
+          ) : filtered.length === 0 ? (
             <div className="tn-empty">
               <div className="tn-empty-icon">👥</div>
               <p className="tn-empty-title">{search ? 'No tenants found' : 'No tenants yet'}</p>
               <p className="tn-empty-sub">{search ? 'Try a different search' : 'Add your first tenant to get started'}</p>
               {!search && !isAtLimit && (
-                <button className="tn-empty-btn" onClick={()=>{ resetForm(); setShowForm(true); }}>
+                <button className="tn-empty-btn" onClick={() => { resetForm(); setShowForm(true); }}>
                   ➕ Add First Tenant
                 </button>
               )}
             </div>
           ) : (
             <div className="tn-tenants-grid">
-              {filtered.map(tenant=>(
+              {filtered.map(tenant => (
                 <div key={tenant.id} className="tc">
-                  <div className="tc-accent" style={{background:'linear-gradient(90deg,#4f46e5,#0891b2)'}} />
+                  <div className="tc-accent" style={{ background:'linear-gradient(90deg,#4f46e5,#0891b2)' }} />
                   <div className="tc-body">
                     <div className="tc-header">
                       <div className="tc-avatar">{tenant.name?.charAt(0).toUpperCase()}</div>
-                      <div style={{flex:1}}>
+                      <div style={{ flex:1 }}>
                         <div className="tc-name">{tenant.name}</div>
                         <div className="tc-phone">📞 {tenant.phone}</div>
                       </div>
@@ -542,12 +431,12 @@ export default function Tenants() {
                     <div className="tc-details">
                       {[
                         ['🛏️ Room',    `Room ${tenant.roomNumber}`],
-                        ['🪑 Bed',     `Bed ${tenant.bedNumber||'N/A'}`],
+                        ['🪑 Bed',     `Bed ${tenant.bedNumber || 'N/A'}`],
                         ['💰 Rent',    `₹${(tenant.monthlyRent||0).toLocaleString()}/mo`],
                         ['💵 Deposit', `₹${(tenant.deposit||0).toLocaleString()}`],
-                        ['📅 Check-in', tenant.checkIn||'N/A'],
+                        ['📅 Check-in', tenant.checkIn || 'N/A'],
                         ['🪪 ID',      tenant.idType],
-                      ].map(([k,v])=>(
+                      ].map(([k, v]) => (
                         <div key={k} className="tc-detail-item">
                           <span className="tc-detail-key">{k}</span>
                           <span className="tc-detail-val">{v}</span>
@@ -558,8 +447,8 @@ export default function Tenants() {
                     {tenant.company && <div className="tc-company">🏢 {tenant.company}</div>}
 
                     <div className="tc-footer">
-                      <button className="tc-edit-btn" onClick={()=>handleEdit(tenant)}>✏️ Edit</button>
-                      <button className="tc-del-btn" onClick={()=>setDeleteTarget(tenant)}>🗑️ Remove</button>
+                      <button className="tc-edit-btn" onClick={() => handleEdit(tenant)}>✏️ Edit</button>
+                      <button className="tc-del-btn"  onClick={() => setDeleteTarget(tenant)}>🗑️ Remove</button>
                     </div>
                   </div>
                 </div>
@@ -568,7 +457,7 @@ export default function Tenants() {
           )}
         </div>
 
-        {/* ── Add / Edit Tenant Sheet ── */}
+        {/* Add / Edit Sheet */}
         {showForm && (
           <>
             <div className="bso" onClick={resetForm} />
@@ -580,53 +469,51 @@ export default function Tenants() {
               </div>
               <div className="bs-body">
 
-                {/* Personal */}
                 <div className="fs-section">
                   <div className="fs-section-title">👤 Personal Details</div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">Full Name *</label>
                       <input className="fs-input" type="text" placeholder="John Doe"
-                        value={form.name} onChange={e=>setForm({...form,name:e.target.value})} />
+                        value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Phone *</label>
                       <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
-                        value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} />
+                        value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">Email</label>
                       <input className="fs-input" type="email" placeholder="john@email.com"
-                        value={form.email} onChange={e=>setForm({...form,email:e.target.value})} />
+                        value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Company / College</label>
                       <input className="fs-input" type="text" placeholder="ABC Company"
-                        value={form.company} onChange={e=>setForm({...form,company:e.target.value})} />
+                        value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-field">
                     <label className="fs-label">Address</label>
                     <input className="fs-input" type="text" placeholder="Home address"
-                      value={form.address} onChange={e=>setForm({...form,address:e.target.value})} />
+                      value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
                   </div>
                 </div>
 
-                {/* Room */}
                 <div className="fs-section">
                   <div className="fs-section-title">🛏️ Room Details</div>
                   <div className="fs-field">
                     <label className="fs-label">Room Number *</label>
                     <select className="fs-input" value={form.roomNumber}
-                      onChange={e=>setForm({...form,roomNumber:e.target.value,bedNumber:''})}>
+                      onChange={e => setForm({ ...form, roomNumber: e.target.value, bedNumber: '' })}>
                       <option value="">Select Room</option>
-                      {rooms.map(r=>{
-                        const vacant = r.totalBeds-(r.occupiedBeds||0);
+                      {rooms.map(r => {
+                        const vacant = r.totalBeds - (r.occupiedBeds || 0);
                         return (
                           <option key={r.id} value={r.roomNumber}
-                            disabled={vacant===0 && r.roomNumber!==form.roomNumber}>
+                            disabled={vacant === 0 && r.roomNumber !== form.roomNumber}>
                             Room {r.roomNumber} ({r.roomType}) — {vacant} vacant
                           </option>
                         );
@@ -634,19 +521,18 @@ export default function Tenants() {
                     </select>
                   </div>
 
-                  {/* Bed selector */}
                   {form.roomNumber && (
                     <div className="fs-field">
                       <label className="fs-label">Bed Number *</label>
-                      {beds.length===0 ? (
+                      {beds.length === 0 ? (
                         <div className="fs-no-bed error">❌ No vacant beds in this room!</div>
                       ) : (
                         <div className="fs-bed-grid">
-                          {beds.map(({num, occupied})=>(
+                          {beds.map(({ num, occupied }) => (
                             <button key={num}
-                              className={`fs-bed-btn ${occupied?'occupied':form.bedNumber==num?'selected':'vacant'}`}
+                              className={`fs-bed-btn ${occupied ? 'occupied' : form.bedNumber == num ? 'selected' : 'vacant'}`}
                               disabled={occupied}
-                              onClick={()=>!occupied&&setForm({...form,bedNumber:num.toString()})}>
+                              onClick={() => !occupied && setForm({ ...form, bedNumber: num.toString() })}>
                               {num}
                             </button>
                           ))}
@@ -655,80 +541,75 @@ export default function Tenants() {
                     </div>
                   )}
 
-                  {!form.roomNumber && (
-                    <div className="fs-no-bed">← Select a room first</div>
-                  )}
+                  {!form.roomNumber && <div className="fs-no-bed">← Select a room first</div>}
 
-                  {/* Room preview */}
                   {selectedRoom && (
                     <div className="fs-room-preview">
                       <div className="fs-rp-title">📋 Room Info</div>
                       <div className="fs-rp-chips">
                         <span className="fs-rp-chip">🛏️ {selectedRoom.totalBeds} beds</span>
-                        <span className="fs-rp-chip" style={{color:'#059669'}}>🟢 {selectedRoom.totalBeds-(selectedRoom.occupiedBeds||0)} vacant</span>
-                        <span className="fs-rp-chip" style={{color:'#dc2626'}}>🔴 {selectedRoom.occupiedBeds||0} occupied</span>
+                        <span className="fs-rp-chip" style={{ color:'#059669' }}>🟢 {selectedRoom.totalBeds-(selectedRoom.occupiedBeds||0)} vacant</span>
+                        <span className="fs-rp-chip" style={{ color:'#dc2626' }}>🔴 {selectedRoom.occupiedBeds||0} occupied</span>
                         <span className="fs-rp-chip">💰 ₹{selectedRoom.rentPerBed?.toLocaleString()}/bed</span>
                       </div>
                     </div>
                   )}
 
-                  <div className="fs-row" style={{marginTop:'12px'}}>
+                  <div className="fs-row" style={{ marginTop:'12px' }}>
                     <div className="fs-field">
                       <label className="fs-label">Monthly Rent (₹)</label>
                       <input className="fs-input" type="number" inputMode="numeric" placeholder="5000"
-                        value={form.monthlyRent} onChange={e=>setForm({...form,monthlyRent:e.target.value})} />
+                        value={form.monthlyRent} onChange={e => setForm({ ...form, monthlyRent: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Deposit (₹)</label>
                       <input className="fs-input" type="number" inputMode="numeric" placeholder="10000"
-                        value={form.deposit} onChange={e=>setForm({...form,deposit:e.target.value})} />
+                        value={form.deposit} onChange={e => setForm({ ...form, deposit: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-field">
                     <label className="fs-label">Check-in Date</label>
                     <input className="fs-input" type="date"
-                      value={form.checkIn} onChange={e=>setForm({...form,checkIn:e.target.value})} />
+                      value={form.checkIn} onChange={e => setForm({ ...form, checkIn: e.target.value })} />
                   </div>
                 </div>
 
-                {/* ID Proof */}
                 <div className="fs-section">
                   <div className="fs-section-title">🪪 ID Proof</div>
                   <div className="fs-field">
                     <label className="fs-label">ID Type</label>
                     <div className="fs-seg">
-                      {['Aadhaar','Passport','Driving License','PAN Card'].map(t=>(
-                        <button key={t} className={`fs-seg-btn${form.idType===t?' active':''}`}
-                          onClick={()=>setForm({...form,idType:t})}>{t}</button>
+                      {['Aadhaar', 'Passport', 'Driving License', 'PAN Card'].map(t => (
+                        <button key={t} className={`fs-seg-btn${form.idType === t ? ' active' : ''}`}
+                          onClick={() => setForm({ ...form, idType: t })}>{t}</button>
                       ))}
                     </div>
                   </div>
                   <div className="fs-field">
                     <label className="fs-label">ID Number</label>
                     <input className="fs-input" type="text" placeholder="Enter ID number"
-                      value={form.idNumber} onChange={e=>setForm({...form,idNumber:e.target.value})} />
+                      value={form.idNumber} onChange={e => setForm({ ...form, idNumber: e.target.value })} />
                   </div>
                 </div>
 
-                {/* Emergency */}
                 <div className="fs-section">
                   <div className="fs-section-title">🆘 Emergency Contact</div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">Contact Name</label>
                       <input className="fs-input" type="text" placeholder="Parent / Spouse"
-                        value={form.emergencyContact} onChange={e=>setForm({...form,emergencyContact:e.target.value})} />
+                        value={form.emergencyContact} onChange={e => setForm({ ...form, emergencyContact: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Contact Phone</label>
                       <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
-                        value={form.emergencyPhone} onChange={e=>setForm({...form,emergencyPhone:e.target.value})} />
+                        value={form.emergencyPhone} onChange={e => setForm({ ...form, emergencyPhone: e.target.value })} />
                     </div>
                   </div>
                 </div>
 
                 <button className="fs-save-btn" onClick={handleSave}
-                  disabled={saving||(isAtLimit&&!editId)}>
+                  disabled={saving || (isAtLimit && !editId)}>
                   {saving ? 'Saving…' : editId ? '✏️ Update Tenant' : '💾 Save Tenant'}
                 </button>
 
@@ -737,21 +618,18 @@ export default function Tenants() {
           </>
         )}
 
-        {/* ── Delete Confirm Sheet ── */}
+        {/* Delete Confirm */}
         {deleteTarget && (
           <>
-            <div className="bso" onClick={()=>setDeleteTarget(null)} />
+            <div className="bso" onClick={() => setDeleteTarget(null)} />
             <div className="bs">
               <div className="bs-handle" />
               <div className="del-sheet">
                 <div className="del-icon">🗑️</div>
                 <p className="del-title">Remove {deleteTarget.name}?</p>
-                <p className="del-sub">
-                  They will be removed from active tenants.<br/>
-                  Their rent history will be preserved in Reports.
-                </p>
+                <p className="del-sub">They will be removed from active tenants.<br />Their rent history will be preserved in Reports.</p>
                 <div className="del-btn-row">
-                  <button className="del-cancel" onClick={()=>setDeleteTarget(null)}>Cancel</button>
+                  <button className="del-cancel"  onClick={() => setDeleteTarget(null)}>Cancel</button>
                   <button className="del-confirm" onClick={handleDelete}>Yes, Remove</button>
                 </div>
               </div>
