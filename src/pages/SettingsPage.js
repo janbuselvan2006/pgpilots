@@ -1,15 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from '../firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+
+// Secondary Firebase app — used ONLY to create staff accounts
+// without signing out the current owner
+const firebaseConfig = {
+  apiKey: "AIzaSyDIvLqFM0jMWJtPAMyOkU4HdrYJKsoknTo",
+  authDomain: "new2-42396.firebaseapp.com",
+  projectId: "new2-42396",
+  storageBucket: "new2-42396.firebasestorage.app",
+  messagingSenderId: "186741862906",
+  appId: "1:186741862906:web:8cde0b14daba62f1823443",
+};
+const secondaryApp  = getApps().find(a => a.name === 'secondary') || initializeApp(firebaseConfig, 'secondary');
+const secondaryAuth = getAuth(secondaryApp);
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
   .st-root { font-family:'DM Sans',sans-serif; background:#f0f2f8; min-height:100vh; }
 
-  /* ── Top bar ── */
   .st-topbar {
     background:linear-gradient(135deg,#1a1a2e 0%,#0f3460 100%);
     padding:20px 20px 28px; position:relative; overflow:hidden;
@@ -22,7 +36,6 @@ const css = `
   .st-page-title { font-size:22px; font-weight:800; color:#fff; margin:0 0 3px; }
   .st-page-sub   { font-size:12px; color:rgba(255,255,255,0.5); font-weight:500; }
 
-  /* ── Profile chip in topbar ── */
   .st-profile-chip {
     display:flex; align-items:center; gap:10px;
     background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12);
@@ -46,10 +59,8 @@ const css = `
     white-space:nowrap;
   }
 
-  /* ── Content ── */
   .st-content { padding:16px 16px 100px; }
 
-  /* ── Tab strip ── */
   .st-tabs {
     display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:18px;
     -webkit-overflow-scrolling:touch; scrollbar-width:none;
@@ -64,16 +75,13 @@ const css = `
   }
   .st-tab.active { background:linear-gradient(135deg,#e94560,#0f3460); color:white; border-color:transparent; }
 
-  /* ── Alert banners ── */
   .st-success { background:#f0fdf4; border:1px solid #bbf7d0; color:#059669; padding:12px 16px; border-radius:12px; font-weight:600; margin-bottom:14px; font-size:13px; }
   .st-error   { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; padding:12px 16px; border-radius:12px; font-weight:600; margin-bottom:14px; font-size:13px; }
 
-  /* ── Section card ── */
   .st-card { background:white; border-radius:18px; padding:20px; margin-bottom:14px; box-shadow:0 2px 10px rgba(0,0,0,0.06); }
   .st-card-title { font-size:16px; font-weight:800; color:#1a1a2e; margin:0 0 4px; }
   .st-card-sub   { font-size:12px; color:#94a3b8; margin-bottom:18px; }
 
-  /* ── Form fields ── */
   .st-field { margin-bottom:14px; }
   .st-label { display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px; }
   .st-input {
@@ -85,7 +93,6 @@ const css = `
   .st-input:focus { border-color:#e94560; background:white; }
   .st-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
-  /* Pass wrap */
   .st-pass-wrap { position:relative; }
   .st-pass-input {
     width:100%; padding:13px 48px 13px 14px; border:1.5px solid #e2e8f0; border-radius:12px;
@@ -95,7 +102,6 @@ const css = `
   .st-pass-input:focus { border-color:#e94560; background:white; }
   .st-eye { position:absolute; right:14px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:18px; user-select:none; -webkit-tap-highlight-color:transparent; }
 
-  /* ── Save button ── */
   .st-save-btn {
     width:100%; padding:15px;
     background:linear-gradient(135deg,#e94560,#0f3460);
@@ -109,10 +115,8 @@ const css = `
   .st-save-btn:active { transform:scale(0.98); opacity:0.9; }
   .st-save-btn:disabled { opacity:0.6; cursor:not-allowed; }
 
-  /* ── Email info ── */
   .st-email-info { font-size:12px; color:#94a3b8; padding:10px 14px; background:#f8fafc; border-radius:10px; margin-bottom:14px; }
 
-  /* ── QR upload ── */
   .st-qr-upload {
     border:2px dashed #e2e8f0; border-radius:14px; padding:28px 20px;
     text-align:center; cursor:pointer; background:#fafbff;
@@ -126,12 +130,10 @@ const css = `
   .st-qr-img { width:100px; height:100px; object-fit:contain; border:1px solid #e2e8f0; border-radius:12px; padding:6px; }
   .st-qr-change { padding:10px 16px; background:#f1f5f9; color:#475569; border:none; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; -webkit-tap-highlight-color:transparent; }
 
-  /* ── Password tips ── */
   .st-tips { background:#f8fafc; border-radius:12px; padding:14px; margin-bottom:14px; }
   .st-tip-title { font-size:12px; font-weight:800; color:#475569; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.3px; }
   .st-tip { font-size:13px; color:#64748b; margin-bottom:4px; }
 
-  /* ── Plan cards ── */
   .st-current-plan {
     border-radius:16px; padding:18px; margin-bottom:18px;
     display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;
@@ -155,15 +157,126 @@ const css = `
 
   .st-support { font-size:13px; color:#94a3b8; text-align:center; padding:14px; background:#f8fafc; border-radius:10px; }
 
-  /* ── Loading ── */
   .st-loading { text-align:center; padding:50px; color:#94a3b8; }
   .st-spinner { width:30px; height:30px; border:3px solid #e2e8f0; border-top-color:#e94560; border-radius:50%; animation:stspin 0.7s linear infinite; margin:0 auto 12px; }
   @keyframes stspin { to{transform:rotate(360deg)} }
+
+  /* ── Staff Access styles ── */
+  .st-staff-header {
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;
+  }
+  .st-add-staff-btn {
+    padding:10px 18px;
+    background:linear-gradient(135deg,#e94560,#0f3460);
+    color:white; border:none; border-radius:12px;
+    font-size:13px; font-weight:700; font-family:inherit;
+    cursor:pointer; -webkit-tap-highlight-color:transparent;
+    display:flex; align-items:center; gap:6px;
+  }
+  .st-add-staff-btn:disabled { opacity:0.6; cursor:not-allowed; }
+
+  .st-staff-list { display:flex; flex-direction:column; gap:12px; }
+  .st-staff-item {
+    border:1.5px solid #e2e8f0; border-radius:14px; padding:14px 16px;
+    display:flex; align-items:center; gap:12px; background:#fafbff;
+  }
+  .st-staff-avatar {
+    width:42px; height:42px; border-radius:11px; flex-shrink:0;
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    display:flex; align-items:center; justify-content:center;
+    color:white; font-weight:800; font-size:16px;
+  }
+  .st-staff-info { flex:1; min-width:0; }
+  .st-staff-name { font-size:14px; font-weight:700; color:#1a1a2e; }
+  .st-staff-pg   { font-size:12px; color:#64748b; margin-top:2px; }
+  .st-staff-badge {
+    font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px;
+    display:inline-block; margin-top:4px;
+  }
+  .st-staff-actions { display:flex; gap:8px; flex-shrink:0; }
+  .st-staff-del-btn {
+    padding:8px 12px; background:#fef2f2; color:#dc2626;
+    border:1px solid #fecaca; border-radius:10px;
+    font-size:12px; font-weight:700; cursor:pointer;
+    font-family:inherit; -webkit-tap-highlight-color:transparent;
+  }
+  .st-staff-copy-btn {
+    padding:8px 12px; background:#f0fdf4; color:#059669;
+    border:1px solid #bbf7d0; border-radius:10px;
+    font-size:12px; font-weight:700; cursor:pointer;
+    font-family:inherit; -webkit-tap-highlight-color:transparent;
+  }
+
+  .st-empty-staff {
+    text-align:center; padding:40px 20px;
+    border:2px dashed #e2e8f0; border-radius:16px;
+    color:#94a3b8;
+  }
+  .st-empty-icon { font-size:40px; margin-bottom:10px; }
+  .st-empty-text { font-size:14px; font-weight:600; margin-bottom:4px; color:#64748b; }
+  .st-empty-sub  { font-size:13px; }
+
+  /* Add Staff Modal */
+  .st-modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.5);
+    display:flex; align-items:flex-end; justify-content:center;
+    z-index:1000; padding:0;
+  }
+  @media(min-width:640px){
+    .st-modal-overlay { align-items:center; padding:20px; }
+  }
+  .st-modal {
+    background:white; border-radius:24px 24px 0 0;
+    padding:24px 20px 40px; width:100%; max-width:480px;
+    box-shadow:0 -8px 40px rgba(0,0,0,0.15);
+    animation:slideUp 0.25s ease-out;
+  }
+  @media(min-width:640px){
+    .st-modal { border-radius:24px; padding:28px 24px; }
+  }
+  @keyframes slideUp { from{transform:translateY(60px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+  .st-modal-header {
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;
+  }
+  .st-modal-title { font-size:18px; font-weight:800; color:#1a1a2e; }
+  .st-modal-close {
+    width:32px; height:32px; border-radius:50%; background:#f1f5f9;
+    border:none; cursor:pointer; font-size:16px; display:flex;
+    align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent;
+  }
+  .st-modal-sub { font-size:13px; color:#94a3b8; margin-bottom:20px; }
+
+  /* Credential reveal box */
+  .st-cred-box {
+    background:linear-gradient(135deg,#f0fdf4,#ecfdf5);
+    border:2px solid #bbf7d0; border-radius:16px;
+    padding:20px; margin-bottom:16px;
+  }
+  .st-cred-title { font-size:13px; font-weight:800; color:#059669; margin-bottom:14px; text-align:center; }
+  .st-cred-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .st-cred-label { font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.4px; }
+  .st-cred-value { font-size:14px; font-weight:800; color:#1a1a2e; font-family:monospace; }
+  .st-cred-warn { font-size:12px; color:#d97706; font-weight:600; text-align:center; margin-top:10px; background:#fffbeb; padding:8px 12px; border-radius:8px; }
+
+  .st-pg-select {
+    width:100%; padding:13px 14px; border:1.5px solid #e2e8f0; border-radius:12px;
+    font-size:15px; font-family:inherit; color:#1a1a2e; background:#fafbff;
+    outline:none; box-sizing:border-box; -webkit-appearance:none;
+    transition:border-color 0.2s; cursor:pointer;
+  }
+  .st-pg-select:focus { border-color:#e94560; background:white; }
 
   @media(min-width:640px){
     .st-content { padding:24px 24px 60px; }
   }
 `;
+
+// Generate a random 8-char password
+function generatePassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({length:8}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+}
 
 export default function SettingsPage() {
   const [pgOwner, setPgOwner]   = useState(null);
@@ -175,7 +288,6 @@ export default function SettingsPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingQR, setUploadingQR]       = useState(false);
 
-  // show/hide password toggles
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew]         = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -190,6 +302,15 @@ export default function SettingsPage() {
   const [passwordForm, setPasswordForm] = useState({
     currentPassword:'', newPassword:'', confirmPassword:'',
   });
+
+  // Staff state
+  const [staffList, setStaffList]         = useState([]);
+  const [staffLoading, setStaffLoading]   = useState(false);
+  const [showAddStaff, setShowAddStaff]   = useState(false);
+  const [addingStaff, setAddingStaff]     = useState(false);
+  const [staffForm, setStaffForm]         = useState({ name:'', pgId:'' });
+  const [newCredentials, setNewCredentials] = useState(null); // shown after creation
+  const [pgList, setPgList]               = useState([]);
 
   const user = auth.currentUser;
 
@@ -214,7 +335,27 @@ export default function SettingsPage() {
     setLoading(false);
   };
 
-  useEffect(()=>{ fetchOwner(); },[]);
+  const fetchPGs = async () => {
+    try {
+      const snap = await getDocs(collection(db,'pgOwners',user.uid,'pgs'));
+      setPgList(snap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.error(e); }
+  };
+
+  const fetchStaff = async () => {
+    setStaffLoading(true);
+    try {
+      const snap = await getDocs(collection(db,'pgOwners',user.uid,'staff'));
+      setStaffList(snap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.error(e); }
+    setStaffLoading(false);
+  };
+
+  useEffect(()=>{ fetchOwner(); fetchPGs(); },[]);
+
+  useEffect(()=>{
+    if(activeTab==='staff') fetchStaff();
+  },[activeTab]);
 
   const showOk  = (msg) => { setSuccessMsg(msg); setErrorMsg('');   setTimeout(()=>setSuccessMsg(''),3000); };
   const showErr = (msg) => { setErrorMsg(msg);   setSuccessMsg(''); setTimeout(()=>setErrorMsg(''),4000); };
@@ -296,6 +437,83 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
+  // ── Staff: Create new staff login using PG Code ──
+  const handleAddStaff = async () => {
+    if (!staffForm.name.trim()) return showErr('Enter staff name!');
+    if (!staffForm.pgId)        return showErr('Select a PG!');
+
+    setAddingStaff(true);
+    const password = generatePassword();
+    const pgDoc    = pgList.find(p => p.id === staffForm.pgId);
+    const pgName   = pgDoc?.pgName || pgDoc?.name || 'PG';
+    const pgCode   = pgDoc?.pgCode || '';
+
+    if (!pgCode) {
+      setAddingStaff(false);
+      return showErr('This PG has no PG Code. Please add a PG Code first.');
+    }
+
+    // Email = ANB465@pgpilots.in (pgCode + domain)
+    const email = `${pgCode}@pgpilots.in`;
+
+    try {
+      // ✅ Use secondaryAuth so the owner is NOT signed out
+      const cred     = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      const staffUid = cred.user.uid;
+      await secondaryAuth.signOut();
+
+      // Save staff doc — password stored so owner can view anytime
+      await addDoc(collection(db, 'pgOwners', user.uid, 'staff'), {
+        staffUid,
+        name:     staffForm.name.trim(),
+        email,
+        pgCode,
+        pgId:     staffForm.pgId,
+        pgName,
+        ownerId:  user.uid,
+        password, // ✅ owner can see this anytime
+        isActive: true,
+        createdAt: serverTimestamp(),
+      });
+
+      // Top-level lookup so staff login can find ownerId + pgId
+      await addDoc(collection(db, 'staffAccounts'), {
+        staffUid,
+        email,
+        pgCode,
+        pgId:      staffForm.pgId,
+        pgName,
+        ownerId:   user.uid,
+        ownerName: pgOwner?.ownerName || pgOwner?.name || '',
+        isActive:  true,
+        createdAt: serverTimestamp(),
+      });
+
+      setNewCredentials({ name: staffForm.name, email, password, pgName, pgCode });
+      setStaffForm({ name:'', pgId:'' });
+      fetchStaff();
+    } catch(err) {
+      console.error(err);
+      if (err.code === 'auth/email-already-in-use')
+        showErr(`${email} already has a staff account!`);
+      else showErr('Failed to create staff account! ' + err.message);
+    }
+    setAddingStaff(false);
+  };
+
+  const handleDeleteStaff = async (staffId, staffName) => {
+    if (!window.confirm(`Remove ${staffName} from staff?`)) return;
+    try {
+      await deleteDoc(doc(db,'pgOwners',user.uid,'staff',staffId));
+      setStaffList(prev=>prev.filter(s=>s.id!==staffId));
+      showOk(`✅ ${staffName} removed from staff.`);
+    } catch { showErr('Failed to remove staff!'); }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(()=>showOk('✅ Copied to clipboard!'));
+  };
+
   const currentPlan = pgOwner?.plan || 'basic';
   const plan = planDetails[currentPlan] || planDetails.basic;
 
@@ -303,6 +521,7 @@ export default function SettingsPage() {
     {id:'profile',  label:'👤 Profile'},
     {id:'payment',  label:'💳 Payment'},
     {id:'password', label:'🔒 Password'},
+    {id:'staff',    label:'👥 Staff'},
     {id:'plan',     label:'⭐ Plan'},
   ];
 
@@ -311,7 +530,6 @@ export default function SettingsPage() {
       <style>{css}</style>
       <div className="st-root">
 
-        {/* Top bar */}
         <div className="st-topbar">
           <div className="st-topbar-row">
             <div>
@@ -320,7 +538,6 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Profile chip */}
           {pgOwner && (
             <div className="st-profile-chip">
               <div className="st-profile-avatar">
@@ -332,9 +549,16 @@ export default function SettingsPage() {
               <div style={{flex:1, minWidth:0}}>
                 <div className="st-profile-name">{pgOwner.ownerName||pgOwner.name}</div>
                 <div className="st-profile-pg">{pgOwner.pgName}</div>
-                <span className="st-plan-tag" style={{background:plan.bg,color:plan.color}}>
-                  ⭐ {plan.name}
-                </span>
+                <div style={{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap',marginTop:'4px'}}>
+                  <span className="st-plan-tag" style={{background:plan.bg,color:plan.color}}>
+                    ⭐ {plan.name}
+                  </span>
+                  {pgOwner.pgCode && (
+                    <span style={{fontSize:'10px',fontWeight:'800',padding:'3px 8px',borderRadius:'20px',background:'rgba(255,255,255,0.15)',color:'white',letterSpacing:'1px'}}>
+                      🔑 {pgOwner.pgCode}
+                    </span>
+                  )}
+                </div>
               </div>
               <button className="st-photo-btn" onClick={()=>photoRef.current.click()}>
                 {uploadingPhoto ? '⏳' : '📷 Photo'}
@@ -346,12 +570,9 @@ export default function SettingsPage() {
         </div>
 
         <div className="st-content">
-
-          {/* Alerts */}
           {successMsg && <div className="st-success">{successMsg}</div>}
           {errorMsg   && <div className="st-error">{errorMsg}</div>}
 
-          {/* Tab strip */}
           <div className="st-tabs">
             {tabs.map(({id,label})=>(
               <button key={id} className={`st-tab${activeTab===id?' active':''}`}
@@ -363,13 +584,11 @@ export default function SettingsPage() {
             <div className="st-loading"><div className="st-spinner"/>Loading…</div>
           ) : (
             <>
-
               {/* ── PROFILE ── */}
               {activeTab==='profile' && (
                 <div className="st-card">
                   <h2 className="st-card-title">👤 Profile Information</h2>
                   <p className="st-card-sub">Update your personal and PG details</p>
-
                   <div className="st-row">
                     <div className="st-field">
                       <label className="st-label">Owner Name *</label>
@@ -384,21 +603,18 @@ export default function SettingsPage() {
                         onChange={e=>setProfileForm(p=>({...p,phone:e.target.value}))} />
                     </div>
                   </div>
-
                   <div className="st-field">
                     <label className="st-label">PG Name *</label>
                     <input className="st-input" type="text" placeholder="Name of your PG"
                       value={profileForm.pgName}
                       onChange={e=>setProfileForm(p=>({...p,pgName:e.target.value}))} />
                   </div>
-
                   <div className="st-field">
                     <label className="st-label">PG Address</label>
                     <input className="st-input" type="text" placeholder="Full address"
                       value={profileForm.address}
                       onChange={e=>setProfileForm(p=>({...p,address:e.target.value}))} />
                   </div>
-
                   <div className="st-row">
                     <div className="st-field">
                       <label className="st-label">City</label>
@@ -413,11 +629,9 @@ export default function SettingsPage() {
                         onChange={e=>setProfileForm(p=>({...p,state:e.target.value}))} />
                     </div>
                   </div>
-
                   <div className="st-email-info">
                     📧 {user?.email || `${pgOwner?.phone}@pgpilots.in`} &nbsp;·&nbsp; Cannot be changed
                   </div>
-
                   <button className="st-save-btn" onClick={handleSaveProfile} disabled={saving}>
                     {saving ? 'Saving…' : '💾 Save Profile'}
                   </button>
@@ -429,7 +643,6 @@ export default function SettingsPage() {
                 <div className="st-card">
                   <h2 className="st-card-title">💳 Payment Details</h2>
                   <p className="st-card-sub">Tenants will use these details to pay rent</p>
-
                   <div className="st-field">
                     <label className="st-label">UPI ID</label>
                     <input className="st-input" type="text"
@@ -437,7 +650,6 @@ export default function SettingsPage() {
                       value={paymentForm.upiId}
                       onChange={e=>setPaymentForm(p=>({...p,upiId:e.target.value}))} />
                   </div>
-
                   <div className="st-field">
                     <label className="st-label">Payment QR Code</label>
                     {paymentForm.qrCodeUrl ? (
@@ -459,7 +671,6 @@ export default function SettingsPage() {
                     <input ref={qrRef} type="file" accept="image/*"
                       style={{display:'none'}} onChange={handleQRUpload} />
                   </div>
-
                   <button className="st-save-btn" onClick={handleSavePayment} disabled={saving}>
                     {saving ? 'Saving…' : '💾 Save Payment Details'}
                   </button>
@@ -471,7 +682,6 @@ export default function SettingsPage() {
                 <div className="st-card">
                   <h2 className="st-card-title">🔒 Change Password</h2>
                   <p className="st-card-sub">Keep your account secure with a strong password</p>
-
                   <div className="st-field">
                     <label className="st-label">Current Password</label>
                     <div className="st-pass-wrap">
@@ -485,7 +695,6 @@ export default function SettingsPage() {
                       </span>
                     </div>
                   </div>
-
                   <div className="st-field">
                     <label className="st-label">New Password</label>
                     <div className="st-pass-wrap">
@@ -498,7 +707,6 @@ export default function SettingsPage() {
                         {showNew?'🙈':'👁️'}
                       </span>
                     </div>
-                    {/* Strength bar */}
                     {passwordForm.newPassword && (
                       <div style={{marginTop:'6px'}}>
                         <div style={{height:'4px',borderRadius:'99px',background:'#e2e8f0',overflow:'hidden'}}>
@@ -514,7 +722,6 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
-
                   <div className="st-field">
                     <label className="st-label">Confirm New Password</label>
                     <div className="st-pass-wrap">
@@ -535,17 +742,99 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
-
                   <div className="st-tips">
                     <div className="st-tip-title">💡 Tips</div>
                     <div className="st-tip">✅ At least 6 characters</div>
                     <div className="st-tip">✅ Mix letters and numbers</div>
                     <div className="st-tip">✅ Don't share with anyone</div>
                   </div>
-
                   <button className="st-save-btn" onClick={handleChangePassword} disabled={saving}>
                     {saving ? 'Changing…' : '🔒 Change Password'}
                   </button>
+                </div>
+              )}
+
+              {/* ── STAFF ACCESS ── */}
+              {activeTab==='staff' && (
+                <div className="st-card">
+                  <div className="st-staff-header">
+                    <div>
+                      <h2 className="st-card-title">👥 Staff Access</h2>
+                      <p className="st-card-sub" style={{marginBottom:0}}>Create logins for your staff members</p>
+                    </div>
+                    <button className="st-add-staff-btn" onClick={()=>{ setShowAddStaff(true); setNewCredentials(null); }}>
+                      ➕ Add Staff
+                    </button>
+                  </div>
+
+                  {staffLoading ? (
+                    <div className="st-loading" style={{padding:'30px'}}>
+                      <div className="st-spinner"/>Loading staff…
+                    </div>
+                  ) : staffList.length === 0 ? (
+                    <div className="st-empty-staff">
+                      <div className="st-empty-icon">👤</div>
+                      <div className="st-empty-text">No staff added yet</div>
+                      <div className="st-empty-sub">Add staff to give them limited access to a PG</div>
+                    </div>
+                  ) : (
+                    <div className="st-staff-list">
+                      {staffList.map(s=>(
+                        <div key={s.id} className="st-staff-item" style={{flexDirection:'column',alignItems:'stretch',gap:'10px'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                            <div className="st-staff-avatar">
+                              {s.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="st-staff-info" style={{flex:1}}>
+                              <div className="st-staff-name">{s.name}</div>
+                              <div className="st-staff-pg">📍 {s.pgName} {s.pgCode && <span style={{marginLeft:'6px',fontWeight:'800',color:'#e94560'}}>· {s.pgCode}</span>}</div>
+                              <span className="st-staff-badge" style={{
+                                background: s.isActive ? '#f0fdf4' : '#fef2f2',
+                                color: s.isActive ? '#059669' : '#dc2626',
+                              }}>
+                                {s.isActive ? '🟢 Active' : '🔴 Inactive'}
+                              </span>
+                            </div>
+                            <button className="st-staff-del-btn"
+                              onClick={()=>handleDeleteStaff(s.id, s.name)}>
+                              🗑️
+                            </button>
+                          </div>
+                          {/* Credentials row */}
+                          <div style={{background:'#f8fafc',borderRadius:'10px',padding:'10px 12px'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
+                              <span style={{fontSize:'11px',fontWeight:'700',color:'#64748b',textTransform:'uppercase',letterSpacing:'0.4px'}}>Login Email</span>
+                              <button className="st-staff-copy-btn" style={{padding:'4px 10px',fontSize:'11px'}}
+                                onClick={()=>copyToClipboard(s.email)}>
+                                📋 Copy
+                              </button>
+                            </div>
+                            <div style={{fontFamily:'monospace',fontSize:'14px',fontWeight:'800',color:'#1a1a2e'}}>{s.email}</div>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'8px',marginBottom:'4px'}}>
+                              <span style={{fontSize:'11px',fontWeight:'700',color:'#64748b',textTransform:'uppercase',letterSpacing:'0.4px'}}>Password</span>
+                              <button className="st-staff-copy-btn" style={{padding:'4px 10px',fontSize:'11px'}}
+                                onClick={()=>copyToClipboard(s.password||'—')}>
+                                📋 Copy
+                              </button>
+                            </div>
+                            <div style={{fontFamily:'monospace',fontSize:'16px',fontWeight:'800',color:'#e94560',letterSpacing:'2px'}}>{s.password||'—'}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Info box */}
+                  <div style={{marginTop:'18px', background:'#f8fafc', borderRadius:'12px', padding:'14px'}}>
+                    <div style={{fontSize:'12px', fontWeight:'800', color:'#475569', marginBottom:'8px', textTransform:'uppercase', letterSpacing:'0.3px'}}>
+                      ℹ️ How Staff Login Works
+                    </div>
+                    <div style={{fontSize:'13px', color:'#64748b', lineHeight:'1.6'}}>
+                      Staff login at <strong>/staff-login</strong> with their email and password.<br/>
+                      They can only see the PG assigned to them.<br/>
+                      You can remove staff access anytime.
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -554,8 +843,6 @@ export default function SettingsPage() {
                 <div className="st-card">
                   <h2 className="st-card-title">⭐ Plan &amp; Subscription</h2>
                   <p className="st-card-sub">Your current plan and available upgrades</p>
-
-                  {/* Current plan highlight */}
                   <div className="st-current-plan"
                     style={{background:plan.bg, border:`2px solid ${plan.color}`}}>
                     <div>
@@ -569,8 +856,6 @@ export default function SettingsPage() {
                       ))}
                     </div>
                   </div>
-
-                  {/* All plans */}
                   <div style={{fontSize:'13px',fontWeight:'800',color:'#1e293b',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'12px'}}>
                     Available Plans
                   </div>
@@ -596,16 +881,116 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
-
                   <div className="st-support">
                     📞 To upgrade, contact us at <strong>support@pgpilots.in</strong>
                   </div>
                 </div>
               )}
-
             </>
           )}
         </div>
+
+        {/* ── Add Staff Modal ── */}
+        {showAddStaff && (
+          <div className="st-modal-overlay" onClick={(e)=>{ if(e.target===e.currentTarget){ setShowAddStaff(false); setNewCredentials(null); }}}>
+            <div className="st-modal">
+              <div className="st-modal-header">
+                <div className="st-modal-title">
+                  {newCredentials ? '✅ Staff Created!' : '➕ Add Staff Member'}
+                </div>
+                <button className="st-modal-close" onClick={()=>{ setShowAddStaff(false); setNewCredentials(null); }}>✕</button>
+              </div>
+              <p className="st-modal-sub">
+                {newCredentials
+                  ? 'Share these login details with your staff. Save the password now — it won\'t be shown again.'
+                  : 'Create a login for your staff. They can only access their assigned PG.'}
+              </p>
+
+              {errorMsg && <div className="st-error">{errorMsg}</div>}
+
+              {newCredentials ? (
+                <>
+                  <div className="st-cred-box">
+                    <div className="st-cred-title">🔐 Staff Login Credentials</div>
+                    <div className="st-cred-row">
+                      <span className="st-cred-label">Staff Name</span>
+                      <span className="st-cred-value">{newCredentials.name}</span>
+                    </div>
+                    <div className="st-cred-row">
+                      <span className="st-cred-label">PG</span>
+                      <span className="st-cred-value">{newCredentials.pgName}</span>
+                    </div>
+                    <div className="st-cred-row">
+                      <span className="st-cred-label">PG Code</span>
+                      <span className="st-cred-value" style={{color:'#e94560',letterSpacing:'2px'}}>{newCredentials.pgCode}</span>
+                    </div>
+                    <div style={{borderTop:'1px solid #bbf7d0',margin:'12px 0'}}/>
+                    <div style={{fontSize:'11px',fontWeight:'700',color:'#059669',marginBottom:'8px',textTransform:'uppercase',letterSpacing:'0.4px'}}>Login at /staff-login</div>
+                    <div className="st-cred-row">
+                      <span className="st-cred-label">Email</span>
+                      <span className="st-cred-value" style={{fontSize:'13px'}}>{newCredentials.email}</span>
+                    </div>
+                    <div className="st-cred-row" style={{marginBottom:0}}>
+                      <span className="st-cred-label">Password</span>
+                      <span className="st-cred-value" style={{color:'#e94560',fontSize:'20px',letterSpacing:'3px'}}>
+                        {newCredentials.password}
+                      </span>
+                    </div>
+                    <div className="st-cred-warn" style={{marginTop:'12px'}}>✅ Password is saved — you can view it anytime in the Staff tab.</div>
+                  </div>
+                  <button className="st-save-btn"
+                    style={{marginBottom:'10px'}}
+                    onClick={()=>copyToClipboard(`PG: ${newCredentials.pgName} (${newCredentials.pgCode})
+Email: ${newCredentials.email}
+Password: ${newCredentials.password}
+Login at: ${window.location.origin}/staff-login`)}>
+                    📋 Copy Login Details
+                  </button>
+                  <button
+                    onClick={()=>{ setShowAddStaff(false); setNewCredentials(null); }}
+                    style={{width:'100%',padding:'13px',background:'#f1f5f9',color:'#475569',border:'none',borderRadius:'14px',fontSize:'15px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit'}}>
+                    Done
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="st-field">
+                    <label className="st-label">Staff Name *</label>
+                    <input className="st-input" type="text" placeholder="e.g. Ravi Kumar"
+                      value={staffForm.name}
+                      onChange={e=>setStaffForm(p=>({...p,name:e.target.value}))} />
+                  </div>
+                  <div className="st-field">
+                    <label className="st-label">Assign to PG *</label>
+                    {pgList.length === 0 ? (
+                      <div style={{padding:'12px 14px',background:'#fef2f2',borderRadius:'12px',fontSize:'13px',color:'#dc2626',fontWeight:'600'}}>
+                        ⚠️ No PGs found. Add a PG first from the Dashboard.
+                      </div>
+                    ) : (
+                      <select className="st-pg-select"
+                        value={staffForm.pgId}
+                        onChange={e=>setStaffForm(p=>({...p,pgId:e.target.value}))}>
+                        <option value="">Select a PG…</option>
+                        {pgList.map(pg=>(
+                          <option key={pg.id} value={pg.id}>
+                            {pg.pgName || pg.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div style={{background:'#f8fafc',borderRadius:'12px',padding:'12px 14px',marginBottom:'16px',fontSize:'13px',color:'#64748b'}}>
+                    🔑 A random email and password will be auto-generated for this staff member.
+                  </div>
+                  <button className="st-save-btn" onClick={handleAddStaff} disabled={addingStaff || pgList.length===0}>
+                    {addingStaff ? '⏳ Creating…' : '✅ Create Staff Login'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </>
   );

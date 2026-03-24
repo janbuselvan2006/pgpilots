@@ -8,6 +8,8 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 import AdminRoute from './AdminRoute';
+import StaffLogin from './Stafflogin';
+import StaffDashboard from './Staffdashboard';
 
 function LoadingScreen() {
   return (
@@ -31,13 +33,17 @@ function LoadingScreen() {
   );
 }
 
-// ✅ FIXED: Don't redirect if user is mid-signup
 function PublicRoute({ children }) {
   const [user, loading] = useAuthState(auth);
   if (loading) return <LoadingScreen />;
   const isSigningUp = sessionStorage.getItem('signingUp') === 'true';
   if (isSigningUp) return children;
-  return user ? <Navigate to="/dashboard" replace /> : children;
+  if (user) {
+    // If staff, redirect to staff dashboard
+    const isStaff = sessionStorage.getItem('staffMode') === 'true';
+    return <Navigate to={isStaff ? '/staff-dashboard' : '/dashboard'} replace />;
+  }
+  return children;
 }
 
 function ProtectedRoute({ children }) {
@@ -46,19 +52,51 @@ function ProtectedRoute({ children }) {
   return user ? children : <Navigate to="/login" replace />;
 }
 
+// Staff can only access staff-dashboard, not owner dashboard
+function OwnerRoute({ children }) {
+  const [user, loading] = useAuthState(auth);
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
+  const isStaff = sessionStorage.getItem('staffMode') === 'true';
+  if (isStaff) return <Navigate to="/staff-dashboard" replace />;
+  return children;
+}
+
+// Staff-only route
+function StaffRoute({ children }) {
+  const [user, loading] = useAuthState(auth);
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/staff-login" replace />;
+  return children;
+}
+
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+
         <Route path="/login"
           element={<PublicRoute><Login /></PublicRoute>} />
+
         <Route path="/signup"
           element={<PublicRoute><Signup /></PublicRoute>} />
+
+        {/* Staff login — separate page */}
+        <Route path="/staff-login"
+          element={<PublicRoute><StaffLogin /></PublicRoute>} />
+
+        {/* Owner dashboard — blocked for staff */}
         <Route path="/dashboard"
-          element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          element={<OwnerRoute><Dashboard /></OwnerRoute>} />
+
+        {/* Staff dashboard — staff only */}
+        <Route path="/staff-dashboard"
+          element={<StaffRoute><StaffDashboard /></StaffRoute>} />
+
         <Route path="/admin"
           element={<AdminRoute><AdminPanel /></AdminRoute>} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
