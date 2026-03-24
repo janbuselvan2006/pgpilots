@@ -265,6 +265,59 @@ const css = `
     box-shadow: 0 2px 10px rgba(0,0,0,0.06);
   }
 
+  /* Overview */
+  .db-overview-grid {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .db-overview-card {
+    background: white; border-radius: 18px; padding: 18px 18px 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .db-overview-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .db-overview-title {
+    font-size: 15px; font-weight: 800; color: #1e293b;
+  }
+  .db-overview-sub {
+    font-size: 12px; color: #94a3b8; margin-top: 2px;
+  }
+  .db-overview-pill {
+    background: #eef2ff; color: #4338ca;
+    padding: 4px 10px; border-radius: 999px; font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .db-overview-meta {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px; margin-top: 2px;
+  }
+  .db-overview-meta-item {
+    background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .db-overview-meta-label {
+    font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .db-overview-meta-value {
+    font-size: 13px; font-weight: 700; color: #1e293b; margin-top: 4px;
+  }
+  .db-overview-actions {
+    display: flex; gap: 10px; margin-top: 2px;
+  }
+  .db-overview-btn {
+    flex: 1; padding: 10px 12px; border-radius: 12px; border: none;
+    font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
+  }
+  .db-overview-btn.primary { background: #e94560; color: white; }
+  .db-overview-btn.ghost   { background: #f1f5f9; color: #64748b; }
+  .db-overview-empty {
+    padding: 40px 20px; text-align: center;
+    background: white; border-radius: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+
   /* ── BOTTOM NAV ── */
   .db-bottom-nav {
     display: none; position: fixed; bottom: 0; left: 0; right: 0;
@@ -340,6 +393,7 @@ const css = `
     .db-quick-grid { grid-template-columns: repeat(2,1fr); gap: 10px; }
     .db-quick-btn  { padding: 16px 10px; border-radius: 14px; }
     .db-quick-icon { font-size: 24px; }
+    .db-overview-grid { grid-template-columns: 1fr; }
   }
 
   @media (min-width: 769px) {
@@ -360,6 +414,7 @@ const timeAgo = (date) => {
 };
 
 export default function Dashboard() {
+  const ALL_PGS_ID = '__all__';
   const [pgOwner, setPgOwner]         = useState(null);
   const [pgs, setPgs]                 = useState([]);
   const [selectedPgId, setSelectedPgId] = useState(null);
@@ -379,6 +434,7 @@ export default function Dashboard() {
   const [addingPg, setAddingPg]     = useState(false);
 
   const navigate = useNavigate();
+  const isAllSelected = selectedPgId === ALL_PGS_ID;
 
   // ── Fetch all PGs for this owner
   const fetchPGs = async (user) => {
@@ -401,19 +457,28 @@ export default function Dashboard() {
   };
 
   // ── Fetch dashboard stats for selected PG
+  const fetchStatsForPgIds = async (pgIds) => {
+    if (!pgIds || pgIds.length === 0) return { tenants: [], rooms: [], payments: [] };
+    const [tSnaps, rSnaps, pSnaps] = await Promise.all([
+      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'tenants'),  where('pgId', '==', id))))),
+      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'rooms'),    where('pgId', '==', id))))),
+      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'payments'), where('pgId', '==', id))))),
+    ]);
+
+    const tenants  = tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() })));
+    const rooms    = rSnaps.flatMap(s => s.docs.map(d => d.data()));
+    const payments = pSnaps.flatMap(s => s.docs.map(d => d.data()));
+    return { tenants, rooms, payments };
+  };
+
   const fetchStats = useCallback(async (pgId, ownerId) => {
     if (!pgId || !ownerId) return;
     setStatsLoading(true);
     try {
-      const [tSnap, rSnap, pSnap] = await Promise.all([
-        getDocs(query(collection(db, 'tenants'),  where('pgId',    '==', pgId))),
-        getDocs(query(collection(db, 'rooms'),    where('pgId',    '==', pgId))),
-        getDocs(query(collection(db, 'payments'), where('pgId',    '==', pgId))),
-      ]);
+      const pgIds = pgId === ALL_PGS_ID ? pgs.map(p => p.id) : [pgId];
+      const { tenants: allTenants, rooms, payments } = await fetchStatsForPgIds(pgIds);
 
-      const tenants  = tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted');
-      const rooms    = rSnap.docs.map(d => d.data());
-      const payments = pSnap.docs.map(d => d.data());
+      const tenants = allTenants.filter(t => t.status !== 'deleted');
 
       const totalBeds    = rooms.reduce((a, r) => a + (r.totalBeds    || 0), 0);
       const occupiedBeds = rooms.reduce((a, r) => a + (r.occupiedBeds || 0), 0);
@@ -463,7 +528,7 @@ export default function Dashboard() {
       });
     } catch (e) { console.error(e); }
     setStatsLoading(false);
-  }, []);
+  }, [pgs]);
 
   // ── Auth + initial data load
   useEffect(() => {
@@ -515,10 +580,26 @@ export default function Dashboard() {
   }, [activeMenu]);
 
   const handleMenu = (label) => {
+    if (label === 'Overview') {
+      setSelectedPgId(ALL_PGS_ID);
+      setActiveMenu('Dashboard');
+      setSidebarOpen(false);
+      if (auth.currentUser) fetchStats(ALL_PGS_ID, auth.currentUser.uid);
+      return;
+    }
     setActiveMenu(label);
     setSidebarOpen(false);
     if (label === 'Dashboard' && selectedPgId && auth.currentUser) {
       fetchStats(selectedPgId, auth.currentUser.uid);
+    }
+  };
+
+  const openPgDashboard = (pgId) => {
+    setSelectedPgId(pgId);
+    setActiveMenu('Dashboard');
+    setSidebarOpen(false);
+    if (auth.currentUser) {
+      fetchStats(pgId, auth.currentUser.uid);
     }
   };
 
@@ -560,6 +641,7 @@ export default function Dashboard() {
   };
 
   const menuItems = [
+    {icon:'🗂️',label:'Overview'},
     {icon:'📊',label:'Dashboard'},
     {icon:'🛏️',label:'Rooms'},
     {icon:'👥',label:'Tenants'},
@@ -586,14 +668,19 @@ export default function Dashboard() {
     {icon:'⚡', label:'Electricity',    menu:'Electricity', accent:'#dc2626'},
   ];
 
-  const knownPages = ['Dashboard','Rooms','Tenants','Rent','Electricity','Reports','Settings'];
+  const knownPages = ['Overview','Dashboard','Rooms','Tenants','Rent','Electricity','Reports','Settings'];
 
   const PgSwitcherSelect = ({ className }) => (
     <select
       className={className}
       value={selectedPgId || ''}
-      onChange={e => setSelectedPgId(e.target.value)}
+      onChange={e => {
+        const next = e.target.value;
+        if (next === ALL_PGS_ID) setActiveMenu('Dashboard');
+        setSelectedPgId(next);
+      }}
     >
+      <option value={ALL_PGS_ID}>All PGs (Overview)</option>
       {pgs.map(pg => (
         <option key={pg.id} value={pg.id}>{pg.pgName} — {pg.city}</option>
       ))}
@@ -612,9 +699,9 @@ export default function Dashboard() {
           </button>
           <div style={{textAlign:'center'}}>
             <div className="db-mobile-logo">🏠 PGpilots</div>
-            {selectedPg && <div className="db-mobile-pg-name">{selectedPg.pgName}</div>}
+            <div className="db-mobile-pg-name">{isAllSelected ? 'All PGs' : (selectedPg?.pgName || '')}</div>
           </div>
-          <div className="db-plan-badge">⭐ {selectedPg?.plan ? selectedPg.plan.charAt(0).toUpperCase() + selectedPg.plan.slice(1) : 'Trial'}</div>
+          <div className="db-plan-badge">⭐ {isAllSelected ? 'All' : (selectedPg?.plan ? selectedPg.plan.charAt(0).toUpperCase() + selectedPg.plan.slice(1) : 'Trial')}</div>
         </div>
 
         {/* ── Overlay ── */}
@@ -631,7 +718,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div className="db-owner-name">{pgOwner.ownerName || pgOwner.name}</div>
-                  <div className="db-owner-pg">{selectedPg?.pgName || pgOwner.pgName}</div>
+                  <div className="db-owner-pg">{isAllSelected ? 'All PGs' : (selectedPg?.pgName || pgOwner.pgName)}</div>
                 </div>
               </div>
             )}
@@ -679,7 +766,11 @@ export default function Dashboard() {
               {pgs.length > 1 && (
                 <select
                   value={selectedPgId || ''}
-                  onChange={e => setSelectedPgId(e.target.value)}
+                  onChange={e => {
+                    const next = e.target.value;
+                    if (next === ALL_PGS_ID) setActiveMenu('Dashboard');
+                    setSelectedPgId(next);
+                  }}
                   style={{
                     padding:'8px 14px', borderRadius:'10px',
                     border:'1.5px solid #e2e8f0', fontSize:'13px',
@@ -687,6 +778,7 @@ export default function Dashboard() {
                     cursor:'pointer', outline:'none', fontFamily:'inherit',
                   }}
                 >
+                  <option value={ALL_PGS_ID}>All PGs (Overview)</option>
                   {pgs.map(pg => (
                     <option key={pg.id} value={pg.id}>{pg.pgName} — {pg.city}</option>
                   ))}
@@ -703,7 +795,7 @@ export default function Dashboard() {
                 ＋ Add PG
               </button>
               <div className="db-desktop-badge">
-                ⭐ {selectedPg?.plan ? selectedPg.plan.charAt(0).toUpperCase() + selectedPg.plan.slice(1) : 'Trial'} Plan
+                ⭐ {isAllSelected ? 'All' : (selectedPg?.plan ? selectedPg.plan.charAt(0).toUpperCase() + selectedPg.plan.slice(1) : 'Trial')} Plan
               </div>
             </div>
           </div>
@@ -717,6 +809,56 @@ export default function Dashboard() {
             {activeMenu === 'Electricity' && <ElectricityPage pgId={selectedPgId} />}
             {activeMenu === 'Reports'     && <ReportsPage pgId={selectedPgId} />}
             {activeMenu === 'Settings'    && <SettingsPage pgId={selectedPgId} />}
+
+            {/* ── Overview (All PGs) ── */}
+            {activeMenu === 'Overview' && (
+              <div className="db-dash-content">
+                <div className="db-section-title">All PGs</div>
+                {pgs.length > 0 ? (
+                  <div className="db-overview-grid">
+                    {pgs.map(pg => (
+                      <div key={pg.id} className="db-overview-card">
+                        <div className="db-overview-head">
+                          <div>
+                            <div className="db-overview-title">{pg.pgName || 'Untitled PG'}</div>
+                            <div className="db-overview-sub">
+                              {[pg.city, pg.state].filter(Boolean).join(', ') || 'Location not set'}
+                            </div>
+                          </div>
+                          <div className="db-overview-pill">
+                            {pg.plan ? pg.plan.charAt(0).toUpperCase() + pg.plan.slice(1) : 'Trial'}
+                          </div>
+                        </div>
+                        <div className="db-overview-meta">
+                          <div className="db-overview-meta-item">
+                            <div className="db-overview-meta-label">PG Code</div>
+                            <div className="db-overview-meta-value">{pg.pgCode || '—'}</div>
+                          </div>
+                          <div className="db-overview-meta-item">
+                            <div className="db-overview-meta-label">Status</div>
+                            <div className="db-overview-meta-value">{pg.isActive === false ? 'Inactive' : 'Active'}</div>
+                          </div>
+                        </div>
+                        <div className="db-overview-actions">
+                          <button className="db-overview-btn ghost" onClick={() => setSelectedPgId(pg.id)}>
+                            Set Active
+                          </button>
+                          <button className="db-overview-btn primary" onClick={() => openPgDashboard(pg.id)}>
+                            Open Dashboard
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="db-overview-empty">
+                    <div style={{ fontSize:'40px', marginBottom:'10px' }}>🏠</div>
+                    <p style={{ fontSize:'15px', fontWeight:'700', color:'#1e293b', margin:'0 0 4px' }}>No PGs yet</p>
+                    <p style={{ fontSize:'13px', color:'#94a3b8', margin:0 }}>Add your first PG to get started</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── Dashboard Home ── */}
             {activeMenu === 'Dashboard' && (

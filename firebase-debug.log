@@ -1,0 +1,74 @@
+[debug] [2026-03-24T16:32:40.898Z] ----------------------------------------------------------------------
+[debug] [2026-03-24T16:32:40.902Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\hr\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2026-03-24T16:32:40.903Z] CLI Version:   15.11.0
+[debug] [2026-03-24T16:32:40.903Z] Platform:      win32
+[debug] [2026-03-24T16:32:40.903Z] Node Version:  v24.14.0
+[debug] [2026-03-24T16:32:40.904Z] Time:          Tue Mar 24 2026 22:02:40 GMT+0530 (India Standard Time)
+[debug] [2026-03-24T16:32:40.904Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-24T16:32:46.433Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-24T16:32:46.433Z] > authorizing via signed-in user (anbuselvan2006abc@gmail.com)
+[debug] [2026-03-24T16:32:46.434Z] [iam] checking project new2-42396 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2026-03-24T16:32:46.435Z] Checked if tokens are valid: false, expires at: 1774356690076
+[debug] [2026-03-24T16:32:46.436Z] Checked if tokens are valid: false, expires at: 1774356690076
+[debug] [2026-03-24T16:32:46.436Z] > refreshing access token with scopes: []
+[debug] [2026-03-24T16:32:46.441Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-03-24T16:32:46.441Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-03-24T16:32:58.590Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-03-24T16:32:58.590Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-03-24T16:32:58.605Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/new2-42396:testIamPermissions [none]
+[debug] [2026-03-24T16:32:58.605Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/new2-42396:testIamPermissions  x-goog-user-project=new2-42396
+[debug] [2026-03-24T16:32:58.605Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/new2-42396:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-03-24T16:33:07.484Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/new2-42396:testIamPermissions 200
+[debug] [2026-03-24T16:33:07.485Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/new2-42396:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-03-24T16:33:07.486Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:07.487Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:07.487Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/new2-42396/serviceAccounts/new2-42396@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2026-03-24T16:33:07.487Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/new2-42396/serviceAccounts/new2-42396@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-03-24T16:33:14.854Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/new2-42396/serviceAccounts/new2-42396@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2026-03-24T16:33:14.854Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/new2-42396/serviceAccounts/new2-42396@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'new2-42396'...
+[info] 
+[info] i  deploying functions 
+[debug] [2026-03-24T16:33:14.870Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:14.870Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:14.871Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/new2-42396 [none]
+[debug] [2026-03-24T16:33:18.745Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/new2-42396 200
+[debug] [2026-03-24T16:33:18.745Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/new2-42396 {"projectNumber":"186741862906","projectId":"new2-42396","lifecycleState":"ACTIVE","name":"pg-management","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2026-03-07T09:57:33.162604Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[debug] [2026-03-24T16:33:18.756Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:18.756Z] Checked if tokens are valid: true, expires at: 1774373577590
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2026-03-24T16:33:18.760Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:18.760Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:18.761Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/new2-42396/services/cloudbuild.googleapis.com [none]
+[debug] [2026-03-24T16:33:18.761Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/new2-42396/services/cloudbuild.googleapis.com  x-goog-user-project=new2-42396
+[debug] [2026-03-24T16:33:18.766Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/new2-42396/services/artifactregistry.googleapis.com [none]
+[debug] [2026-03-24T16:33:18.767Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/new2-42396/services/artifactregistry.googleapis.com  x-goog-user-project=new2-42396
+[debug] [2026-03-24T16:33:23.760Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/new2-42396/services/cloudbuild.googleapis.com 200
+[debug] [2026-03-24T16:33:23.760Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/new2-42396/services/cloudbuild.googleapis.com [omitted]
+[warn] !  functions: missing required API cloudbuild.googleapis.com. Enabling now... 
+[debug] [2026-03-24T16:33:23.762Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:23.763Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:23.763Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/new2-42396/services/cloudbuild.googleapis.com:enable [none]
+[debug] [2026-03-24T16:33:23.763Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/new2-42396/services/cloudbuild.googleapis.com:enable  x-goog-user-project=new2-42396
+[debug] [2026-03-24T16:33:23.808Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/new2-42396/services/artifactregistry.googleapis.com 200
+[debug] [2026-03-24T16:33:23.808Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/new2-42396/services/artifactregistry.googleapis.com [omitted]
+[warn] !  artifactregistry: missing required API artifactregistry.googleapis.com. Enabling now... 
+[debug] [2026-03-24T16:33:23.809Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:23.809Z] Checked if tokens are valid: true, expires at: 1774373577590
+[debug] [2026-03-24T16:33:23.809Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/new2-42396/services/artifactregistry.googleapis.com:enable [none]
+[debug] [2026-03-24T16:33:23.809Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/new2-42396/services/artifactregistry.googleapis.com:enable  x-goog-user-project=new2-42396
+[debug] [2026-03-24T16:33:26.153Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/new2-42396/services/artifactregistry.googleapis.com:enable 400
+[debug] [2026-03-24T16:33:26.153Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/new2-42396/services/artifactregistry.googleapis.com:enable [omitted]
+[debug] [2026-03-24T16:33:26.173Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/new2-42396/services/cloudbuild.googleapis.com:enable 400
+[debug] [2026-03-24T16:33:26.173Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/new2-42396/services/cloudbuild.googleapis.com:enable [omitted]
+[debug] [2026-03-24T16:33:31.183Z] Error: Timed out.
+    at Timeout._onTimeout (C:\Users\hr\AppData\Roaming\npm\node_modules\firebase-tools\lib\utils.js:308:49)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[error] 
+[error] Error: An unexpected error has occurred.
