@@ -4,7 +4,6 @@ import {
   collection, addDoc, getDocs,
   doc, query, where, updateDoc
 } from 'firebase/firestore';
-import { useLimitCheck } from '../hooks/useLimitCheck';
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -195,8 +194,6 @@ export default function Tenants({ pgId }) {
   });
 
   const user = auth.currentUser;
-  const { limits } = useLimitCheck();
-
   const fetchData = async () => {
     // ✅ Guard: need both user and pgId
     if (!user || !pgId) { setLoading(false); return; }
@@ -215,10 +212,6 @@ export default function Tenants({ pgId }) {
   useEffect(() => { fetchData(); }, [pgId]);
 
   const tenantCount = tenants.length;
-  const maxTenants  = limits?.maxTenants ?? 50;
-  const tenantPct   = maxTenants > 0 ? (tenantCount / maxTenants) * 100 : 0;
-  const isNearLimit = tenantPct >= 90 && tenantPct < 100;
-  const isAtLimit   = tenantCount >= maxTenants;
 
   const getVacantBeds = (roomNumber) => {
     if (!roomNumber) return [];
@@ -258,7 +251,6 @@ export default function Tenants({ pgId }) {
   };
 
   const handleSave = async () => {
-    if (!editId && isAtLimit) return alert(`🚫 Tenant limit reached! (${tenantCount}/${maxTenants})`);
     if (!form.name || !form.phone || !form.roomNumber) return alert('Please fill Name, Phone and Room Number!');
     if (!form.bedNumber) return alert('Please select a Bed Number!');
     if (!pgId) return alert('No PG selected!');
@@ -349,11 +341,10 @@ export default function Tenants({ pgId }) {
           <div className="tn-topbar-row">
             <div>
               <h1 className="tn-page-title">Tenants</h1>
-              <p className="tn-page-sub">{tenantCount} active · {maxTenants - tenantCount} slots left</p>
+              <p className="tn-page-sub">{tenantCount} active tenants</p>
             </div>
             <button className="tn-add-fab"
-              disabled={isAtLimit}
-              onClick={() => { if (!isAtLimit) { resetForm(); setShowForm(true); } }}>
+              onClick={() => { resetForm(); setShowForm(true); }}>
               ＋
             </button>
           </div>
@@ -362,7 +353,7 @@ export default function Tenants({ pgId }) {
         {/* Stats strip */}
         <div className="tn-stats">
           {[
-            { label:'Tenants', value:`${tenantCount}/${maxTenants}`, color: isAtLimit ? '#dc2626' : isNearLimit ? '#d97706' : '#4f46e5' },
+            { label:'Tenants', value: tenantCount, color: '#4f46e5' },
             { label:'Active',   value: tenants.filter(t => t.status === 'Active').length, color:'#059669' },
             { label:'Deposits', value:`₹${(tenants.reduce((a,t) => a+(t.deposit||0), 0)/1000).toFixed(0)}k`, color:'#d97706' },
             { label:'Revenue',  value:`₹${(tenants.reduce((a,t) => a+(t.monthlyRent||0), 0)/1000).toFixed(0)}k`, color:'#0891b2' },
@@ -377,25 +368,6 @@ export default function Tenants({ pgId }) {
         {/* Content */}
         <div className="tn-content">
 
-          {isAtLimit && (
-            <div className="tn-banner" style={{ background:'#fef2f2', border:'1.5px solid #fecaca' }}>
-              <span className="tn-banner-icon">🚫</span>
-              <div>
-                <div className="tn-banner-title" style={{ color:'#dc2626' }}>Tenant Limit Reached ({tenantCount}/{maxTenants})</div>
-                <div className="tn-banner-sub"   style={{ color:'#ef4444' }}>Contact your admin to increase the limit.</div>
-              </div>
-            </div>
-          )}
-          {isNearLimit && (
-            <div className="tn-banner" style={{ background:'#fffbeb', border:'1.5px solid #fde68a' }}>
-              <span className="tn-banner-icon">⚠️</span>
-              <div>
-                <div className="tn-banner-title" style={{ color:'#d97706' }}>Approaching Limit ({tenantCount}/{maxTenants})</div>
-                <div className="tn-banner-sub"   style={{ color:'#f59e0b' }}>Contact your admin soon to increase your limit.</div>
-              </div>
-            </div>
-          )}
-
           <input className="tn-search" type="text"
             placeholder="🔍 Search by name, phone or room…"
             value={search} onChange={e => setSearch(e.target.value)} />
@@ -407,7 +379,7 @@ export default function Tenants({ pgId }) {
               <div className="tn-empty-icon">👥</div>
               <p className="tn-empty-title">{search ? 'No tenants found' : 'No tenants yet'}</p>
               <p className="tn-empty-sub">{search ? 'Try a different search' : 'Add your first tenant to get started'}</p>
-              {!search && !isAtLimit && (
+              {!search && (
                 <button className="tn-empty-btn" onClick={() => { resetForm(); setShowForm(true); }}>
                   ➕ Add First Tenant
                 </button>
@@ -609,7 +581,7 @@ export default function Tenants({ pgId }) {
                 </div>
 
                 <button className="fs-save-btn" onClick={handleSave}
-                  disabled={saving || (isAtLimit && !editId)}>
+                  disabled={saving}>
                   {saving ? 'Saving…' : editId ? '✏️ Update Tenant' : '💾 Save Tenant'}
                 </button>
 
@@ -641,3 +613,4 @@ export default function Tenants({ pgId }) {
     </>
   );
 }
+

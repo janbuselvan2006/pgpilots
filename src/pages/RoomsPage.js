@@ -282,6 +282,7 @@ export default function Rooms({ pgId }) {
         pgId:         pgId,      // ✅ new field for multi-PG
         createdAt:    new Date(),
       });
+
       resetForm();
       setShowForm(false);
       fetchData();
@@ -291,7 +292,9 @@ export default function Rooms({ pgId }) {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+
     await deleteDoc(doc(db, 'rooms', deleteTarget));
+
     setDeleteTarget(null);
     fetchData();
   };

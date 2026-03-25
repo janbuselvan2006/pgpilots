@@ -285,6 +285,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg]     = useState('');
+  const [billingSettings, setBillingSettings] = useState({ price_per_bed: 0, effective_date: '' });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingQR, setUploadingQR]       = useState(false);
 
@@ -314,12 +315,6 @@ export default function SettingsPage() {
 
   const user = auth.currentUser;
 
-  const planDetails = {
-    trial:    { name:'Trial Plan',    price:'Free · 14 days',  color:'#64748b', bg:'#f8fafc',  features:['All features','Up to 50 tenants','14 day trial'] },
-    basic:    { name:'Basic Plan',    price:'₹499/month',      color:'#4f46e5', bg:'#eef2ff',  features:['Up to 20 tenants','Rent Management','Electricity Bills','Basic Reports'] },
-    standard: { name:'Standard Plan', price:'₹999/month',      color:'#059669', bg:'#ecfdf5',  features:['Up to 50 tenants','All Basic features','PDF Reports','WhatsApp Reminders'] },
-    premium:  { name:'Premium Plan',  price:'₹1999/month',     color:'#d97706', bg:'#fffbeb',  features:['Unlimited tenants','All Standard features','Multi-property','Priority Support'] },
-  };
 
   const fetchOwner = async () => {
     setLoading(true);
@@ -351,7 +346,14 @@ export default function SettingsPage() {
     setStaffLoading(false);
   };
 
-  useEffect(()=>{ fetchOwner(); fetchPGs(); },[]);
+  const fetchBillingSettings = async () => {
+    try {
+      const snap = await getDoc(doc(db,'settings','billing'));
+      if (snap.exists()) setBillingSettings(snap.data());
+    } catch(e){ console.error(e); }
+  };
+
+  useEffect(()=>{ fetchOwner(); fetchPGs(); fetchBillingSettings(); },[]);
 
   useEffect(()=>{
     if(activeTab==='staff') fetchStaff();
@@ -514,15 +516,12 @@ export default function SettingsPage() {
     navigator.clipboard.writeText(text).then(()=>showOk('✅ Copied to clipboard!'));
   };
 
-  const currentPlan = pgOwner?.plan || 'basic';
-  const plan = planDetails[currentPlan] || planDetails.basic;
-
   const tabs = [
     {id:'profile',  label:'👤 Profile'},
     {id:'payment',  label:'💳 Payment'},
     {id:'password', label:'🔒 Password'},
     {id:'staff',    label:'👥 Staff'},
-    {id:'plan',     label:'⭐ Plan'},
+    {id:'billing',  label:'💳 Billing'},
   ];
 
   return (
@@ -550,8 +549,8 @@ export default function SettingsPage() {
                 <div className="st-profile-name">{pgOwner.ownerName||pgOwner.name}</div>
                 <div className="st-profile-pg">{pgOwner.pgName}</div>
                 <div style={{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap',marginTop:'4px'}}>
-                  <span className="st-plan-tag" style={{background:plan.bg,color:plan.color}}>
-                    ⭐ {plan.name}
+                  <span className="st-plan-tag" style={{background:'#fef9c3',color:'#854d0e'}}>
+                    Usage Billing
                   </span>
                   {pgOwner.pgCode && (
                     <span style={{fontSize:'10px',fontWeight:'800',padding:'3px 8px',borderRadius:'20px',background:'rgba(255,255,255,0.15)',color:'white',letterSpacing:'1px'}}>
@@ -838,51 +837,34 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {/* ── PLAN ── */}
-              {activeTab==='plan' && (
+              {/* ── BILLING ── */}
+              {activeTab==='billing' && (
                 <div className="st-card">
-                  <h2 className="st-card-title">⭐ Plan &amp; Subscription</h2>
-                  <p className="st-card-sub">Your current plan and available upgrades</p>
+                  <h2 className="st-card-title">💳 Billing &amp; Usage</h2>
+                  <p className="st-card-sub">Billing is based on peak beds across all PGs</p>
                   <div className="st-current-plan"
-                    style={{background:plan.bg, border:`2px solid ${plan.color}`}}>
+                    style={{background:'#f8fafc', border:'1.5px solid #e2e8f0'}}>
                     <div>
-                      <div className="st-cp-badge" style={{color:plan.color}}>Current Plan</div>
-                      <div className="st-cp-name"  style={{color:plan.color}}>{plan.name}</div>
-                      <div className="st-cp-price">{plan.price}</div>
+                      <div className="st-cp-badge" style={{color:'#0f3460'}}>Current Beds</div>
+                      <div className="st-cp-name"  style={{color:'#0f3460'}}>
+                        {pgOwner?.current_beds ?? pgOwner?.current_bed_count ?? 0}
+                      </div>
+                      <div className="st-cp-price">
+                        Peak this month: {pgOwner?.max_beds_this_month ?? pgOwner?.max_bed_count_this_month ?? (pgOwner?.current_beds ?? pgOwner?.current_bed_count ?? 0)}
+                      </div>
                     </div>
                     <div className="st-cp-features">
-                      {plan.features.map(f=>(
-                        <div key={f} className="st-cp-feature">✅ {f}</div>
-                      ))}
+                      <div className="st-cp-feature">Price per bed: ₹{pgOwner?.price_per_bed || billingSettings.price_per_bed || 0}</div>
+                      <div className="st-cp-feature">
+                        Estimated bill: ₹{((pgOwner?.max_beds_this_month ?? pgOwner?.max_bed_count_this_month ?? (pgOwner?.current_beds ?? pgOwner?.current_bed_count ?? 0)) * (pgOwner?.price_per_bed || billingSettings.price_per_bed || 0)).toLocaleString()}
+                      </div>
+                      {billingSettings.effective_date && (
+                        <div className="st-cp-feature">Next price effective: {billingSettings.effective_date}</div>
+                      )}
                     </div>
                   </div>
-                  <div style={{fontSize:'13px',fontWeight:'800',color:'#1e293b',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'12px'}}>
-                    Available Plans
-                  </div>
-                  <div className="st-plans-grid">
-                    {Object.entries(planDetails).filter(([k])=>k!=='trial').map(([key,p])=>(
-                      <div key={key} className="st-plan-card" style={{
-                        border: currentPlan===key?`2px solid ${p.color}`:'1.5px solid #e2e8f0',
-                        background: currentPlan===key?p.bg:'white',
-                      }}>
-                        {currentPlan===key && (
-                          <div className="st-plan-active-tag" style={{background:p.color}}>✓ Active</div>
-                        )}
-                        <div className="st-plan-name"  style={{color:p.color}}>{p.name}</div>
-                        <div className="st-plan-price">{p.price}</div>
-                        <div className="st-plan-features">
-                          {p.features.map(f=><div key={f} className="st-plan-feat">✅ {f}</div>)}
-                        </div>
-                        {currentPlan!==key && (
-                          <button className="st-upgrade-btn" style={{background:p.color}}>
-                            Upgrade →
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="st-support">
-                    📞 To upgrade, contact us at <strong>support@pgpilots.in</strong>
+                  <div className="st-email-info">
+                    Billing uses the highest bed count in the current month. If beds decrease, your peak stays the same until next month.
                   </div>
                 </div>
               )}

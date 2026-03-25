@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
-  doc, getDoc, collection, getDocs, query, where, orderBy, limit,
+  doc, getDoc, collection, getDocs, query, where,
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import Rooms from './RoomsPage';
@@ -432,16 +433,21 @@ export default function Dashboard() {
   const [newPgCity, setNewPgCity]   = useState('');
   const [newPgState, setNewPgState] = useState('');
   const [addingPg, setAddingPg]     = useState(false);
+  const [billingInfo, setBillingInfo] = useState({ pricePerBed: 8, currentBeds: 0, maxBeds: 0 });
 
   const navigate = useNavigate();
   const isAllSelected = selectedPgId === ALL_PGS_ID;
+  const effectivePgId = isAllSelected ? ALL_PGS_ID : (selectedPg?.pgId || selectedPgId);
 
   // ── Fetch all PGs for this owner
   const fetchPGs = async (user) => {
     // ✅ Try new subcollection first (multi-PG structure)
     const subSnap = await getDocs(collection(db, 'pgOwners', user.uid, 'pgs'));
     if (!subSnap.empty) {
-      const list = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const list = subSnap.docs.map(d => {
+        const data = d.data();
+        return { id: d.id, ...data, pgId: data.pgId || d.id };
+      });
       setPgs(list);
       return list;
     }
@@ -449,7 +455,7 @@ export default function Dashboard() {
     const rootSnap = await getDoc(doc(db, 'pgOwners', user.uid));
     if (rootSnap.exists()) {
       const data = rootSnap.data();
-      const fallback = [{ id: user.uid, ...data }];
+      const fallback = [{ id: user.uid, ...data, pgId: data.pgId || user.uid }];
       setPgs(fallback);
       return fallback;
     }
@@ -471,12 +477,40 @@ export default function Dashboard() {
     return { tenants, rooms, payments };
   };
 
+  const fetchStatsByOwnerId = async (ownerId) => {
+    if (!ownerId) return { tenants: [], rooms: [], payments: [] };
+    const [tSnap, rSnap, pSnap] = await Promise.all([
+      getDocs(query(collection(db, 'tenants'),  where('ownerId', '==', ownerId))),
+      getDocs(query(collection(db, 'rooms'),    where('ownerId', '==', ownerId))),
+      getDocs(query(collection(db, 'payments'), where('ownerId', '==', ownerId))),
+    ]);
+
+    const tenants  = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const rooms    = rSnap.docs.map(d => d.data());
+    const payments = pSnap.docs.map(d => d.data());
+    return { tenants, rooms, payments };
+  };
+
   const fetchStats = useCallback(async (pgId, ownerId) => {
     if (!pgId || !ownerId) return;
     setStatsLoading(true);
     try {
-      const pgIds = pgId === ALL_PGS_ID ? pgs.map(p => p.id) : [pgId];
-      const { tenants: allTenants, rooms, payments } = await fetchStatsForPgIds(pgIds);
+      let allTenants = [];
+      let rooms = [];
+      let payments = [];
+
+      // When older data doesn't have `pgId` saved, querying by `ownerId` is the safe fallback.
+      if (pgId === ALL_PGS_ID) {
+        ({ tenants: allTenants, rooms, payments } = await fetchStatsByOwnerId(ownerId));
+      } else if (pgId === ownerId) {
+        // Legacy single-PG mode (documents may not have pgId).
+        const res = await fetchStatsByOwnerId(ownerId);
+        allTenants = res.tenants.filter(t => !t.pgId || t.pgId === ownerId);
+        rooms      = res.rooms.filter(r => !r.pgId || r.pgId === ownerId);
+        payments   = res.payments.filter(p => !p.pgId || p.pgId === ownerId);
+      } else {
+        ({ tenants: allTenants, rooms, payments } = await fetchStatsForPgIds([pgId]));
+      }
 
       const tenants = allTenants.filter(t => t.status !== 'deleted');
 
@@ -526,6 +560,41 @@ export default function Dashboard() {
         monthlyRevenue: tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0),
         pendingRents:   pending.length,
       });
+
+      // Fetch global billing price
+      const billSnap = await getDoc(doc(db, 'settings', 'billing'));
+      const defaultPrice = billSnap.exists() ? billSnap.data().price_per_bed : 8;
+
+      const ownerRef = doc(db, 'pgOwners', ownerId);
+      let ownerSnap = await getDoc(ownerRef);
+      let ownerData = ownerSnap.data() || {};
+
+      let currentBeds = ownerData.current_beds;
+      let maxBeds = ownerData.max_beds_this_month;
+
+      // If the new billing fields are missing (legacy accounts), ask backend to recalculate atomically.
+      if (currentBeds == null || maxBeds == null) {
+        try {
+          const fn = httpsCallable(getFunctions(), 'recalculateOwnerBeds');
+          const res = await fn({ ownerId });
+          currentBeds = res.data?.current_beds ?? currentBeds;
+          maxBeds = res.data?.max_beds_this_month ?? maxBeds;
+          ownerSnap = await getDoc(ownerRef);
+          ownerData = ownerSnap.data() || ownerData;
+        } catch (err) {
+          console.log('Failed to recalculate bed counts:', err);
+        }
+      }
+
+      const pricePerBed = ownerData.price_per_bed || defaultPrice;
+      const safeCurrent = (currentBeds ?? ownerData.current_bed_count) ?? 0;
+      const safeMax = (maxBeds ?? ownerData.max_bed_count_this_month) ?? safeCurrent;
+
+      setBillingInfo({
+        pricePerBed,
+        currentBeds: safeCurrent,
+        maxBeds:     safeMax
+      });
     } catch (e) { console.error(e); }
     setStatsLoading(false);
   }, [pgs]);
@@ -548,7 +617,7 @@ export default function Dashboard() {
         if (list.length > 0) {
           setSelectedPgId(list[0].id);
           setSelectedPg(list[0]);
-          fetchStats(list[0].id, user.uid);
+          fetchStats(list[0].pgId || list[0].id, user.uid);
         }
       } catch (e) { console.error(e); }
     });
@@ -558,9 +627,14 @@ export default function Dashboard() {
   // ── When selected PG changes, reload stats
   useEffect(() => {
     if (!selectedPgId || !auth.currentUser) return;
+    if (selectedPgId === ALL_PGS_ID) {
+      setSelectedPg(null);
+      fetchStats(ALL_PGS_ID, auth.currentUser.uid);
+      return;
+    }
     const pg = pgs.find(p => p.id === selectedPgId);
     setSelectedPg(pg || null);
-    fetchStats(selectedPgId, auth.currentUser.uid);
+    fetchStats((pg?.pgId || selectedPgId), auth.currentUser.uid);
   }, [selectedPgId]);
 
   // ── Back button handler
@@ -589,8 +663,8 @@ export default function Dashboard() {
     }
     setActiveMenu(label);
     setSidebarOpen(false);
-    if (label === 'Dashboard' && selectedPgId && auth.currentUser) {
-      fetchStats(selectedPgId, auth.currentUser.uid);
+    if (label === 'Dashboard' && effectivePgId && auth.currentUser) {
+      fetchStats(effectivePgId, auth.currentUser.uid);
     }
   };
 
@@ -599,7 +673,8 @@ export default function Dashboard() {
     setActiveMenu('Dashboard');
     setSidebarOpen(false);
     if (auth.currentUser) {
-      fetchStats(pgId, auth.currentUser.uid);
+      const pg = pgs.find(p => p.id === pgId);
+      fetchStats((pg?.pgId || pgId), auth.currentUser.uid);
     }
   };
 
@@ -619,13 +694,17 @@ export default function Dashboard() {
       const code    = `${letters}${digits}`;
 
       const pgRef = fsDoc(fsColl(db, 'pgOwners', user.uid, 'pgs'));
+      const mainPg = pgs.find(p => p.is_main) || pgs[0];
+      const isMain = pgs.length === 0;
+      const parentPgId = isMain ? null : (mainPg?.pgId || mainPg?.id || null);
       const newPg = {
         pgId: pgRef.id,
         pgName: newPgName.trim(),
         city:   newPgCity.trim(),
         state:  newPgState.trim(),
         pgCode: code,
-        plan:   selectedPg?.plan || 'trial',
+        is_main: isMain,
+        parent_pg_id: parentPgId,
         isActive: true,
         createdAt: new Date(),
       };
@@ -701,7 +780,7 @@ export default function Dashboard() {
             <div className="db-mobile-logo">🏠 PGpilots</div>
             <div className="db-mobile-pg-name">{isAllSelected ? 'All PGs' : (selectedPg?.pgName || '')}</div>
           </div>
-          <div className="db-plan-badge">⭐ {isAllSelected ? 'All' : (selectedPg?.plan ? selectedPg.plan.charAt(0).toUpperCase() + selectedPg.plan.slice(1) : 'Trial')}</div>
+          <div className="db-plan-badge">Usage Billing</div>
         </div>
 
         {/* ── Overlay ── */}
@@ -795,7 +874,7 @@ export default function Dashboard() {
                 ＋ Add PG
               </button>
               <div className="db-desktop-badge">
-                ⭐ {isAllSelected ? 'All' : (selectedPg?.plan ? selectedPg.plan.charAt(0).toUpperCase() + selectedPg.plan.slice(1) : 'Trial')} Plan
+                Usage Billing
               </div>
             </div>
           </div>
@@ -803,12 +882,12 @@ export default function Dashboard() {
           <div className="db-page-content">
 
             {/* ── Routed pages ── */}
-            {activeMenu === 'Rooms'       && <Rooms       pgId={selectedPgId} />}
-            {activeMenu === 'Tenants'     && <Tenants     pgId={selectedPgId} />}
-            {activeMenu === 'Rent'        && <RentPage    pgId={selectedPgId} />}
-            {activeMenu === 'Electricity' && <ElectricityPage pgId={selectedPgId} />}
-            {activeMenu === 'Reports'     && <ReportsPage pgId={selectedPgId} />}
-            {activeMenu === 'Settings'    && <SettingsPage pgId={selectedPgId} />}
+            {activeMenu === 'Rooms'       && <Rooms       pgId={effectivePgId} />}
+            {activeMenu === 'Tenants'     && <Tenants     pgId={effectivePgId} />}
+            {activeMenu === 'Rent'        && <RentPage    pgId={effectivePgId} />}
+            {activeMenu === 'Electricity' && <ElectricityPage pgId={effectivePgId} />}
+            {activeMenu === 'Reports'     && <ReportsPage pgId={effectivePgId} />}
+            {activeMenu === 'Settings'    && <SettingsPage pgId={effectivePgId} />}
 
             {/* ── Overview (All PGs) ── */}
             {activeMenu === 'Overview' && (
@@ -826,7 +905,7 @@ export default function Dashboard() {
                             </div>
                           </div>
                           <div className="db-overview-pill">
-                            {pg.plan ? pg.plan.charAt(0).toUpperCase() + pg.plan.slice(1) : 'Trial'}
+                            Usage Billing
                           </div>
                         </div>
                         <div className="db-overview-meta">
@@ -891,6 +970,29 @@ export default function Dashboard() {
                   </div>
 
                   <div style={{ height: '20px' }} />
+
+                  {/* ✅ Usage & Billing Section */}
+                  <div className="db-section-title">Usage & Billing (All PGs)</div>
+                  <div className="db-activity-card" style={{ padding: '16px 20px', marginBottom: '24px', background: 'linear-gradient(135deg, #fff 0%, #f8fafc 100%)', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', borderRadius: '18px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                      <div style={{ textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>Current Beds</div>
+                        <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>{billingInfo.currentBeds}</div>
+                        <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px' }}>All PGs combined</div>
+                      </div>
+                      <div style={{ textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>Peak (Mo)</div>
+                        <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>{billingInfo.maxBeds}</div>
+                        <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px' }}>Highest this month</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#e94560', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>Est. Bill</div>
+                        <div style={{ fontSize: '18px', fontWeight: '800', color: '#e94560' }}>₹{billingInfo.maxBeds * billingInfo.pricePerBed}</div>
+                        <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px' }}>₹{billingInfo.pricePerBed}/bed</div>
+                      </div>
+                    </div>
+                  </div>
+
 
                   {/* Quick actions */}
                   <div className="db-section-title">Quick Actions</div>

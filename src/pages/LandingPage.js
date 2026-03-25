@@ -384,13 +384,11 @@ function LandingPage() {
         <section id="pricing" style={{ background:'var(--dark)', padding:'100px 60px' }}>
           <div style={{ maxWidth:'1200px', margin:'0 auto', textAlign:'center' }}>
             <div className="section-tag" style={{ justifyContent:'center' }}>Pricing</div>
-            <h2 className="section-title">4x cheaper than<br />the competition.</h2>
-            <p className="section-sub" style={{ margin:'0 auto 64px' }}>Other PG software charges ₹2,000–₹5,000/month. We charge ₹499. Same features. Better experience.</p>
+            <h2 className="section-title">Usage-based pricing<br />that scales with you.</h2>
+            <p className="section-sub" style={{ margin:'0 auto 64px' }}>Simple, usage-based billing. Pay only for the beds you use each month.</p>
             <div className="pricing-grid reveal">
               {[
-                { plan:'Basic', price:'₹499', period:'Up to 20 tenants', features:['Room & Tenant Management','Rent Tracking','Electricity Bills','Basic Reports','Mobile Friendly'], featured:false },
-                { plan:'Standard', price:'₹999', period:'Up to 50 tenants', features:['Everything in Basic','PDF Report Download','WhatsApp Reminders','Payment History','Priority Support'], featured:true },
-                { plan:'Premium', price:'₹1,999', period:'Unlimited tenants', features:['Everything in Standard','Multiple Properties','Advanced Analytics','ID Proof Storage','Dedicated Support'], featured:false },
+                { plan:'Pay-as-you-go', price:'₹ per bed', period:'Billed monthly on peak beds', features:['Unlimited PGs & rooms','All features included','Pay only for beds used','Peak-bed billing'], featured:true },
               ].map(({ plan, price, period, features, featured }) => (
                 <div className={`price-card${featured ? ' featured' : ''}`} key={plan}>
                   <div className="price-plan">{plan}</div>
@@ -408,7 +406,7 @@ function LandingPage() {
               ))}
             </div>
             <p style={{ fontSize:'14px', color:'var(--muted)', marginTop:'32px' }}>
-              ✅ 14-day free trial &nbsp;•&nbsp; No credit card required &nbsp;•&nbsp; Cancel anytime
+              ✅ No setup fees · Pay only for beds used · Cancel anytime
             </p>
           </div>
         </section>
@@ -468,3 +466,9 @@ function LandingPage() {
 }
 
 export default LandingPage;
+
+
+
+
+
+

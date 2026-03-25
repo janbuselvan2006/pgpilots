@@ -473,8 +473,6 @@ export default function Signup() {
     try {
       const user     = auth.currentUser;
       const code     = await createUniquePGCode(pgName);
-      const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 14);
 
       // ✅ Resolve email — use real email or fallback to phone-based email
       const resolvedEmail = email.trim()
@@ -490,12 +488,11 @@ export default function Signup() {
         email: resolvedEmail,
         phone: phone.replace(/\D/g, ''),
         pgCode: code,
-        plan: 'trial',
         isActive: true,
-        trialEnd: trialEnd.toISOString().split('T')[0],
         createdAt: new Date(),
-        features: { electricity: true, payments: true, rooms: true, tenants: true, reports: true },
-        limits: { maxTenants: 50, maxRooms: 20, maxReportsPerMonth: 5 },
+        billing_mode: 'usage',
+        current_beds: 0,
+        max_beds_this_month: 0,
       });
 
       // ✅ Link email+password to phone auth user so all 3 login methods work
