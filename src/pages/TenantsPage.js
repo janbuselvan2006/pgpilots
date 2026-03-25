@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { db, auth } from '../firebase';
 import {
   collection, addDoc, getDocs,
@@ -209,6 +210,7 @@ export default function Tenants({ pgId }) {
   const [search, setSearch]             = useState('');
   const [editId, setEditId]             = useState(null);
   const [showQr, setShowQr]             = useState(false);
+  const [qrDataUrl, setQrDataUrl]       = useState('');
   const [form, setForm] = useState({
     name:'', phone:'', email:'', address:'', company:'',
     roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
@@ -218,6 +220,15 @@ export default function Tenants({ pgId }) {
 
   const user = auth.currentUser;
   const qrLink = user && pgId ? `${window.location.origin}/tenant-onboard?ownerId=${user.uid}&pgId=${pgId}` : '';
+
+  useEffect(() => {
+    let active = true;
+    if (!qrLink) { setQrDataUrl(''); return; }
+    QRCode.toDataURL(qrLink, { width: 220, margin: 2 })
+      .then(url => { if (active) setQrDataUrl(url); })
+      .catch(() => { if (active) setQrDataUrl(''); });
+    return () => { active = false; };
+  }, [qrLink]);
   const fetchData = async () => {
     // ✅ Guard: need both user and pgId
     if (!user || !pgId) { setLoading(false); return; }
@@ -462,10 +473,10 @@ export default function Tenants({ pgId }) {
             <div className="qr-modal" onClick={(e) => e.stopPropagation()}>
               <div className="qr-title">Tenant Self Onboarding</div>
               <div className="qr-sub">Ask tenant to scan and fill the form</div>
-              {qrLink ? (
-                <img className="qr-img" alt="Tenant QR" src={`https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl=${encodeURIComponent(qrLink)}`} />
+              {qrDataUrl ? (
+                <img className="qr-img" alt="Tenant QR" src={qrDataUrl} />
               ) : (
-                <div className="tn-loading">QR unavailable</div>
+                <div className="tn-loading">Generating QR…</div>
               )}
               <div className="qr-actions">
                 <button className="qr-btn qr-copy"
