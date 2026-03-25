@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { db, auth } from '../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   collection, addDoc, getDocs,
   doc, query, where, updateDoc
@@ -211,6 +212,8 @@ export default function Tenants({ pgId }) {
   const [editId, setEditId]             = useState(null);
   const [showQr, setShowQr]             = useState(false);
   const [qrDataUrl, setQrDataUrl]       = useState('');
+  const [qrToken, setQrToken]           = useState('');
+  const [qrLoading, setQrLoading]       = useState(false);
   const [form, setForm] = useState({
     name:'', phone:'', email:'', address:'', company:'',
     roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
@@ -219,7 +222,24 @@ export default function Tenants({ pgId }) {
   });
 
   const user = auth.currentUser;
-  const qrLink = user && pgId ? `${window.location.origin}/tenant-onboard?ownerId=${user.uid}&pgId=${pgId}` : '';
+  const qrLink = qrToken ? `${window.location.origin}/tenant-onboard?token=${qrToken}` : '';
+
+  useEffect(() => {
+    const generateToken = async () => {
+      if (!showQr || !pgId || !user) return;
+      setQrLoading(true);
+      try {
+        const fn = httpsCallable(getFunctions(), 'createOnboardingToken');
+        const res = await fn({ pgId });
+        setQrToken(res.data?.token || '');
+      } catch (e) {
+        console.error(e);
+        setQrToken('');
+      }
+      setQrLoading(false);
+    };
+    generateToken();
+  }, [showQr, pgId, user]);
 
   useEffect(() => {
     let active = true;
@@ -469,14 +489,16 @@ export default function Tenants({ pgId }) {
 
         {/* QR Modal */}
         {showQr && (
-          <div className="qr-overlay" onClick={() => setShowQr(false)}>
+          <div className="qr-overlay" onClick={() => { setShowQr(false); setQrToken(''); setQrDataUrl(''); }}>
             <div className="qr-modal" onClick={(e) => e.stopPropagation()}>
               <div className="qr-title">Tenant Self Onboarding</div>
               <div className="qr-sub">Ask tenant to scan and fill the form</div>
-              {qrDataUrl ? (
+              {qrLoading ? (
+                <div className="tn-loading">Generating QR…</div>
+              ) : qrDataUrl ? (
                 <img className="qr-img" alt="Tenant QR" src={qrDataUrl} />
               ) : (
-                <div className="tn-loading">Generating QR…</div>
+                <div className="tn-loading">QR unavailable</div>
               )}
               <div className="qr-actions">
                 <button className="qr-btn qr-copy"

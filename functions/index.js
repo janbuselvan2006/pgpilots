@@ -1,13 +1,25 @@
 const { onDocumentDeleted, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onCall } = require("firebase-functions/v2/https");
+const { onCall, onRequest } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 const db = admin.firestore();
+const bucket = admin.storage().bucket();
 
 setGlobalOptions({ maxInstances: 10 });
+
+const setCors = (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+  res.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return true;
+  }
+  return false;
+};
 
 // ─────────────────────────────────────────────────────────────
 // FUNCTION 1 — onOwnerDeleted
@@ -336,4 +348,135 @@ exports.deleteStaffAccounts = onCall(async (request) => {
   }
 
   return { deleted };
+});
+
+// Generate a secure onboarding token for a PG (owner only)
+exports.createOnboardingToken = onCall(async (request) => {
+  if (!request.auth) {
+    throw new Error("Unauthorized");
+  }
+
+  const ownerId = request.auth.uid;
+  const pgId = request.data?.pgId;
+  if (!pgId) {
+    throw new Error("Missing pgId");
+  }
+
+  const pgSnap = await db.collection("pgOwners").doc(ownerId).collection("pgs").doc(pgId).get();
+  if (!pgSnap.exists) {
+    throw new Error("PG not found");
+  }
+
+  const tokenRef = db.collection("onboardingTokens").doc();
+  const expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  await tokenRef.set({
+    ownerId,
+    pgId,
+    expiresAt,
+    used: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { token: tokenRef.id, expiresAt: expiresAt.toDate().toISOString() };
+});
+
+// Public: Fetch onboarding data via token
+exports.getOnboardingData = onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  const token = req.query.token || req.body?.token;
+  if (!token) return res.status(400).json({ error: "Missing token" });
+
+  const tokenSnap = await db.collection("onboardingTokens").doc(token).get();
+  if (!tokenSnap.exists) return res.status(404).json({ error: "Invalid token" });
+  const tokenData = tokenSnap.data();
+  if (tokenData.used) return res.status(410).json({ error: "Token already used" });
+  if (tokenData.expiresAt?.toDate && tokenData.expiresAt.toDate() < new Date()) {
+    return res.status(410).json({ error: "Token expired" });
+  }
+
+  const ownerSnap = await db.collection("pgOwners").doc(tokenData.ownerId).get();
+  const pgSnap = await db.collection("pgOwners").doc(tokenData.ownerId).collection("pgs").doc(tokenData.pgId).get();
+  if (!pgSnap.exists) return res.status(404).json({ error: "PG not found" });
+
+  const roomsSnap = await db.collection("rooms").where("pgId", "==", tokenData.pgId).get();
+  const tenantsSnap = await db.collection("tenants").where("pgId", "==", tokenData.pgId).get();
+
+  const ownerData = ownerSnap.exists ? ownerSnap.data() : {};
+  return res.json({
+    owner: ownerSnap.exists ? { phone: ownerData.phone || "", email: ownerData.email || ownerData.ownerEmail || "" } : {},
+    pg: pgSnap.data(),
+    rooms: roomsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    tenants: tenantsSnap.docs.map(d => ({
+      roomNumber: d.data().roomNumber,
+      bedNumber: d.data().bedNumber,
+      status: d.data().status || "Active",
+    })),
+  });
+});
+
+// Public: Submit onboarding data via token
+exports.submitOnboarding = onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const { token, form, family, pdfBase64 } = req.body || {};
+  if (!token || !form) return res.status(400).json({ error: "Missing data" });
+  if (!form.name || !form.phone || !form.roomNumber || !form.bedNumber) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  const tokenRef = db.collection("onboardingTokens").doc(token);
+  const tokenSnap = await tokenRef.get();
+  if (!tokenSnap.exists) return res.status(404).json({ error: "Invalid token" });
+  const tokenData = tokenSnap.data();
+  if (tokenData.used) return res.status(410).json({ error: "Token already used" });
+  if (tokenData.expiresAt?.toDate && tokenData.expiresAt.toDate() < new Date()) {
+    return res.status(410).json({ error: "Token expired" });
+  }
+
+  const ownerId = tokenData.ownerId;
+  const pgId = tokenData.pgId;
+
+  // Validate room/bed availability
+  const roomSnap = await db.collection("rooms")
+    .where("pgId", "==", pgId)
+    .where("roomNumber", "==", form.roomNumber)
+    .get();
+  if (roomSnap.empty) return res.status(400).json({ error: "Room not found" });
+  const roomDoc = roomSnap.docs[0];
+
+  const tenantSnap = await db.collection("tenants")
+    .where("pgId", "==", pgId)
+    .where("roomNumber", "==", form.roomNumber)
+    .where("bedNumber", "==", form.bedNumber)
+    .get();
+  const alreadyTaken = tenantSnap.docs.some(d => d.data().status !== "deleted");
+  if (alreadyTaken) return res.status(409).json({ error: "Bed already occupied" });
+
+  let pdfUrl = "";
+  if (pdfBase64) {
+    const buffer = Buffer.from(pdfBase64, "base64");
+    const fileName = `${(form.admissionNumber || form.name || "tenant").toString().replace(/\s+/g, "_")}_${Date.now()}.pdf`;
+    const file = bucket.file(`tenantForms/${ownerId}/${pgId}/${fileName}`);
+    await file.save(buffer, { contentType: "application/pdf" });
+    const [signedUrl] = await file.getSignedUrl({ action: "read", expires: "2036-01-01" });
+    pdfUrl = signedUrl;
+  }
+
+  const tenantDoc = {
+    ...form,
+    ownerId,
+    pgId,
+    status: "Active",
+    family: Array.isArray(family) ? family : [],
+    onboardingPdfUrl: pdfUrl,
+    onboardingSource: "qr",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  await db.collection("tenants").add(tenantDoc);
+  await roomDoc.ref.update({ occupiedBeds: admin.firestore.FieldValue.increment(1) });
+  await tokenRef.update({ used: true, usedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+  return res.json({ ok: true, pdfUrl });
 });
