@@ -95,6 +95,7 @@ const css = `
   .tc-footer  { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
   .tc-edit-btn { flex: 1; padding: 10px; background: #eef2ff; color: #4f46e5; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
   .tc-del-btn  { flex: 1; padding: 10px; background: #fef2f2; color: #dc2626; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  .tc-pdf-btn  { flex: 1; padding: 10px; background: #f0fdf4; color: #059669; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
 
   .tn-empty       { text-align: center; padding: 50px 20px; background: white; border-radius: 18px; }
   .tn-empty-icon  { font-size: 48px; margin-bottom: 12px; }
@@ -167,6 +168,27 @@ const css = `
   .del-cancel  { flex:1; padding:13px; background:#f1f5f9; color:#64748b; border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
   .del-confirm { flex:1; padding:13px; background:#dc2626; color:white; border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
 
+  .qr-overlay {
+    position: fixed; inset: 0; background: rgba(15,20,40,0.6);
+    z-index: 120; display: flex; align-items: center; justify-content: center;
+    padding: 20px; backdrop-filter: blur(3px);
+  }
+  .qr-modal {
+    background: white; border-radius: 18px; padding: 20px;
+    width: 100%; max-width: 360px; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+  .qr-title { font-size: 16px; font-weight: 800; color: #1e293b; margin-bottom: 6px; }
+  .qr-sub   { font-size: 12px; color: #94a3b8; margin-bottom: 14px; }
+  .qr-img   { width: 200px; height: 200px; object-fit: contain; margin: 0 auto 12px; }
+  .qr-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .qr-btn {
+    padding: 10px; border-radius: 10px; border: none; cursor: pointer;
+    font-size: 12px; font-weight: 700; font-family: inherit;
+  }
+  .qr-copy { background: #eef2ff; color: #4f46e5; }
+  .qr-manual { background: #e94560; color: white; }
+
   @media (min-width: 640px) {
     .tn-tenants-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
     .tn-tenants-grid .tc { margin-bottom: 0; }
@@ -186,6 +208,7 @@ export default function Tenants({ pgId }) {
   const [saving, setSaving]             = useState(false);
   const [search, setSearch]             = useState('');
   const [editId, setEditId]             = useState(null);
+  const [showQr, setShowQr]             = useState(false);
   const [form, setForm] = useState({
     name:'', phone:'', email:'', address:'', company:'',
     roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
@@ -194,6 +217,7 @@ export default function Tenants({ pgId }) {
   });
 
   const user = auth.currentUser;
+  const qrLink = user && pgId ? `${window.location.origin}/tenant-onboard?ownerId=${user.uid}&pgId=${pgId}` : '';
   const fetchData = async () => {
     // ✅ Guard: need both user and pgId
     if (!user || !pgId) { setLoading(false); return; }
@@ -344,7 +368,7 @@ export default function Tenants({ pgId }) {
               <p className="tn-page-sub">{tenantCount} active tenants</p>
             </div>
             <button className="tn-add-fab"
-              onClick={() => { resetForm(); setShowForm(true); }}>
+              onClick={() => setShowQr(true)}>
               ＋
             </button>
           </div>
@@ -419,6 +443,9 @@ export default function Tenants({ pgId }) {
                     {tenant.company && <div className="tc-company">🏢 {tenant.company}</div>}
 
                     <div className="tc-footer">
+                      {tenant.onboardingPdfUrl && (
+                        <button className="tc-pdf-btn" onClick={() => window.open(tenant.onboardingPdfUrl, '_blank')}>⬇️ PDF</button>
+                      )}
                       <button className="tc-edit-btn" onClick={() => handleEdit(tenant)}>✏️ Edit</button>
                       <button className="tc-del-btn"  onClick={() => setDeleteTarget(tenant)}>🗑️ Remove</button>
                     </div>
@@ -428,6 +455,34 @@ export default function Tenants({ pgId }) {
             </div>
           )}
         </div>
+
+        {/* QR Modal */}
+        {showQr && (
+          <div className="qr-overlay" onClick={() => setShowQr(false)}>
+            <div className="qr-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="qr-title">Tenant Self Onboarding</div>
+              <div className="qr-sub">Ask tenant to scan and fill the form</div>
+              {qrLink ? (
+                <img className="qr-img" alt="Tenant QR" src={`https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl=${encodeURIComponent(qrLink)}`} />
+              ) : (
+                <div className="tn-loading">QR unavailable</div>
+              )}
+              <div className="qr-actions">
+                <button className="qr-btn qr-copy"
+                  onClick={() => {
+                    if (!qrLink) return;
+                    navigator.clipboard.writeText(qrLink);
+                  }}>
+                  Copy Link
+                </button>
+                <button className="qr-btn qr-manual"
+                  onClick={() => { setShowQr(false); resetForm(); setShowForm(true); }}>
+                  Add Manually
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add / Edit Sheet */}
         {showForm && (

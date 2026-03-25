@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   doc, getDoc, collection, getDocs, query, where,
 } from 'firebase/firestore';
@@ -266,59 +265,6 @@ const css = `
     box-shadow: 0 2px 10px rgba(0,0,0,0.06);
   }
 
-  /* Overview */
-  .db-overview-grid {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
-  .db-overview-card {
-    background: white; border-radius: 18px; padding: 18px 18px 16px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-    display: flex; flex-direction: column; gap: 10px;
-  }
-  .db-overview-head {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  }
-  .db-overview-title {
-    font-size: 15px; font-weight: 800; color: #1e293b;
-  }
-  .db-overview-sub {
-    font-size: 12px; color: #94a3b8; margin-top: 2px;
-  }
-  .db-overview-pill {
-    background: #eef2ff; color: #4338ca;
-    padding: 4px 10px; border-radius: 999px; font-size: 10px; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.4px;
-  }
-  .db-overview-meta {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px; margin-top: 2px;
-  }
-  .db-overview-meta-item {
-    background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px;
-    padding: 10px 12px;
-  }
-  .db-overview-meta-label {
-    font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;
-  }
-  .db-overview-meta-value {
-    font-size: 13px; font-weight: 700; color: #1e293b; margin-top: 4px;
-  }
-  .db-overview-actions {
-    display: flex; gap: 10px; margin-top: 2px;
-  }
-  .db-overview-btn {
-    flex: 1; padding: 10px 12px; border-radius: 12px; border: none;
-    font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
-  }
-  .db-overview-btn.primary { background: #e94560; color: white; }
-  .db-overview-btn.ghost   { background: #f1f5f9; color: #64748b; }
-  .db-overview-empty {
-    padding: 40px 20px; text-align: center;
-    background: white; border-radius: 18px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-  }
-
   /* ── BOTTOM NAV ── */
   .db-bottom-nav {
     display: none; position: fixed; bottom: 0; left: 0; right: 0;
@@ -394,7 +340,6 @@ const css = `
     .db-quick-grid { grid-template-columns: repeat(2,1fr); gap: 10px; }
     .db-quick-btn  { padding: 16px 10px; border-radius: 14px; }
     .db-quick-icon { font-size: 24px; }
-    .db-overview-grid { grid-template-columns: 1fr; }
   }
 
   @media (min-width: 769px) {
@@ -433,11 +378,12 @@ export default function Dashboard() {
   const [newPgCity, setNewPgCity]   = useState('');
   const [newPgState, setNewPgState] = useState('');
   const [addingPg, setAddingPg]     = useState(false);
-  const [billingInfo, setBillingInfo] = useState({ pricePerBed: 8, currentBeds: 0, maxBeds: 0 });
 
   const navigate = useNavigate();
+  const primaryPgId = pgs[0]?.pgId || pgs[0]?.id || null;
   const isAllSelected = selectedPgId === ALL_PGS_ID;
-  const effectivePgId = isAllSelected ? ALL_PGS_ID : (selectedPg?.pgId || selectedPgId);
+  const dashboardPgId = isAllSelected ? ALL_PGS_ID : (selectedPg?.pgId || selectedPgId);
+  const effectivePgId = isAllSelected && activeMenu !== 'Dashboard' ? primaryPgId : dashboardPgId;
 
   // ── Fetch all PGs for this owner
   const fetchPGs = async (user) => {
@@ -561,40 +507,6 @@ export default function Dashboard() {
         pendingRents:   pending.length,
       });
 
-      // Fetch global billing price
-      const billSnap = await getDoc(doc(db, 'settings', 'billing'));
-      const defaultPrice = billSnap.exists() ? billSnap.data().price_per_bed : 8;
-
-      const ownerRef = doc(db, 'pgOwners', ownerId);
-      let ownerSnap = await getDoc(ownerRef);
-      let ownerData = ownerSnap.data() || {};
-
-      let currentBeds = ownerData.current_beds;
-      let maxBeds = ownerData.max_beds_this_month;
-
-      // If the new billing fields are missing (legacy accounts), ask backend to recalculate atomically.
-      if (currentBeds == null || maxBeds == null) {
-        try {
-          const fn = httpsCallable(getFunctions(), 'recalculateOwnerBeds');
-          const res = await fn({ ownerId });
-          currentBeds = res.data?.current_beds ?? currentBeds;
-          maxBeds = res.data?.max_beds_this_month ?? maxBeds;
-          ownerSnap = await getDoc(ownerRef);
-          ownerData = ownerSnap.data() || ownerData;
-        } catch (err) {
-          console.log('Failed to recalculate bed counts:', err);
-        }
-      }
-
-      const pricePerBed = ownerData.price_per_bed || defaultPrice;
-      const safeCurrent = (currentBeds ?? ownerData.current_bed_count) ?? 0;
-      const safeMax = (maxBeds ?? ownerData.max_bed_count_this_month) ?? safeCurrent;
-
-      setBillingInfo({
-        pricePerBed,
-        currentBeds: safeCurrent,
-        maxBeds:     safeMax
-      });
     } catch (e) { console.error(e); }
     setStatsLoading(false);
   }, [pgs]);
@@ -654,27 +566,13 @@ export default function Dashboard() {
   }, [activeMenu]);
 
   const handleMenu = (label) => {
-    if (label === 'Overview') {
-      setSelectedPgId(ALL_PGS_ID);
-      setActiveMenu('Dashboard');
-      setSidebarOpen(false);
-      if (auth.currentUser) fetchStats(ALL_PGS_ID, auth.currentUser.uid);
-      return;
+    setSidebarOpen(false);
+    if (label !== 'Dashboard' && selectedPgId === ALL_PGS_ID) {
+      if (primaryPgId) setSelectedPgId(primaryPgId);
     }
     setActiveMenu(label);
-    setSidebarOpen(false);
-    if (label === 'Dashboard' && effectivePgId && auth.currentUser) {
-      fetchStats(effectivePgId, auth.currentUser.uid);
-    }
-  };
-
-  const openPgDashboard = (pgId) => {
-    setSelectedPgId(pgId);
-    setActiveMenu('Dashboard');
-    setSidebarOpen(false);
-    if (auth.currentUser) {
-      const pg = pgs.find(p => p.id === pgId);
-      fetchStats((pg?.pgId || pgId), auth.currentUser.uid);
+    if (label === 'Dashboard' && dashboardPgId && auth.currentUser) {
+      fetchStats(dashboardPgId, auth.currentUser.uid);
     }
   };
 
@@ -720,7 +618,6 @@ export default function Dashboard() {
   };
 
   const menuItems = [
-    {icon:'🗂️',label:'Overview'},
     {icon:'📊',label:'Dashboard'},
     {icon:'🛏️',label:'Rooms'},
     {icon:'👥',label:'Tenants'},
@@ -747,7 +644,7 @@ export default function Dashboard() {
     {icon:'⚡', label:'Electricity',    menu:'Electricity', accent:'#dc2626'},
   ];
 
-  const knownPages = ['Overview','Dashboard','Rooms','Tenants','Rent','Electricity','Reports','Settings'];
+  const knownPages = ['Dashboard','Rooms','Tenants','Rent','Electricity','Reports','Settings'];
 
   const PgSwitcherSelect = ({ className }) => (
     <select
@@ -889,56 +786,6 @@ export default function Dashboard() {
             {activeMenu === 'Reports'     && <ReportsPage pgId={effectivePgId} />}
             {activeMenu === 'Settings'    && <SettingsPage pgId={effectivePgId} />}
 
-            {/* ── Overview (All PGs) ── */}
-            {activeMenu === 'Overview' && (
-              <div className="db-dash-content">
-                <div className="db-section-title">All PGs</div>
-                {pgs.length > 0 ? (
-                  <div className="db-overview-grid">
-                    {pgs.map(pg => (
-                      <div key={pg.id} className="db-overview-card">
-                        <div className="db-overview-head">
-                          <div>
-                            <div className="db-overview-title">{pg.pgName || 'Untitled PG'}</div>
-                            <div className="db-overview-sub">
-                              {[pg.city, pg.state].filter(Boolean).join(', ') || 'Location not set'}
-                            </div>
-                          </div>
-                          <div className="db-overview-pill">
-                            Usage Billing
-                          </div>
-                        </div>
-                        <div className="db-overview-meta">
-                          <div className="db-overview-meta-item">
-                            <div className="db-overview-meta-label">PG Code</div>
-                            <div className="db-overview-meta-value">{pg.pgCode || '—'}</div>
-                          </div>
-                          <div className="db-overview-meta-item">
-                            <div className="db-overview-meta-label">Status</div>
-                            <div className="db-overview-meta-value">{pg.isActive === false ? 'Inactive' : 'Active'}</div>
-                          </div>
-                        </div>
-                        <div className="db-overview-actions">
-                          <button className="db-overview-btn ghost" onClick={() => setSelectedPgId(pg.id)}>
-                            Set Active
-                          </button>
-                          <button className="db-overview-btn primary" onClick={() => openPgDashboard(pg.id)}>
-                            Open Dashboard
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="db-overview-empty">
-                    <div style={{ fontSize:'40px', marginBottom:'10px' }}>🏠</div>
-                    <p style={{ fontSize:'15px', fontWeight:'700', color:'#1e293b', margin:'0 0 4px' }}>No PGs yet</p>
-                    <p style={{ fontSize:'13px', color:'#94a3b8', margin:0 }}>Add your first PG to get started</p>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* ── Dashboard Home ── */}
             {activeMenu === 'Dashboard' && (
               <>
@@ -970,29 +817,6 @@ export default function Dashboard() {
                   </div>
 
                   <div style={{ height: '20px' }} />
-
-                  {/* ✅ Usage & Billing Section */}
-                  <div className="db-section-title">Usage & Billing (All PGs)</div>
-                  <div className="db-activity-card" style={{ padding: '16px 20px', marginBottom: '24px', background: 'linear-gradient(135deg, #fff 0%, #f8fafc 100%)', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', borderRadius: '18px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                      <div style={{ textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
-                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>Current Beds</div>
-                        <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>{billingInfo.currentBeds}</div>
-                        <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px' }}>All PGs combined</div>
-                      </div>
-                      <div style={{ textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
-                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>Peak (Mo)</div>
-                        <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>{billingInfo.maxBeds}</div>
-                        <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px' }}>Highest this month</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#e94560', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>Est. Bill</div>
-                        <div style={{ fontSize: '18px', fontWeight: '800', color: '#e94560' }}>₹{billingInfo.maxBeds * billingInfo.pricePerBed}</div>
-                        <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px' }}>₹{billingInfo.pricePerBed}/bed</div>
-                      </div>
-                    </div>
-                  </div>
-
 
                   {/* Quick actions */}
                   <div className="db-section-title">Quick Actions</div>

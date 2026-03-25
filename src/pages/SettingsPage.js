@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from '../firebase';
-import { doc, getDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -161,6 +162,30 @@ const css = `
   .st-spinner { width:30px; height:30px; border:3px solid #e2e8f0; border-top-color:#e94560; border-radius:50%; animation:stspin 0.7s linear infinite; margin:0 auto 12px; }
   @keyframes stspin { to{transform:rotate(360deg)} }
 
+  /* Manage PG styles */
+  .st-pg-card {
+    border:1.5px solid #e2e8f0; border-radius:16px; padding:16px;
+    background:#fafbff; margin-bottom:12px;
+  }
+  .st-pg-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px; }
+  .st-pg-title { font-size:14px; font-weight:800; color:#1a1a2e; }
+  .st-pg-badge {
+    font-size:10px; font-weight:800; padding:3px 8px; border-radius:20px;
+    background:#e2e8f0; color:#475569; text-transform:uppercase; letter-spacing:0.4px;
+  }
+  .st-pg-actions { display:flex; gap:10px; margin-top:10px; }
+  .st-pg-save {
+    flex:1; padding:10px 12px; border-radius:10px; border:none;
+    background:linear-gradient(135deg,#e94560,#0f3460); color:white;
+    font-size:12px; font-weight:800; cursor:pointer; font-family:inherit;
+  }
+  .st-pg-delete {
+    flex:1; padding:10px 12px; border-radius:10px; border:1px solid #fecaca;
+    background:#fef2f2; color:#dc2626; font-size:12px; font-weight:800;
+    cursor:pointer; font-family:inherit;
+  }
+  .st-pg-save:disabled, .st-pg-delete:disabled { opacity:0.6; cursor:not-allowed; }
+
   /* ── Staff Access styles ── */
   .st-staff-header {
     display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;
@@ -312,6 +337,9 @@ export default function SettingsPage() {
   const [staffForm, setStaffForm]         = useState({ name:'', pgId:'' });
   const [newCredentials, setNewCredentials] = useState(null); // shown after creation
   const [pgList, setPgList]               = useState([]);
+  const [pgEdits, setPgEdits]             = useState({});
+  const [savingPgId, setSavingPgId]       = useState(null);
+  const [deletingPgId, setDeletingPgId]   = useState(null);
 
   const user = auth.currentUser;
 
@@ -358,6 +386,20 @@ export default function SettingsPage() {
   useEffect(()=>{
     if(activeTab==='staff') fetchStaff();
   },[activeTab]);
+
+  useEffect(()=>{
+    const next = {};
+    pgList.forEach((pg) => {
+      next[pg.id] = {
+        pgName: pg.pgName || '',
+        city: pg.city || '',
+        state: pg.state || '',
+        address: pg.address || '',
+        pgCode: pg.pgCode || '',
+      };
+    });
+    setPgEdits(next);
+  }, [pgList]);
 
   const showOk  = (msg) => { setSuccessMsg(msg); setErrorMsg('');   setTimeout(()=>setSuccessMsg(''),3000); };
   const showErr = (msg) => { setErrorMsg(msg);   setSuccessMsg(''); setTimeout(()=>setErrorMsg(''),4000); };
@@ -437,6 +479,101 @@ export default function SettingsPage() {
       else showErr('Failed to change password!');
     }
     setSaving(false);
+  };
+
+  const updateStaffPgName = async (pgId, pgName) => {
+    const ownerStaffSnap = await getDocs(query(collection(db, 'pgOwners', user.uid, 'staff'), where('pgId', '==', pgId)));
+    const staffAccSnap   = await getDocs(query(collection(db, 'staffAccounts'), where('pgId', '==', pgId)));
+    await Promise.all([
+      ...ownerStaffSnap.docs.map(d => updateDoc(d.ref, { pgName })),
+      ...staffAccSnap.docs.map(d => updateDoc(d.ref, { pgName })),
+    ]);
+  };
+
+  const handleSavePg = async (pg) => {
+    const draft = pgEdits[pg.id];
+    if (!draft?.pgName?.trim()) return showErr('PG name is required!');
+    setSavingPgId(pg.id);
+    try {
+      const payload = {
+        pgName: draft.pgName.trim(),
+        city: draft.city.trim(),
+        state: draft.state.trim(),
+        address: draft.address.trim(),
+      };
+      await updateDoc(doc(db, 'pgOwners', user.uid, 'pgs', pg.id), payload);
+      await updateStaffPgName(pg.id, payload.pgName);
+      showOk('✅ PG details updated!');
+      fetchPGs();
+    } catch (e) {
+      console.error(e);
+      showErr('Failed to update PG!');
+    }
+    setSavingPgId(null);
+  };
+
+  const handleDeletePg = async (pg) => {
+    const first = window.confirm(`Delete "${pg.pgName || 'this PG'}"?`);
+    if (!first) return;
+    const second = window.confirm('This will permanently delete all rooms, tenants, payments, electricity bills, and staff logins for this PG. This cannot be undone. Continue?');
+    if (!second) return;
+
+    setDeletingPgId(pg.id);
+    try {
+      const pgId = pg.id;
+      const staffUids = new Set();
+
+      // Delete rooms, tenants, payments, electricity bills
+      const targets = [
+        collection(db, 'rooms'),
+        collection(db, 'tenants'),
+        collection(db, 'payments'),
+        collection(db, 'electricityBills'),
+      ];
+      for (const colRef of targets) {
+        const snap = await getDocs(query(colRef, where('pgId', '==', pgId)));
+        await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+      }
+
+      // Delete staff under owner
+      const ownerStaffSnap = await getDocs(query(collection(db, 'pgOwners', user.uid, 'staff'), where('pgId', '==', pgId)));
+      ownerStaffSnap.docs.forEach(d => {
+        const data = d.data();
+        if (data?.staffUid) staffUids.add(data.staffUid);
+      });
+      await Promise.all(ownerStaffSnap.docs.map(d => deleteDoc(d.ref)));
+
+      // Collect staffAccounts lookup
+      const staffAccSnap = await getDocs(query(collection(db, 'staffAccounts'), where('pgId', '==', pgId)));
+      staffAccSnap.docs.forEach(d => {
+        const data = d.data();
+        if (data?.staffUid) staffUids.add(data.staffUid);
+      });
+
+      // Best-effort: delete staff auth users (must run before staffAccounts are deleted)
+      if (staffUids.size > 0) {
+        try {
+          const fn = httpsCallable(getFunctions(), 'deleteStaffAccounts');
+          await fn({ staffUids: Array.from(staffUids) });
+        } catch (err) {
+          console.warn('Failed to delete staff auth users:', err);
+        }
+      }
+
+      // Delete staffAccounts lookup
+      await Promise.all(staffAccSnap.docs.map(d => deleteDoc(d.ref)));
+
+      // Delete PG doc
+      await deleteDoc(doc(db, 'pgOwners', user.uid, 'pgs', pgId));
+
+      showOk('✅ PG deleted successfully!');
+      fetchPGs();
+      if (activeTab === 'staff') fetchStaff();
+    } catch (e) {
+      console.error(e);
+      showErr('Failed to delete PG!');
+    }
+    setDeletingPgId(null);
   };
 
   // ── Staff: Create new staff login using PG Code ──
@@ -520,6 +657,7 @@ export default function SettingsPage() {
     {id:'profile',  label:'👤 Profile'},
     {id:'payment',  label:'💳 Payment'},
     {id:'password', label:'🔒 Password'},
+    {id:'managepg', label:'🏠 Manage PGs'},
     {id:'staff',    label:'👥 Staff'},
     {id:'billing',  label:'💳 Billing'},
   ];
@@ -750,6 +888,80 @@ export default function SettingsPage() {
                   <button className="st-save-btn" onClick={handleChangePassword} disabled={saving}>
                     {saving ? 'Changing…' : '🔒 Change Password'}
                   </button>
+                </div>
+              )}
+
+              {/* ── MANAGE PGs ── */}
+              {activeTab==='managepg' && (
+                <div className="st-card">
+                  <h2 className="st-card-title">🏠 Manage PGs</h2>
+                  <p className="st-card-sub">Edit branch PG details or delete a PG (double confirmation)</p>
+
+                  {pgList.length === 0 ? (
+                    <div style={{padding:'12px 14px',background:'#fef2f2',borderRadius:'12px',fontSize:'13px',color:'#dc2626',fontWeight:'600'}}>
+                      ⚠️ No PGs found. Add a PG first from the Dashboard.
+                    </div>
+                  ) : (
+                    pgList.map(pg => (
+                      <div key={pg.id} className="st-pg-card">
+                        <div className="st-pg-head">
+                          <div className="st-pg-title">{pg.pgName || 'Untitled PG'}</div>
+                          <div className="st-pg-badge">{pg.is_main ? 'Main PG' : 'Branch PG'}</div>
+                        </div>
+
+                        <div className="st-field">
+                          <label className="st-label">PG Name *</label>
+                          <input className="st-input" type="text"
+                            value={pgEdits[pg.id]?.pgName ?? ''}
+                            onChange={e=>setPgEdits(p=>({ ...p, [pg.id]: { ...(p[pg.id]||{}), pgName: e.target.value } }))} />
+                        </div>
+
+                        <div className="st-row">
+                          <div className="st-field">
+                            <label className="st-label">City</label>
+                            <input className="st-input" type="text"
+                              value={pgEdits[pg.id]?.city ?? ''}
+                              onChange={e=>setPgEdits(p=>({ ...p, [pg.id]: { ...(p[pg.id]||{}), city: e.target.value } }))} />
+                          </div>
+                          <div className="st-field">
+                            <label className="st-label">State</label>
+                            <input className="st-input" type="text"
+                              value={pgEdits[pg.id]?.state ?? ''}
+                              onChange={e=>setPgEdits(p=>({ ...p, [pg.id]: { ...(p[pg.id]||{}), state: e.target.value } }))} />
+                          </div>
+                        </div>
+
+                        <div className="st-field">
+                          <label className="st-label">Address</label>
+                          <input className="st-input" type="text"
+                            value={pgEdits[pg.id]?.address ?? ''}
+                            onChange={e=>setPgEdits(p=>({ ...p, [pg.id]: { ...(p[pg.id]||{}), address: e.target.value } }))} />
+                        </div>
+
+                        <div className="st-field">
+                          <label className="st-label">PG Code</label>
+                          <input className="st-input" type="text" value={pgEdits[pg.id]?.pgCode ?? ''} disabled />
+                        </div>
+
+                        <div className="st-pg-actions">
+                          <button
+                            className="st-pg-save"
+                            onClick={()=>handleSavePg(pg)}
+                            disabled={savingPgId===pg.id || deletingPgId===pg.id}
+                          >
+                            {savingPgId===pg.id ? 'Saving…' : 'Save Changes'}
+                          </button>
+                          <button
+                            className="st-pg-delete"
+                            onClick={()=>handleDeletePg(pg)}
+                            disabled={savingPgId===pg.id || deletingPgId===pg.id}
+                          >
+                            {deletingPgId===pg.id ? 'Deleting…' : 'Delete PG'}
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
 

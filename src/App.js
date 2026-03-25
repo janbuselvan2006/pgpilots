@@ -10,6 +10,7 @@ import AdminPanel from './pages/AdminPanel';
 import AdminRoute from './AdminRoute';
 import StaffLogin from './Stafflogin';
 import StaffDashboard from './Staffdashboard';
+import TenantOnboard from './pages/TenantOnboard';
 
 function LoadingScreen() {
   return (
@@ -96,6 +97,9 @@ function App() {
 
         <Route path="/admin"
           element={<AdminRoute><AdminPanel /></AdminRoute>} />
+
+        <Route path="/tenant-onboard"
+          element={<TenantOnboard />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

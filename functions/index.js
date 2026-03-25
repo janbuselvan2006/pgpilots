@@ -306,3 +306,34 @@ exports.recalculateOwnerBeds = onCall(async (request) => {
 
   return result;
 });
+
+// Delete staff auth users for a specific owner (called from owner settings)
+exports.deleteStaffAccounts = onCall(async (request) => {
+  if (!request.auth) {
+    throw new Error("Unauthorized");
+  }
+
+  const staffUids = Array.isArray(request.data?.staffUids) ? request.data.staffUids : [];
+  if (staffUids.length === 0) {
+    return { deleted: 0 };
+  }
+
+  // Only allow deleting staff that belong to the caller
+  const staffSnap = await db.collection("staffAccounts")
+    .where("ownerId", "==", request.auth.uid)
+    .get();
+  const allowed = new Set(staffSnap.docs.map(d => d.data().staffUid));
+
+  let deleted = 0;
+  for (const staffUid of staffUids) {
+    if (!allowed.has(staffUid)) continue;
+    try {
+      await admin.auth().deleteUser(staffUid);
+      deleted += 1;
+    } catch (e) {
+      console.warn(`Auth user not found (skipping): ${staffUid}`);
+    }
+  }
+
+  return { deleted };
+});
