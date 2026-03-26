@@ -256,6 +256,41 @@ const css = `
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Staff Login button */
+  .lg-staff-divider {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 20px; margin-bottom: 16px;
+  }
+  .lg-staff-divider span {
+    flex: 1; height: 1px; background: #e2e8f0;
+  }
+  .lg-staff-divider p {
+    font-size: 11px; color: #cbd5e1; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .lg-staff-btn {
+    width: 100%; padding: 12px 16px;
+    background: transparent;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 13px; font-weight: 700;
+    font-family: inherit;
+    color: #475569;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: border-color 0.2s, background 0.2s, color 0.2s, box-shadow 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    text-decoration: none;
+  }
+  .lg-staff-btn:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+    background: #f5f3ff;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.12);
+  }
+  .lg-staff-btn:active { transform: scale(0.98); }
+
   /* ─── DESKTOP: sidebar layout ─── */
   @media (min-width: 769px) {
     .lg-root {
@@ -585,6 +620,14 @@ export default function Login() {
         Don't have an account?{' '}
         <Link to="/signup">Create one free</Link>
       </p>
+
+      {/* Staff Login */}
+      <div className="lg-staff-divider">
+        <span /><p>Staff Access</p><span />
+      </div>
+      <Link to="/staff-login" className="lg-staff-btn" id="staff-login-btn">
+        🔒 Staff Login
+      </Link>
     </>
   );
 
