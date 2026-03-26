@@ -282,7 +282,7 @@ export default function RentPage({ pgId }) {
   const handleSavePayment = async () => {
     const amt = parseInt(form.amount);
     if (!amt || amt <= 0) return alert('Enter a valid amount!');
-    if (amt > liveTotalDue) return alert(`Amount cannot exceed ₹${liveTotalDue.toLocaleString()}`);
+    if (amt > liveTotalDue) return alert(`Amount cannot exceed ₹${liveTotalDue.toLocaleString('en-IN')}`);
     const prevPaid = getThisMonthPaid(selectedTenant.id);
     const newTotal = prevPaid + amt;
     const fullAmt  = (selectedTenant.monthlyRent || 0) + liveElec + livePenalty;
@@ -375,7 +375,7 @@ export default function RentPage({ pgId }) {
               {status==='upcoming' && <div className="trc-status-badge" style={{background:'#ecfdf5',color:'#059669'}}>🟢 {daysDiff}d left</div>}
               {status==='paid'     && <div className="trc-status-badge" style={{background:'#ecfdf5',color:'#059669'}}>✅ Paid</div>}
               <div className="trc-amount" style={{ color: accentColor }}>
-                ₹{(status === 'paid' ? getTotalDue(tenant) : balance).toLocaleString()}
+                ₹{(status === 'paid' ? getTotalDue(tenant) : balance).toLocaleString('en-IN')}
               </div>
               <div className="trc-amount-sub">{status === 'paid' ? 'paid' : 'due'}</div>
             </div>
@@ -383,17 +383,17 @@ export default function RentPage({ pgId }) {
 
           <div className="trc-pills">
             <span className="trc-pill">📅 Due {getDueDate(tenant)?.getDate()}th</span>
-            {elec > 0 && <span className="trc-pill info">⚡ ₹{elec.toLocaleString()}</span>}
+            {elec > 0 && <span className="trc-pill info">⚡ ₹{elec.toLocaleString('en-IN')}</span>}
             {!hasElecBill(tenant) && <span className="trc-pill warning">⚠️ No elec bill</span>}
-            {showPenalty && penalty > 0 && <span className="trc-pill danger">🔴 Late penalty ₹{penalty.toLocaleString()}</span>}
-            {partial && <span className="trc-pill warning">⚠️ Partial ₹{paid.toLocaleString()} paid</span>}
+            {showPenalty && penalty > 0 && <span className="trc-pill danger">🔴 Late penalty ₹{penalty.toLocaleString('en-IN')}</span>}
+            {partial && <span className="trc-pill warning">⚠️ Partial ₹{paid.toLocaleString('en-IN')} paid</span>}
           </div>
 
           <div className="trc-breakdown">
-            <div className="trc-bd-item">Rent <span>₹{(tenant.monthlyRent || 0).toLocaleString()}</span></div>
-            {elec > 0 && <div className="trc-bd-item">Elec <span>₹{elec.toLocaleString()}</span></div>}
-            {showPenalty && penalty > 0 && <div className="trc-bd-item">Late Penalty <span style={{color:'#dc2626'}}>₹{penalty.toLocaleString()}</span></div>}
-            <div className="trc-bd-item">Total <span>₹{getTotalDue(tenant).toLocaleString()}</span></div>
+            <div className="trc-bd-item">Rent <span>₹{(tenant.monthlyRent || 0).toLocaleString('en-IN')}</span></div>
+            {elec > 0 && <div className="trc-bd-item">Elec <span>₹{elec.toLocaleString('en-IN')}</span></div>}
+            {showPenalty && penalty > 0 && <div className="trc-bd-item">Late Penalty <span style={{color:'#dc2626'}}>₹{penalty.toLocaleString('en-IN')}</span></div>}
+            <div className="trc-bd-item">Total <span>₹{getTotalDue(tenant).toLocaleString('en-IN')}</span></div>
           </div>
 
           {status !== 'paid' && (
@@ -456,9 +456,9 @@ export default function RentPage({ pgId }) {
 
         <div className="rent-stats">
           {[
-            { label:'Expected',  value:`₹${totalExpected.toLocaleString()}`,  color:'#4f46e5', icon:'💰' },
-            { label:'Collected', value:`₹${totalCollected.toLocaleString()}`, color:'#059669', icon:'✅' },
-            { label:'Pending',   value:`₹${totalPending.toLocaleString()}`,   color:'#dc2626', icon:'⏳' },
+            { label:'Expected',  value:`₹${totalExpected.toLocaleString('en-IN')}`,  color:'#4f46e5', icon:'💰' },
+            { label:'Collected', value:`₹${totalCollected.toLocaleString('en-IN')}`, color:'#059669', icon:'✅' },
+            { label:'Pending',   value:`₹${totalPending.toLocaleString('en-IN')}`,   color:'#dc2626', icon:'⏳' },
             { label:'Paid',      value:`${paidTenants.length}/${tenants.length}`, color:'#d97706', icon:'👥' },
           ].map(({ label, value, color, icon }) => (
             <div key={label} className="rent-stat">
@@ -549,7 +549,7 @@ export default function RentPage({ pgId }) {
                         </div>
                       </div>
                       <div className="hc-right">
-                        <div className="hc-amount" style={{ color: p.isCompleted?'#059669':p.isPartial?'#d97706':'#4f46e5' }}>₹{p.amount?.toLocaleString()}</div>
+                        <div className="hc-amount" style={{ color: p.isCompleted?'#059669':p.isPartial?'#d97706':'#4f46e5' }}>₹{p.amount?.toLocaleString('en-IN')}</div>
                         <div className="hc-method">{p.paymentMethod}</div>
                       </div>
                     </div>
@@ -560,10 +560,10 @@ export default function RentPage({ pgId }) {
                       {p.electricityShare > 0 && <span className="hc-tag" style={{background:'#ecfeff',color:'#0891b2'}}>⚡ Elec</span>}
                     </div>
                     <div className="hc-breakdown">
-                      🏠 Rent ₹{(p.rentAmount || 0).toLocaleString()}
-                      {p.electricityShare > 0 && <span style={{color:'#0891b2'}}> · ⚡ ₹{p.electricityShare.toLocaleString()}</span>}
-                      {p.penaltyAmount    > 0 && <span style={{color:'#dc2626'}}> · 🔴 ₹{p.penaltyAmount.toLocaleString()}</span>}
-                      {p.isPartial && <span style={{color:'#d97706',display:'block',marginTop:'3px'}}>Paid ₹{p.newTotal?.toLocaleString()} of ₹{p.fullAmount?.toLocaleString()}</span>}
+                      🏠 Rent ₹{(p.rentAmount || 0).toLocaleString('en-IN')}
+                      {p.electricityShare > 0 && <span style={{color:'#0891b2'}}> · ⚡ ₹{p.electricityShare.toLocaleString('en-IN')}</span>}
+                      {p.penaltyAmount    > 0 && <span style={{color:'#dc2626'}}> · 🔴 ₹{p.penaltyAmount.toLocaleString('en-IN')}</span>}
+                      {p.isPartial && <span style={{color:'#d97706',display:'block',marginTop:'3px'}}>Paid ₹{p.newTotal?.toLocaleString('en-IN')} of ₹{p.fullAmount?.toLocaleString('en-IN')}</span>}
                     </div>
                     <div className="hc-date">📅 {p.paymentDate}{p.paymentTime && <span> · 🕐 {p.paymentTime}</span>}</div>
                     {p.notes && <div className="hc-notes">📝 {p.notes}</div>}
@@ -589,29 +589,29 @@ export default function RentPage({ pgId }) {
                   <div className="pay-ta">{selectedTenant.name?.charAt(0).toUpperCase()}</div>
                   <div>
                     <div className="pay-tname">{selectedTenant.name}</div>
-                    <div className="pay-tsub">Room {selectedTenant.roomNumber} · ₹{selectedTenant.monthlyRent?.toLocaleString()}/mo</div>
+                    <div className="pay-tsub">Room {selectedTenant.roomNumber} · ₹{selectedTenant.monthlyRent?.toLocaleString('en-IN')}/mo</div>
                     {isPartial(selectedTenant) && (
-                      <div className="pay-tpartial">Already paid ₹{getThisMonthPaid(selectedTenant.id).toLocaleString()} · Balance ₹{liveTotalDue.toLocaleString()}</div>
+                      <div className="pay-tpartial">Already paid ₹{getThisMonthPaid(selectedTenant.id).toLocaleString('en-IN')} · Balance ₹{liveTotalDue.toLocaleString('en-IN')}</div>
                     )}
                   </div>
                 </div>
 
                 <div className="pay-breakdown">
-                  <div className="pay-bd-row"><span>🏠 Monthly Rent</span><span>₹{(selectedTenant.monthlyRent || 0).toLocaleString()}</span></div>
-                  <div className="pay-bd-row"><span>⚡ Electricity</span><span style={{color:liveElec>0?'#d97706':'#94a3b8'}}>{liveElec>0?`₹${liveElec.toLocaleString()}`:'⚠️ Not added'}</span></div>
-                  <div className="pay-bd-row"><span>🔴 Penalty</span><span style={{color:livePenalty>0?'#dc2626':'#94a3b8'}}>{livePenalty>0?`₹${livePenalty.toLocaleString()}`:penaltyEnabled?'✅ None':'—'}</span></div>
+                  <div className="pay-bd-row"><span>🏠 Monthly Rent</span><span>₹{(selectedTenant.monthlyRent || 0).toLocaleString('en-IN')}</span></div>
+                  <div className="pay-bd-row"><span>⚡ Electricity</span><span style={{color:liveElec>0?'#d97706':'#94a3b8'}}>{liveElec>0?`₹${liveElec.toLocaleString('en-IN')}`:'⚠️ Not added'}</span></div>
+                  <div className="pay-bd-row"><span>🔴 Penalty</span><span style={{color:livePenalty>0?'#dc2626':'#94a3b8'}}>{livePenalty>0?`₹${livePenalty.toLocaleString('en-IN')}`:penaltyEnabled?'✅ None':'—'}</span></div>
                   {getThisMonthPaid(selectedTenant.id) > 0 && (
-                    <div className="pay-bd-row"><span>Already Paid</span><span style={{color:'#059669'}}>−₹{getThisMonthPaid(selectedTenant.id).toLocaleString()}</span></div>
+                    <div className="pay-bd-row"><span>Already Paid</span><span style={{color:'#059669'}}>−₹{getThisMonthPaid(selectedTenant.id).toLocaleString('en-IN')}</span></div>
                   )}
-                  <div className="pay-bd-row pay-bd-total"><span>Balance Due</span><span>₹{liveTotalDue.toLocaleString()}</span></div>
+                  <div className="pay-bd-row pay-bd-total"><span>Balance Due</span><span>₹{liveTotalDue.toLocaleString('en-IN')}</span></div>
                 </div>
 
                 {form.amount && parseInt(form.amount) < liveTotalDue && parseInt(form.amount) > 0 && (
-                  <div className="pay-partial-warn">⚠️ Partial — remaining after this: ₹{(liveTotalDue - parseInt(form.amount)).toLocaleString()}</div>
+                  <div className="pay-partial-warn">⚠️ Partial — remaining after this: ₹{(liveTotalDue - parseInt(form.amount)).toLocaleString('en-IN')}</div>
                 )}
 
                 <div className="pf-field">
-                  <label className="pf-label">Amount (₹) — Due: ₹{liveTotalDue.toLocaleString()}</label>
+                  <label className="pf-label">Amount (₹) — Due: ₹{liveTotalDue.toLocaleString('en-IN')}</label>
                   <input className="pf-input" type="number" inputMode="numeric" placeholder="Enter amount"
                     value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
                 </div>

@@ -1079,7 +1079,7 @@ export default function SettingsPage() {
                     <div className="st-cp-features">
                       <div className="st-cp-feature">Price per bed: ₹{pgOwner?.price_per_bed || billingSettings.price_per_bed || 0}</div>
                       <div className="st-cp-feature">
-                        Estimated bill: ₹{((pgOwner?.max_beds_this_month ?? pgOwner?.max_bed_count_this_month ?? (pgOwner?.current_beds ?? pgOwner?.current_bed_count ?? 0)) * (pgOwner?.price_per_bed || billingSettings.price_per_bed || 0)).toLocaleString()}
+                        Estimated bill: ₹{((pgOwner?.max_beds_this_month ?? pgOwner?.max_bed_count_this_month ?? (pgOwner?.current_beds ?? pgOwner?.current_bed_count ?? 0)) * (pgOwner?.price_per_bed || billingSettings.price_per_bed || 0)).toLocaleString('en-IN')}
                       </div>
                       {billingSettings.effective_date && (
                         <div className="st-cp-feature">Next price effective: {billingSettings.effective_date}</div>

@@ -303,10 +303,10 @@ export default function ReportsPage({ pgId }) {
 
     if (type === 'Rent Collection') {
       const stats = [
-        { label:'Expected',  value:`Rs. ${totalExpected.toLocaleString()}`,  color:[79,70,229],  bg:[238,242,255] },
-        { label:'Collected', value:`Rs. ${totalCollected.toLocaleString()}`, color:[5,150,105],  bg:[236,253,245] },
-        { label:'Pending',   value:`Rs. ${totalPending.toLocaleString()}`,   color:[220,38,38],  bg:[254,242,242] },
-        { label:'Penalty',   value:`Rs. ${totalPenalty.toLocaleString()}`,   color:[220,38,38],  bg:[254,242,242] },
+        { label:'Expected',  value:`Rs. ${totalExpected.toLocaleString('en-IN')}`,  color:[79,70,229],  bg:[238,242,255] },
+        { label:'Collected', value:`Rs. ${totalCollected.toLocaleString('en-IN')}`, color:[5,150,105],  bg:[236,253,245] },
+        { label:'Pending',   value:`Rs. ${totalPending.toLocaleString('en-IN')}`,   color:[220,38,38],  bg:[254,242,242] },
+        { label:'Penalty',   value:`Rs. ${totalPenalty.toLocaleString('en-IN')}`,   color:[220,38,38],  bg:[254,242,242] },
         { label:'Payments',  value:`${rentPmts.length} total`,               color:[217,119,6],  bg:[255,251,235] },
       ];
       stats.forEach((s, i) => {
@@ -321,31 +321,31 @@ export default function ReportsPage({ pgId }) {
       if (penaltyEnabled && penTenants.length > 0) {
         pdf.setFontSize(12); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(220, 38, 38);
         pdf.text(`Penalty Tenants (${penTenants.length})`, 14, y); y += 6;
-        autoTable(pdf, { startY: y, head:[['Tenant','Room','Rent','Penalty','Total','Paid','Balance']], body: penTenants.map(t => [t.name, `Room ${t.roomNumber}`, `Rs.${(t.monthlyRent||0).toLocaleString()}`, `Rs.${t.pen.toLocaleString()}`, `Rs.${t.due.toLocaleString()}`, `Rs.${t.paid.toLocaleString()}`, `Rs.${t.bal.toLocaleString()}`]), headStyles:{fillColor:[220,38,38],textColor:255}, alternateRowStyles:{fillColor:[254,242,242]}, styles:{fontSize:9} });
+        autoTable(pdf, { startY: y, head:[['Tenant','Room','Rent','Penalty','Total','Paid','Balance']], body: penTenants.map(t => [t.name, `Room ${t.roomNumber}`, `Rs.${(t.monthlyRent||0).toLocaleString('en-IN')}`, `Rs.${t.pen.toLocaleString('en-IN')}`, `Rs.${t.due.toLocaleString('en-IN')}`, `Rs.${t.paid.toLocaleString('en-IN')}`, `Rs.${t.bal.toLocaleString('en-IN')}`]), headStyles:{fillColor:[220,38,38],textColor:255}, alternateRowStyles:{fillColor:[254,242,242]}, styles:{fontSize:9} });
         y = pdf.lastAutoTable.finalY + 10;
       }
       pdf.setFontSize(12); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
       pdf.text('Payment Details', 14, y); y += 6;
-      autoTable(pdf, { startY: y, head:[['Tenant','Room','Amount','Method','Date','Type']], body: rentPmts.map(p => [p.tenantName, `Room ${p.roomNumber}`, `Rs.${p.amount?.toLocaleString()}`, p.paymentMethod, p.paymentDate, p.isPartial ? 'Partial' : 'Full']), headStyles:{fillColor:[233,69,96],textColor:255}, alternateRowStyles:{fillColor:[248,250,252]}, styles:{fontSize:9} });
+      autoTable(pdf, { startY: y, head:[['Tenant','Room','Amount','Method','Date','Type']], body: rentPmts.map(p => [p.tenantName, `Room ${p.roomNumber}`, `Rs.${p.amount?.toLocaleString('en-IN')}`, p.paymentMethod, p.paymentDate, p.isPartial ? 'Partial' : 'Full']), headStyles:{fillColor:[233,69,96],textColor:255}, alternateRowStyles:{fillColor:[248,250,252]}, styles:{fontSize:9} });
       const unpaid = tenantStatus.filter(t => t.status !== 'paid');
       if (unpaid.length > 0) {
         const fy = pdf.lastAutoTable.finalY + 10;
         pdf.setFontSize(12); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(220, 38, 38);
         pdf.text('Pending Tenants', 14, fy);
-        autoTable(pdf, { startY: fy + 6, head:[['Tenant','Room','Rent','Penalty','Paid','Balance','Status']], body: unpaid.map(t => [t.name, `Room ${t.roomNumber}`, `Rs.${(t.monthlyRent||0).toLocaleString()}`, t.pen > 0 ? `Rs.${t.pen.toLocaleString()}` : '-', `Rs.${t.paid.toLocaleString()}`, `Rs.${t.bal.toLocaleString()}`, t.status === 'partial' ? 'Partial' : 'Unpaid']), headStyles:{fillColor:[220,38,38],textColor:255}, alternateRowStyles:{fillColor:[254,242,242]}, styles:{fontSize:9} });
+        autoTable(pdf, { startY: fy + 6, head:[['Tenant','Room','Rent','Penalty','Paid','Balance','Status']], body: unpaid.map(t => [t.name, `Room ${t.roomNumber}`, `Rs.${(t.monthlyRent||0).toLocaleString('en-IN')}`, t.pen > 0 ? `Rs.${t.pen.toLocaleString('en-IN')}` : '-', `Rs.${t.paid.toLocaleString('en-IN')}`, `Rs.${t.bal.toLocaleString('en-IN')}`, t.status === 'partial' ? 'Partial' : 'Unpaid']), headStyles:{fillColor:[220,38,38],textColor:255}, alternateRowStyles:{fillColor:[254,242,242]}, styles:{fontSize:9} });
       }
     }
     if (type === 'Tenant History') {
       autoTable(pdf, { startY: y, head:[['Name','Room','Check-In','Check-Out','Days','Status']], body: historyTenants.map(t => [t.name, `Room ${t.roomNumber}`, t.checkIn||'-', getCheckOut(t)||'Still staying', getDaysLabel(getDaysStayed(t)), t.status==='deleted'?'Moved Out':'Active']), headStyles:{fillColor:[8,145,178],textColor:255}, alternateRowStyles:{fillColor:[248,250,252]}, styles:{fontSize:9} });
     }
     if (type === 'Electricity') {
-      autoTable(pdf, { startY: y, head:[['Room','Month','Amount','Tenants','Reading Date','Status']], body: elecFiltered.map(b => [`Room ${b.roomNumber}`, `${b.month} ${b.year}`, `Rs.${b.amount?.toLocaleString()}`, b.tenantCount||0, b.readingDate, b.isPaid?'Collected':'Pending']), headStyles:{fillColor:[217,119,6],textColor:255}, alternateRowStyles:{fillColor:[255,251,235]}, styles:{fontSize:9} });
+      autoTable(pdf, { startY: y, head:[['Room','Month','Amount','Tenants','Reading Date','Status']], body: elecFiltered.map(b => [`Room ${b.roomNumber}`, `${b.month} ${b.year}`, `Rs.${b.amount?.toLocaleString('en-IN')}`, b.tenantCount||0, b.readingDate, b.isPaid?'Collected':'Pending']), headStyles:{fillColor:[217,119,6],textColor:255}, alternateRowStyles:{fillColor:[255,251,235]}, styles:{fontSize:9} });
     }
     if (type === 'Occupancy') {
-      autoTable(pdf, { startY: y, head:[['Name','Room','Check-In','Rent','Phone']], body: activeTenants.map(t => [t.name, `Room ${t.roomNumber}`, t.checkIn, `Rs.${(t.monthlyRent||0).toLocaleString()}`, t.phone||'-']), headStyles:{fillColor:[79,70,229],textColor:255}, alternateRowStyles:{fillColor:[248,250,252]}, styles:{fontSize:9} });
+      autoTable(pdf, { startY: y, head:[['Name','Room','Check-In','Rent','Phone']], body: activeTenants.map(t => [t.name, `Room ${t.roomNumber}`, t.checkIn, `Rs.${(t.monthlyRent||0).toLocaleString('en-IN')}`, t.phone||'-']), headStyles:{fillColor:[79,70,229],textColor:255}, alternateRowStyles:{fillColor:[248,250,252]}, styles:{fontSize:9} });
     }
     if (type === 'Vacant Rooms') {
-      autoTable(pdf, { startY: y, head:[['Room','Floor','Type','Total','Occupied','Vacant','Rent/Bed']], body: vacantRooms.map(r => [`Room ${r.roomNumber}`, r.floor||'-', r.roomType||'-', r.totalBeds, r.occupiedBeds||0, r.totalBeds-(r.occupiedBeds||0), `Rs.${(r.rentPerBed||0).toLocaleString()}`]), headStyles:{fillColor:[5,150,105],textColor:255}, alternateRowStyles:{fillColor:[236,253,245]}, styles:{fontSize:9} });
+      autoTable(pdf, { startY: y, head:[['Room','Floor','Type','Total','Occupied','Vacant','Rent/Bed']], body: vacantRooms.map(r => [`Room ${r.roomNumber}`, r.floor||'-', r.roomType||'-', r.totalBeds, r.occupiedBeds||0, r.totalBeds-(r.occupiedBeds||0), `Rs.${(r.rentPerBed||0).toLocaleString('en-IN')}`]), headStyles:{fillColor:[5,150,105],textColor:255}, alternateRowStyles:{fillColor:[236,253,245]}, styles:{fontSize:9} });
     }
     const pc = pdf.internal.getNumberOfPages();
     for (let i = 1; i <= pc; i++) {
@@ -448,10 +448,10 @@ export default function ReportsPage({ pgId }) {
                   </div>
                   <div className="rp-stats-strip" style={{ gridTemplateColumns:'repeat(5,1fr)' }}>
                     {[
-                      { icon:'💰', label:'Expected',  val:`₹${totalExpected.toLocaleString()}`,  color:'#4f46e5' },
-                      { icon:'✅', label:'Collected',  val:`₹${totalCollected.toLocaleString()}`, color:'#059669' },
-                      { icon:'⏳', label:'Pending',    val:`₹${totalPending.toLocaleString()}`,   color:'#dc2626' },
-                      { icon:'🔴', label:'Penalty',    val:`₹${totalPenalty.toLocaleString()}`,   color:penaltyEnabled?'#dc2626':'#94a3b8' },
+                      { icon:'💰', label:'Expected',  val:`₹${totalExpected.toLocaleString('en-IN')}`,  color:'#4f46e5' },
+                      { icon:'✅', label:'Collected',  val:`₹${totalCollected.toLocaleString('en-IN')}`, color:'#059669' },
+                      { icon:'⏳', label:'Pending',    val:`₹${totalPending.toLocaleString('en-IN')}`,   color:'#dc2626' },
+                      { icon:'🔴', label:'Penalty',    val:`₹${totalPenalty.toLocaleString('en-IN')}`,   color:penaltyEnabled?'#dc2626':'#94a3b8' },
                       { icon:'📋', label:'Payments',   val:rentPmts.length,                       color:'#d97706' },
                     ].map(({ icon, label, val, color }) => (
                       <div key={label} className="rp-stat-tile"><div className="rp-stat-icon">{icon}</div><div className="rp-stat-val" style={{ color }}>{val}</div><div className="rp-stat-label">{label}</div></div>
@@ -465,7 +465,7 @@ export default function ReportsPage({ pgId }) {
                     <span className="rp-chip">⚠️ {rentPmts.filter(p => p.isPartial).length} partial payments</span>
                   </div>
                   {penaltyEnabled && penTenants.length > 0 && (
-                    <div className="rp-penalty-banner">🔴 {penTenants.length} tenant{penTenants.length!==1?'s':''} with late penalty · Total ₹{totalPenalty.toLocaleString()}</div>
+                    <div className="rp-penalty-banner">🔴 {penTenants.length} tenant{penTenants.length!==1?'s':''} with late penalty · Total ₹{totalPenalty.toLocaleString('en-IN')}</div>
                   )}
                   <div className="rp-section-title">👥 Tenant Breakdown ({tenantStatus.length})</div>
                   {tenantStatus.map(t => (
@@ -474,12 +474,12 @@ export default function ReportsPage({ pgId }) {
                         <div className="rp-tr-avatar" style={{ background:t.status==='paid'?'linear-gradient(135deg,#059669,#0891b2)':t.status==='partial'?'linear-gradient(135deg,#d97706,#b45309)':'linear-gradient(135deg,#dc2626,#9f1239)' }}>{t.name?.charAt(0).toUpperCase()}</div>
                         <div>
                           <div className="rp-tr-name">{t.name}</div>
-                          <div className="rp-tr-sub">Room {t.roomNumber} · {t.cnt} payment{t.cnt!==1?'s':''}{t.elec>0&&<span style={{color:'#0891b2'}}> · ⚡ ₹{t.elec.toLocaleString()}</span>}{t.showPen&&<span style={{color:'#dc2626'}}> · 🔴 ₹{t.pen.toLocaleString()}</span>}</div>
+                          <div className="rp-tr-sub">Room {t.roomNumber} · {t.cnt} payment{t.cnt!==1?'s':''}{t.elec>0&&<span style={{color:'#0891b2'}}> · ⚡ ₹{t.elec.toLocaleString('en-IN')}</span>}{t.showPen&&<span style={{color:'#dc2626'}}> · 🔴 ₹{t.pen.toLocaleString('en-IN')}</span>}</div>
                         </div>
                       </div>
                       <div className="rp-tr-right">
-                        <div className="rp-tr-amount" style={{ color:t.status==='paid'?'#059669':t.status==='partial'?'#d97706':'#dc2626' }}>₹{t.status==='paid'?t.due.toLocaleString():t.bal.toLocaleString()}</div>
-                        <div style={{ fontSize:'9px', color:'#94a3b8', marginTop:'2px' }}>{t.status==='paid'?'paid':`of ₹${t.due.toLocaleString()}`}</div>
+                        <div className="rp-tr-amount" style={{ color:t.status==='paid'?'#059669':t.status==='partial'?'#d97706':'#dc2626' }}>₹{t.status==='paid'?t.due.toLocaleString('en-IN'):t.bal.toLocaleString('en-IN')}</div>
+                        <div style={{ fontSize:'9px', color:'#94a3b8', marginTop:'2px' }}>{t.status==='paid'?'paid':`of ₹${t.due.toLocaleString('en-IN')}`}</div>
                         <StatusTag status={t.status} />
                       </div>
                     </div>
@@ -492,7 +492,7 @@ export default function ReportsPage({ pgId }) {
                       {rentPmts.map(p => (
                         <div key={p.id} className="rp-payment-row" style={{ background:p.isCompleted?'#f0fdf4':p.isPartial?'#fffbeb':'#f8fafc' }}>
                           <div><div className="rp-pr-name">{p.tenantName}</div><div className="rp-pr-sub">Room {p.roomNumber} · {p.paymentDate}{p.paymentTime&&` · ${p.paymentTime}`}</div></div>
-                          <div style={{ textAlign:'right' }}><div className="rp-pr-amount" style={{ color:p.isCompleted?'#059669':p.isPartial?'#d97706':'#4f46e5' }}>₹{p.amount?.toLocaleString()}</div><div className="rp-pr-method">{p.paymentMethod}</div></div>
+                          <div style={{ textAlign:'right' }}><div className="rp-pr-amount" style={{ color:p.isCompleted?'#059669':p.isPartial?'#d97706':'#4f46e5' }}>₹{p.amount?.toLocaleString('en-IN')}</div><div className="rp-pr-method">{p.paymentMethod}</div></div>
                         </div>
                       ))}
                     </div>
@@ -509,7 +509,7 @@ export default function ReportsPage({ pgId }) {
                   </div>
                   <div className="rp-stats-strip" style={{ gridTemplateColumns:'repeat(4,1fr)' }}>
                     {[
-                      { icon:'⚡', label:'Billed',    val:`₹${totalElecBilled.toLocaleString()}`,    color:'#d97706' },
+                      { icon:'⚡', label:'Billed',    val:`₹${totalElecBilled.toLocaleString('en-IN')}`,    color:'#d97706' },
                       { icon:'🏠', label:'Rooms',     val:elecFiltered.length,                        color:'#4f46e5' },
                       { icon:'✅', label:'Collected', val:elecFiltered.filter(b=>b.isPaid).length,    color:'#059669' },
                       { icon:'⏳', label:'Pending',   val:elecFiltered.filter(b=>!b.isPaid).length,   color:'#dc2626' },
@@ -525,7 +525,7 @@ export default function ReportsPage({ pgId }) {
                       {elecFiltered.map(b => (
                         <div key={b.id} className="rp-payment-row" style={{ background:b.isPaid?'#f0fdf4':'#fffbeb' }}>
                           <div><div className="rp-pr-name">Room {b.roomNumber}</div><div className="rp-pr-sub">{b.month} {b.year} · {b.tenantCount} tenants · {b.readingDate}</div>{b.notes&&<div className="rp-pr-sub">📝 {b.notes}</div>}</div>
-                          <div style={{ textAlign:'right' }}><div className="rp-pr-amount" style={{ color:'#d97706' }}>₹{b.amount?.toLocaleString()}</div><span className="rp-tr-tag" style={{ background:b.isPaid?'#dcfce7':'#fef2f2', color:b.isPaid?'#059669':'#dc2626' }}>{b.isPaid?'✅ Done':'⏳ Pending'}</span></div>
+                          <div style={{ textAlign:'right' }}><div className="rp-pr-amount" style={{ color:'#d97706' }}>₹{b.amount?.toLocaleString('en-IN')}</div><span className="rp-tr-tag" style={{ background:b.isPaid?'#dcfce7':'#fef2f2', color:b.isPaid?'#059669':'#dc2626' }}>{b.isPaid?'✅ Done':'⏳ Pending'}</span></div>
                         </div>
                       ))}
                     </div>
@@ -562,7 +562,7 @@ export default function ReportsPage({ pgId }) {
                           <div className="rp-tr-avatar" style={{ background:'linear-gradient(135deg,#4f46e5,#0891b2)' }}>{t.name?.charAt(0).toUpperCase()}</div>
                           <div><div className="rp-tr-name">{t.name}</div><div className="rp-tr-sub">Room {t.roomNumber} · {t.checkIn||'—'}</div></div>
                         </div>
-                        <div className="rp-tr-right"><div className="rp-tr-amount" style={{ color:'#4f46e5' }}>₹{(t.monthlyRent||0).toLocaleString()}</div><div style={{ fontSize:'9px', color:'#94a3b8' }}>per month</div></div>
+                        <div className="rp-tr-right"><div className="rp-tr-amount" style={{ color:'#4f46e5' }}>₹{(t.monthlyRent||0).toLocaleString('en-IN')}</div><div style={{ fontSize:'9px', color:'#94a3b8' }}>per month</div></div>
                       </div>
                     ))}
                   </div>
@@ -581,7 +581,7 @@ export default function ReportsPage({ pgId }) {
                       { icon:'🏠', label:'Total Rooms',  val:rooms.length,      color:'#4f46e5' },
                       { icon:'🔴', label:'Vacant Rooms', val:vacantRooms.length, color:'#dc2626' },
                       { icon:'🛏️', label:'Vacant Beds',  val:totalVacant,        color:'#d97706' },
-                      { icon:'💸', label:'Rev. Lost',    val:`₹${vacantRooms.reduce((a,r)=>a+((r.totalBeds-(r.occupiedBeds||0))*(r.rentPerBed||0)),0).toLocaleString()}`, color:'#dc2626' },
+                      { icon:'💸', label:'Rev. Lost',    val:`₹${vacantRooms.reduce((a,r)=>a+((r.totalBeds-(r.occupiedBeds||0))*(r.rentPerBed||0)),0).toLocaleString('en-IN')}`, color:'#dc2626' },
                     ].map(({ icon, label, val, color }) => (
                       <div key={label} className="rp-stat-tile"><div className="rp-stat-icon">{icon}</div><div className="rp-stat-val" style={{ color }}>{val}</div><div className="rp-stat-label">{label}</div></div>
                     ))}
@@ -602,7 +602,7 @@ export default function ReportsPage({ pgId }) {
                             <div className="rp-tr-right">
                               <div className="rp-tr-amount" style={{ color:'#dc2626' }}>🔴 {vacant} vacant</div>
                               <div style={{ fontSize:'9px', color:'#94a3b8' }}>of {r.totalBeds} beds</div>
-                              <div style={{ fontSize:'11px', color:'#4f46e5', fontWeight:'700', marginTop:'2px' }}>₹{(r.rentPerBed||0).toLocaleString()}/bed</div>
+                              <div style={{ fontSize:'11px', color:'#4f46e5', fontWeight:'700', marginTop:'2px' }}>₹{(r.rentPerBed||0).toLocaleString('en-IN')}/bed</div>
                             </div>
                           </div>
                         );

@@ -336,7 +336,7 @@ export default function StaffDashboard() {
                 {[
                   { icon:'👥', label:'Tenants',   val: tenants.length,                          color:'#4f46e5' },
                   { icon:'🛏️', label:'Vacant',    val: vacantBeds,                              color:'#059669' },
-                  { icon:'💰', label:'Collected', val:`₹${(monthlyRevenue/1000).toFixed(1)}k`,  color:'#d97706' },
+                  { icon:'💰', label:'Collected', val:`₹${monthlyRevenue.toLocaleString('en-IN')}`,  color:'#d97706' },
                   { icon:'⏳', label:'Pending',   val: pendingCount,                            color:'#dc2626' },
                 ].map(({ icon, label, val, color }) => (
                   <div key={label} className="sd-stat-tile">
@@ -377,7 +377,7 @@ export default function StaffDashboard() {
                       <div style={{ flex: 1 }}>
                         <div className="sd-tenant-name">{t.name}</div>
                         <div className="sd-tenant-sub">Room {t.roomNumber || '—'} · Bed {t.bedNumber || '—'}</div>
-                        <div className="sd-tenant-rent">₹{(t.monthlyRent || 0).toLocaleString()}/mo</div>
+                        <div className="sd-tenant-rent">₹{(t.monthlyRent || 0).toLocaleString('en-IN')}/mo</div>
                       </div>
                       <span className="sd-tenant-badge" style={{
                         background: isPaid ? '#ecfdf5' : '#fef2f2',

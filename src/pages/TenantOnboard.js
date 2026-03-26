@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { db, storage } from '../firebase';
+import {
+  doc, getDoc, collection, getDocs, query, where, addDoc, updateDoc,
+} from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
@@ -78,11 +83,10 @@ const DISTRICTS = {
   'Delhi': ['Central Delhi','East Delhi','North Delhi','South Delhi','West Delhi'],
 };
 
-const FUNCTIONS_BASE = 'https://us-central1-new2-42396.cloudfunctions.net';
-
 export default function TenantOnboard() {
   const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
+  const ownerId = params.get('ownerId');
+  const pgId = params.get('pgId');
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -127,19 +131,22 @@ export default function TenantOnboard() {
 
   useEffect(() => {
     const load = async () => {
-      if (!token) {
+      if (!ownerId || !pgId) {
         setError('Invalid onboarding link.');
         setLoading(false);
         return;
       }
       try {
-        const res = await fetch(`${FUNCTIONS_BASE}/getOnboardingData?token=${encodeURIComponent(token)}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to load PG data');
-        setPgData(data.pg || null);
-        setOwnerData(data.owner || null);
-        setRooms((data.rooms || []).map(r => ({ ...r })));
-        setTenants((data.tenants || []).filter(t => t.status !== 'deleted'));
+        const pgSnap = await getDoc(doc(db, 'pgOwners', ownerId, 'pgs', pgId));
+        const ownerSnap = await getDoc(doc(db, 'pgOwners', ownerId));
+        setPgData(pgSnap.exists() ? pgSnap.data() : null);
+        setOwnerData(ownerSnap.exists() ? ownerSnap.data() : null);
+
+        const rSnap = await getDocs(query(collection(db, 'rooms'), where('pgId', '==', pgId)));
+        setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        const tSnap = await getDocs(query(collection(db, 'tenants'), where('pgId', '==', pgId)));
+        setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted'));
       } catch (e) {
         console.error(e);
         setError('Failed to load PG data.');
@@ -147,7 +154,7 @@ export default function TenantOnboard() {
       setLoading(false);
     };
     load();
-  }, [token]);
+  }, [ownerId, pgId]);
 
   const occupiedByRoom = useMemo(() => {
     const map = {};
@@ -279,23 +286,28 @@ export default function TenantOnboard() {
       };
 
       const docPdf = buildPdf(tenantDoc);
-      const dataUri = docPdf.output('datauristring');
-      const pdfBase64 = dataUri.split(',')[1];
+      const pdfBlob = docPdf.output('blob');
 
-      const res = await fetch(`${FUNCTIONS_BASE}/submitOnboarding`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          form: tenantDoc,
-          family: tenantDoc.family,
-          pdfBase64,
-        }),
+      const fileName = `${form.admissionNumber || form.name || 'tenant'}_${Date.now()}.pdf`.replace(/\s+/g, '_');
+      const pdfRef = ref(storage, `tenantForms/${ownerId}/${pgId}/${fileName}`);
+      await uploadBytes(pdfRef, pdfBlob);
+      const url = await getDownloadURL(pdfRef);
+      tenantDoc.onboardingPdfUrl = url;
+
+      await addDoc(collection(db, 'tenants'), {
+        ...tenantDoc,
+        ownerId,
+        pgId,
+        status: 'Active',
+        createdAt: new Date(),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to submit');
 
-      setPdfUrl(data.pdfUrl || '');
+      const room = rooms.find(r => r.roomNumber === form.roomNumber);
+      if (room) {
+        await updateDoc(doc(db, 'rooms', room.id), { occupiedBeds: (room.occupiedBeds || 0) + 1 });
+      }
+
+      setPdfUrl(url);
       setSuccess('✅ Submitted successfully! Your onboarding is complete.');
     } catch (e) {
       console.error(e);

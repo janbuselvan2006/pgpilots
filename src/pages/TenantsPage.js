@@ -7,6 +7,20 @@ import {
   doc, query, where, updateDoc
 } from 'firebase/firestore';
 
+const RELATIONS = ['Father','Mother','Brother','Sister','Grandfather','Grandmother','Guardian','Other'];
+const STATES = [
+  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh',
+  'Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland',
+  'Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
+  'Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'
+];
+const DISTRICTS = {
+  'Tamil Nadu': ['Chennai','Coimbatore','Madurai','Salem','Tiruchirappalli'],
+  'Karnataka': ['Bengaluru Urban','Mysuru','Mangaluru','Hubballi','Belagavi'],
+  'Maharashtra': ['Mumbai','Pune','Nagpur','Nashik','Thane'],
+  'Delhi': ['Central Delhi','East Delhi','North Delhi','South Delhi','West Delhi'],
+};
+
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
@@ -140,6 +154,7 @@ const css = `
   .fs-input  { width: 100%; padding: 13px 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-size: 15px; font-family: inherit; color: #1a1a2e; background: #fafbff; outline: none; box-sizing: border-box; -webkit-appearance: none; transition: border-color 0.2s; }
   .fs-input:focus { border-color: #e94560; background: white; }
   .fs-row    { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .fs-row-3  { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
   .fs-no-bed { padding: 13px 14px; border-radius: 12px; font-size: 13px; font-weight: 600; border: 1.5px solid #fde68a; background: #fffbeb; color: #d97706; }
   .fs-no-bed.error { border-color: #fecaca; background: #fef2f2; color: #dc2626; }
 
@@ -161,6 +176,19 @@ const css = `
   .fs-save-btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #e94560, #0f3460); color: white; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 6px; box-shadow: 0 4px 14px rgba(233,69,96,0.3); -webkit-tap-highlight-color: transparent; transition: opacity 0.2s, transform 0.1s; }
   .fs-save-btn:active   { transform: scale(0.98); opacity: 0.9; }
   .fs-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .fs-hint { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+  /* Family rows */
+  .fs-family-row { display: grid; grid-template-columns: 1fr 1fr 0.5fr 1fr auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+  .fs-family-row .fs-input, .fs-family-row select { font-size: 13px; padding: 10px 10px; }
+  .fs-add-btn { padding: 8px 14px; background: #eef2ff; color: #4f46e5; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .fs-remove-btn { padding: 8px 10px; background: #fef2f2; color: #dc2626; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; min-width: 32px; height: 40px; display: flex; align-items: center; justify-content: center; }
+
+  @media (max-width: 639px) {
+    .fs-family-row { grid-template-columns: 1fr 1fr; }
+    .fs-family-row > *:nth-child(5) { grid-column: span 2; justify-self: start; }
+  }
 
   .del-sheet   { padding: 20px 20px 32px; text-align: center; }
   .del-icon    { font-size: 44px; margin-bottom: 12px; }
@@ -200,7 +228,19 @@ const css = `
   }
 `;
 
-// ✅ Now accepts pgId prop from Dashboard
+const EMPTY_FORM = {
+  name:'', phone:'', email:'', company:'',
+  admissionNumber:'', dateOfJoining:'', dob:'', age:'', bloodGroup:'',
+  maritalStatus:'', nationality:'',
+  addressLine:'', state:'', district:'', city:'', pincode:'',
+  organizationType:'College', organizationName:'', designation:'',
+  organizationAddress:'', organizationPhone:'',
+  roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
+  checkIn:'', idType:'Aadhaar', idNumber:'',
+  emergencyContact:'', emergencyPhone:'',
+  guardianName:'', guardianPhone:'',
+};
+
 export default function Tenants({ pgId }) {
   const [tenants, setTenants]           = useState([]);
   const [rooms, setRooms]               = useState([]);
@@ -214,12 +254,8 @@ export default function Tenants({ pgId }) {
   const [qrDataUrl, setQrDataUrl]       = useState('');
   const [qrToken, setQrToken]           = useState('');
   const [qrLoading, setQrLoading]       = useState(false);
-  const [form, setForm] = useState({
-    name:'', phone:'', email:'', address:'', company:'',
-    roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
-    checkIn:'', idType:'Aadhaar', idNumber:'',
-    emergencyContact:'', emergencyPhone:'',
-  });
+  const [family, setFamily]             = useState([{ relation: 'Father', name: '', age: '', phone: '' }]);
+  const [form, setForm]                 = useState({ ...EMPTY_FORM });
 
   const user = auth.currentUser;
   const qrLink = qrToken ? `${window.location.origin}/tenant-onboard?token=${qrToken}` : '';
@@ -249,12 +285,11 @@ export default function Tenants({ pgId }) {
       .catch(() => { if (active) setQrDataUrl(''); });
     return () => { active = false; };
   }, [qrLink]);
+
   const fetchData = async () => {
-    // ✅ Guard: need both user and pgId
     if (!user || !pgId) { setLoading(false); return; }
     setLoading(true);
     try {
-      // ✅ Query by pgId instead of ownerId
       const tSnap = await getDocs(query(collection(db, 'tenants'), where('pgId', '==', pgId)));
       setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted'));
       const rSnap = await getDocs(query(collection(db, 'rooms'), where('pgId', '==', pgId)));
@@ -263,7 +298,6 @@ export default function Tenants({ pgId }) {
     setLoading(false);
   };
 
-  // ✅ Re-fetch whenever pgId changes (user switches PG)
   useEffect(() => { fetchData(); }, [pgId]);
 
   const tenantCount = tenants.length;
@@ -281,12 +315,8 @@ export default function Tenants({ pgId }) {
   };
 
   const resetForm = () => {
-    setForm({
-      name:'', phone:'', email:'', address:'', company:'',
-      roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
-      checkIn:'', idType:'Aadhaar', idNumber:'',
-      emergencyContact:'', emergencyPhone:'',
-    });
+    setForm({ ...EMPTY_FORM });
+    setFamily([{ relation: 'Father', name: '', age: '', phone: '' }]);
     setEditId(null);
     setShowForm(false);
   };
@@ -294,13 +324,32 @@ export default function Tenants({ pgId }) {
   const handleEdit = (tenant) => {
     setForm({
       name: tenant.name||'', phone: tenant.phone||'', email: tenant.email||'',
-      address: tenant.address||'', company: tenant.company||'',
+      company: tenant.company||'',
+      admissionNumber: tenant.admissionNumber||'', dateOfJoining: tenant.dateOfJoining||'',
+      dob: tenant.dob||'', age: tenant.age||'', bloodGroup: tenant.bloodGroup||'',
+      maritalStatus: tenant.maritalStatus||'', nationality: tenant.nationality||'',
+      addressLine: tenant.addressLine || tenant.address ||'',
+      state: tenant.state||'', district: tenant.district||'',
+      city: tenant.city||'', pincode: tenant.pincode||'',
+      organizationType: tenant.organizationType||'College',
+      organizationName: tenant.organizationName || tenant.company ||'',
+      designation: tenant.designation||'',
+      organizationAddress: tenant.organizationAddress||'',
+      organizationPhone: tenant.organizationPhone||'',
       roomNumber: tenant.roomNumber||'', bedNumber: tenant.bedNumber||'',
       monthlyRent: tenant.monthlyRent||'', deposit: tenant.deposit||'',
       checkIn: tenant.checkIn||'', idType: tenant.idType||'Aadhaar',
-      idNumber: tenant.idNumber||'', emergencyContact: tenant.emergencyContact||'',
+      idNumber: tenant.idNumber||'',
+      emergencyContact: tenant.emergencyContact||'',
       emergencyPhone: tenant.emergencyPhone||'',
+      guardianName: tenant.guardianName||'',
+      guardianPhone: tenant.guardianPhone||'',
     });
+    setFamily(
+      Array.isArray(tenant.family) && tenant.family.length > 0
+        ? tenant.family
+        : [{ relation: 'Father', name: '', age: '', phone: '' }]
+    );
     setEditId(tenant.id);
     setShowForm(true);
   };
@@ -315,6 +364,7 @@ export default function Tenants({ pgId }) {
         ...form,
         monthlyRent: parseInt(form.monthlyRent) || 0,
         deposit:     parseInt(form.deposit)     || 0,
+        family: family.filter(f => f.name || f.phone),
       };
       if (editId) {
         const old = tenants.find(t => t.id === editId);
@@ -326,7 +376,6 @@ export default function Tenants({ pgId }) {
         }
         await updateDoc(doc(db, 'tenants', editId), data);
       } else {
-        // ✅ Save with both ownerId (backward compat) and pgId (multi-PG)
         await addDoc(collection(db, 'tenants'), {
           ...data,
           ownerId:   user.uid,
@@ -349,7 +398,6 @@ export default function Tenants({ pgId }) {
       await updateDoc(doc(db, 'tenants', deleteTarget.id), {
         status: 'deleted', deletedAt: new Date().toISOString(),
       });
-      // ✅ Query by pgId to find the right room
       const rSnap = await getDocs(query(collection(db, 'rooms'),
         where('pgId', '==', pgId),
         where('roomNumber', '==', deleteTarget.roomNumber)
@@ -372,7 +420,21 @@ export default function Tenants({ pgId }) {
   const beds         = getVacantBeds(form.roomNumber);
   const selectedRoom = rooms.find(r => r.roomNumber === form.roomNumber);
 
-  // ✅ Show warning if no PG selected
+  // Family helpers
+  const addFamilyRow = () => {
+    setFamily(rows => [...rows, { relation: 'Father', name: '', age: '', phone: '' }]);
+  };
+  const removeFamilyRow = (idx) => {
+    setFamily(rows => rows.filter((_, i) => i !== idx));
+  };
+  const updateFamily = (idx, field, value) => {
+    setFamily(rows => {
+      const next = [...rows];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+  };
+
   if (!pgId) {
     return (
       <>
@@ -410,8 +472,8 @@ export default function Tenants({ pgId }) {
           {[
             { label:'Tenants', value: tenantCount, color: '#4f46e5' },
             { label:'Active',   value: tenants.filter(t => t.status === 'Active').length, color:'#059669' },
-            { label:'Deposits', value:`₹${(tenants.reduce((a,t) => a+(t.deposit||0), 0)/1000).toFixed(0)}k`, color:'#d97706' },
-            { label:'Revenue',  value:`₹${(tenants.reduce((a,t) => a+(t.monthlyRent||0), 0)/1000).toFixed(0)}k`, color:'#0891b2' },
+            { label:'Deposits', value:`₹${tenants.reduce((a,t) => a+(t.deposit||0), 0).toLocaleString('en-IN')}`, color:'#d97706' },
+            { label:'Revenue',  value:`₹${tenants.reduce((a,t) => a+(t.monthlyRent||0), 0).toLocaleString('en-IN')}`, color:'#0891b2' },
           ].map(({ label, value, color }) => (
             <div key={label} className="tn-stat">
               <div className="tn-stat-num" style={{ color }}>{value}</div>
@@ -459,9 +521,9 @@ export default function Tenants({ pgId }) {
                       {[
                         ['🛏️ Room',    `Room ${tenant.roomNumber}`],
                         ['🪑 Bed',     `Bed ${tenant.bedNumber || 'N/A'}`],
-                        ['💰 Rent',    `₹${(tenant.monthlyRent||0).toLocaleString()}/mo`],
-                        ['💵 Deposit', `₹${(tenant.deposit||0).toLocaleString()}`],
-                        ['📅 Check-in', tenant.checkIn || 'N/A'],
+                        ['💰 Rent',    `₹${(tenant.monthlyRent||0).toLocaleString('en-IN')}/mo`],
+                        ['💵 Deposit', `₹${(tenant.deposit||0).toLocaleString('en-IN')}`],
+                        ['📅 Check-in', tenant.checkIn || tenant.dateOfJoining || 'N/A'],
                         ['🪪 ID',      tenant.idType],
                       ].map(([k, v]) => (
                         <div key={k} className="tc-detail-item">
@@ -471,7 +533,7 @@ export default function Tenants({ pgId }) {
                       ))}
                     </div>
 
-                    {tenant.company && <div className="tc-company">🏢 {tenant.company}</div>}
+                    {(tenant.company || tenant.organizationName) && <div className="tc-company">🏢 {tenant.organizationName || tenant.company}</div>}
 
                     <div className="tc-footer">
                       {tenant.onboardingPdfUrl && (
@@ -517,7 +579,7 @@ export default function Tenants({ pgId }) {
           </div>
         )}
 
-        {/* Add / Edit Sheet */}
+        {/* ══════════ Add / Edit Sheet — Full Form (matches TenantOnboard) ══════════ */}
         {showForm && (
           <>
             <div className="bso" onClick={resetForm} />
@@ -529,18 +591,48 @@ export default function Tenants({ pgId }) {
               </div>
               <div className="bs-body">
 
+                {/* ── Personal Details ── */}
                 <div className="fs-section">
                   <div className="fs-section-title">👤 Personal Details</div>
                   <div className="fs-row">
                     <div className="fs-field">
+                      <label className="fs-label">Admission Number</label>
+                      <input className="fs-input" placeholder="ADM001"
+                        value={form.admissionNumber} onChange={e => setForm({ ...form, admissionNumber: e.target.value })} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Date of Joining</label>
+                      <input className="fs-input" type="date"
+                        value={form.dateOfJoining} onChange={e => setForm({ ...form, dateOfJoining: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="fs-row">
+                    <div className="fs-field">
                       <label className="fs-label">Full Name *</label>
-                      <input className="fs-input" type="text" placeholder="John Doe"
+                      <input className="fs-input" placeholder="John Doe"
                         value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Phone *</label>
                       <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
                         value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="fs-row-3">
+                    <div className="fs-field">
+                      <label className="fs-label">DOB</label>
+                      <input className="fs-input" type="date"
+                        value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Age</label>
+                      <input className="fs-input" placeholder="25"
+                        value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Blood Group</label>
+                      <input className="fs-input" placeholder="O+"
+                        value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-row">
@@ -550,20 +642,123 @@ export default function Tenants({ pgId }) {
                         value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                     </div>
                     <div className="fs-field">
-                      <label className="fs-label">Company / College</label>
-                      <input className="fs-input" type="text" placeholder="ABC Company"
-                        value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} />
+                      <label className="fs-label">Marital Status</label>
+                      <input className="fs-input" placeholder="Single / Married"
+                        value={form.maritalStatus} onChange={e => setForm({ ...form, maritalStatus: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-field">
-                    <label className="fs-label">Address</label>
-                    <input className="fs-input" type="text" placeholder="Home address"
-                      value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
+                    <label className="fs-label">Nationality</label>
+                    <input className="fs-input" placeholder="Indian"
+                      value={form.nationality} onChange={e => setForm({ ...form, nationality: e.target.value })} />
                   </div>
                 </div>
 
+                {/* ── Address Details ── */}
                 <div className="fs-section">
-                  <div className="fs-section-title">🛏️ Room Details</div>
+                  <div className="fs-section-title">📍 Address Details</div>
+                  <div className="fs-field">
+                    <label className="fs-label">Address Line</label>
+                    <input className="fs-input" placeholder="Door No, Street, Area"
+                      value={form.addressLine} onChange={e => setForm({ ...form, addressLine: e.target.value })} />
+                  </div>
+                  <div className="fs-row">
+                    <div className="fs-field">
+                      <label className="fs-label">State</label>
+                      <select className="fs-input" value={form.state}
+                        onChange={e => setForm({ ...form, state: e.target.value, district: '' })}>
+                        <option value="">Select State</option>
+                        {STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">District</label>
+                      <input className="fs-input" list="fs-districts" placeholder="Type district"
+                        value={form.district} onChange={e => setForm({ ...form, district: e.target.value })} />
+                      <datalist id="fs-districts">
+                        {(DISTRICTS[form.state] || []).map(d => <option key={d} value={d} />)}
+                      </datalist>
+                      <div className="fs-hint">Type to enter if not listed</div>
+                    </div>
+                  </div>
+                  <div className="fs-row">
+                    <div className="fs-field">
+                      <label className="fs-label">City</label>
+                      <input className="fs-input" placeholder="City / Town"
+                        value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Pincode</label>
+                      <input className="fs-input" placeholder="600001"
+                        value={form.pincode} onChange={e => setForm({ ...form, pincode: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Family Information ── */}
+                <div className="fs-section">
+                  <div className="fs-section-title">👨‍👩‍👧 Family Information</div>
+                  {family.map((row, idx) => (
+                    <div key={idx} className="fs-family-row">
+                      <select className="fs-input" value={row.relation}
+                        onChange={e => updateFamily(idx, 'relation', e.target.value)}>
+                        {RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                      <input className="fs-input" placeholder="Name" value={row.name}
+                        onChange={e => updateFamily(idx, 'name', e.target.value)} />
+                      <input className="fs-input" placeholder="Age" value={row.age}
+                        onChange={e => updateFamily(idx, 'age', e.target.value)} />
+                      <input className="fs-input" placeholder="Mobile No" value={row.phone}
+                        onChange={e => updateFamily(idx, 'phone', e.target.value)} />
+                      {family.length > 1 && (
+                        <button type="button" className="fs-remove-btn" onClick={() => removeFamilyRow(idx)}>✕</button>
+                      )}
+                    </div>
+                  ))}
+                  <button type="button" className="fs-add-btn" onClick={addFamilyRow}>+ Add Family Member</button>
+                </div>
+
+                {/* ── Professional Details ── */}
+                <div className="fs-section">
+                  <div className="fs-section-title">💼 Professional Details</div>
+                  <div className="fs-field">
+                    <label className="fs-label">Organization Type</label>
+                    <div className="fs-seg">
+                      {['College', 'Company', 'Other'].map(t => (
+                        <button key={t} className={`fs-seg-btn${form.organizationType === t ? ' active' : ''}`}
+                          onClick={() => setForm({ ...form, organizationType: t })}>{t}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="fs-row">
+                    <div className="fs-field">
+                      <label className="fs-label">College / Company Name</label>
+                      <input className="fs-input" placeholder="ABC College / XYZ Corp"
+                        value={form.organizationName} onChange={e => setForm({ ...form, organizationName: e.target.value })} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Designation</label>
+                      <input className="fs-input" placeholder="Student / Engineer"
+                        value={form.designation} onChange={e => setForm({ ...form, designation: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="fs-row">
+                    <div className="fs-field">
+                      <label className="fs-label">Organization Address</label>
+                      <input className="fs-input" placeholder="Org address"
+                        value={form.organizationAddress} onChange={e => setForm({ ...form, organizationAddress: e.target.value })} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Organization Phone</label>
+                      <input className="fs-input" type="tel" placeholder="044-12345678"
+                        value={form.organizationPhone} onChange={e => setForm({ ...form, organizationPhone: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Room & Bed ── */}
+                <div className="fs-section">
+                  <div className="fs-section-title">🛏️ Room & Bed</div>
                   <div className="fs-field">
                     <label className="fs-label">Room Number *</label>
                     <select className="fs-input" value={form.roomNumber}
@@ -610,7 +805,7 @@ export default function Tenants({ pgId }) {
                         <span className="fs-rp-chip">🛏️ {selectedRoom.totalBeds} beds</span>
                         <span className="fs-rp-chip" style={{ color:'#059669' }}>🟢 {selectedRoom.totalBeds-(selectedRoom.occupiedBeds||0)} vacant</span>
                         <span className="fs-rp-chip" style={{ color:'#dc2626' }}>🔴 {selectedRoom.occupiedBeds||0} occupied</span>
-                        <span className="fs-rp-chip">💰 ₹{selectedRoom.rentPerBed?.toLocaleString()}/bed</span>
+                        <span className="fs-rp-chip">💰 ₹{selectedRoom.rentPerBed?.toLocaleString('en-IN')}/bed</span>
                       </div>
                     </div>
                   )}
@@ -634,12 +829,13 @@ export default function Tenants({ pgId }) {
                   </div>
                 </div>
 
+                {/* ── ID Proof ── */}
                 <div className="fs-section">
                   <div className="fs-section-title">🪪 ID Proof</div>
                   <div className="fs-field">
                     <label className="fs-label">ID Type</label>
                     <div className="fs-seg">
-                      {['Aadhaar', 'Passport', 'Driving License', 'PAN Card'].map(t => (
+                      {['Aadhaar', 'PAN', 'Passport', 'Driving License', 'Voter ID'].map(t => (
                         <button key={t} className={`fs-seg-btn${form.idType === t ? ' active' : ''}`}
                           onClick={() => setForm({ ...form, idType: t })}>{t}</button>
                       ))}
@@ -647,23 +843,36 @@ export default function Tenants({ pgId }) {
                   </div>
                   <div className="fs-field">
                     <label className="fs-label">ID Number</label>
-                    <input className="fs-input" type="text" placeholder="Enter ID number"
+                    <input className="fs-input" placeholder="Enter ID number"
                       value={form.idNumber} onChange={e => setForm({ ...form, idNumber: e.target.value })} />
                   </div>
                 </div>
 
+                {/* ── Emergency / Guardian ── */}
                 <div className="fs-section">
-                  <div className="fs-section-title">🆘 Emergency Contact</div>
+                  <div className="fs-section-title">🆘 Emergency & Guardian</div>
                   <div className="fs-row">
                     <div className="fs-field">
-                      <label className="fs-label">Contact Name</label>
-                      <input className="fs-input" type="text" placeholder="Parent / Spouse"
+                      <label className="fs-label">Emergency Contact</label>
+                      <input className="fs-input" placeholder="Name"
                         value={form.emergencyContact} onChange={e => setForm({ ...form, emergencyContact: e.target.value })} />
                     </div>
                     <div className="fs-field">
-                      <label className="fs-label">Contact Phone</label>
+                      <label className="fs-label">Emergency Phone</label>
                       <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
                         value={form.emergencyPhone} onChange={e => setForm({ ...form, emergencyPhone: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="fs-row">
+                    <div className="fs-field">
+                      <label className="fs-label">Guardian Name</label>
+                      <input className="fs-input" placeholder="Guardian name"
+                        value={form.guardianName} onChange={e => setForm({ ...form, guardianName: e.target.value })} />
+                    </div>
+                    <div className="fs-field">
+                      <label className="fs-label">Guardian Phone</label>
+                      <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
+                        value={form.guardianPhone} onChange={e => setForm({ ...form, guardianPhone: e.target.value })} />
                     </div>
                   </div>
                 </div>
@@ -701,4 +910,3 @@ export default function Tenants({ pgId }) {
     </>
   );
 }
-

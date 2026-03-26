@@ -633,7 +633,7 @@ export default function Dashboard() {
   const statTiles = [
     {icon:'👥', label:'Tenants', value: statsLoading ? '…' : dashStats.totalTenants,                            color:'#4f46e5', menu:'Tenants'},
     {icon:'🛏️', label:'Vacant',  value: statsLoading ? '…' : dashStats.vacantBeds,                             color:'#059669', menu:'Rooms'},
-    {icon:'💰', label:'Revenue', value: statsLoading ? '…' : `₹${(dashStats.monthlyRevenue/1000).toFixed(1)}k`,color:'#d97706', menu:'Rent'},
+    {icon:'💰', label:'Revenue', value: statsLoading ? '…' : `₹${dashStats.monthlyRevenue.toLocaleString('en-IN')}`,color:'#d97706', menu:'Rent'},
     {icon:'⏳', label:'Pending', value: statsLoading ? '…' : dashStats.pendingRents,                           color:'#dc2626', menu:'Rent'},
   ];
 
@@ -845,7 +845,7 @@ export default function Dashboard() {
                               <div className="db-pending-name">{p.name}</div>
                               <div className="db-pending-room">Room {p.room}</div>
                             </div>
-                            <div className="db-pending-amt">₹{p.due.toLocaleString()}</div>
+                            <div className="db-pending-amt">₹{p.due.toLocaleString('en-IN')}</div>
                           </div>
                         ))}
                       </div>

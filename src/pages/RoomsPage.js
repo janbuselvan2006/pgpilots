@@ -477,7 +477,7 @@ export default function Rooms({ pgId }) {
 
                     <div className="room-footer">
                       <div>
-                        <span className="room-rent">₹{room.rentPerBed.toLocaleString()}</span>
+                        <span className="room-rent">₹{room.rentPerBed.toLocaleString('en-IN')}</span>
                         <span className="room-rent-sub"> /bed/mo</span>
                       </div>
                       <button className="room-delete-btn" onClick={() => setDeleteTarget(room)}>

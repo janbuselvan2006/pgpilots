@@ -254,7 +254,7 @@ export default function ElectricityPage({ pgId }) {
 
         <div className="el-stats">
           {[
-            { label:'Billed',    value:`₹${(totalBilled/1000).toFixed(1)}k`,   color:'#d97706', icon:'⚡' },
+            { label:'Billed',    value:`₹${totalBilled.toLocaleString('en-IN')}`,   color:'#d97706', icon:'⚡' },
             { label:'Rooms',     value:`${roomsBilled}/${rooms.length}`,         color:'#4f46e5', icon:'🏠' },
             { label:'Collected', value:`${collectedCount}/${totalTenants}`,      color:'#059669', icon:'✅' },
             { label:'Pending',   value:`${totalTenants - collectedCount}`,       color:'#dc2626', icon:'⏳' },
@@ -303,7 +303,7 @@ export default function ElectricityPage({ pgId }) {
                         <div className="el-bill-room">Room {bill.roomNumber}</div>
                         <div className="el-bill-sub">{bill.month} {bill.year} · {bill.readingDate}{bill.notes && ` · ${bill.notes}`}</div>
                       </div>
-                      <div className="el-bill-badge">⚡ ₹{bill.amount?.toLocaleString()}</div>
+                      <div className="el-bill-badge">⚡ ₹{bill.amount?.toLocaleString('en-IN')}</div>
                     </div>
                     <div className="el-bill-body">
                       {rt.length === 0 ? (
@@ -326,11 +326,11 @@ export default function ElectricityPage({ pgId }) {
                                 </div>
                                 <div>
                                   <div className="el-tr-name">{tenant.name}</div>
-                                  <div className="el-tr-bd">🏠 ₹{(tenant.monthlyRent||0).toLocaleString()} + ⚡ ₹{perHead.toLocaleString()}</div>
+                                  <div className="el-tr-bd">🏠 ₹{(tenant.monthlyRent||0).toLocaleString('en-IN')} + ⚡ ₹{perHead.toLocaleString('en-IN')}</div>
                                 </div>
                               </div>
                               <div className="el-tr-right">
-                                <div className="el-tr-elec">₹{perHead.toLocaleString()}</div>
+                                <div className="el-tr-elec">₹{perHead.toLocaleString('en-IN')}</div>
                                 <div className="el-tr-status" style={{
                                   background: collected ? '#dcfce7' : '#fef9c3',
                                   color:      collected ? '#059669' : '#d97706',
@@ -345,7 +345,7 @@ export default function ElectricityPage({ pgId }) {
                       {rt.length > 1 && (
                         <div className="el-per-head">
                           <span>⚡ Per tenant share</span>
-                          <span style={{ color:'#d97706', fontWeight:'800' }}>₹{perHead.toLocaleString()}</span>
+                          <span style={{ color:'#d97706', fontWeight:'800' }}>₹{perHead.toLocaleString('en-IN')}</span>
                         </div>
                       )}
                     </div>
@@ -385,7 +385,7 @@ export default function ElectricityPage({ pgId }) {
                               </div>
                             </div>
                             <div className="el-hc-right">
-                              <div className="el-hc-amount">₹{bill.amount?.toLocaleString()}</div>
+                              <div className="el-hc-amount">₹{bill.amount?.toLocaleString('en-IN')}</div>
                               <div className="el-hc-status" style={{
                                 background: allCollected ? '#dcfce7' : '#fef2f2',
                                 color:      allCollected ? '#059669' : '#dc2626',
@@ -468,7 +468,7 @@ export default function ElectricityPage({ pgId }) {
                     <div className="ef-preview-title">📋 Preview · {form.month} {form.year}</div>
                     <div className="ef-preview-total">
                       <span>Room {form.roomNumber} Total</span>
-                      <span>₹{parseInt(form.amount).toLocaleString()}</span>
+                      <span>₹{parseInt(form.amount).toLocaleString('en-IN')}</span>
                     </div>
                     {previewTenants.length === 0 ? (
                       <div style={{ color:'#dc2626', fontSize:'13px', fontWeight:'600' }}>⚠️ No active tenants in this room!</div>
@@ -476,9 +476,9 @@ export default function ElectricityPage({ pgId }) {
                       <div key={t.id} className="ef-preview-tenant">
                         <div>
                           <div className="ef-pt-name">👤 {t.name}</div>
-                          <div className="ef-pt-bd">Rent ₹{(t.monthlyRent||0).toLocaleString()} + Elec ₹{perTenant.toLocaleString()}</div>
+                          <div className="ef-pt-bd">Rent ₹{(t.monthlyRent||0).toLocaleString('en-IN')} + Elec ₹{perTenant.toLocaleString('en-IN')}</div>
                         </div>
-                        <div className="ef-pt-total">₹{((t.monthlyRent||0)+perTenant).toLocaleString()}</div>
+                        <div className="ef-pt-total">₹{((t.monthlyRent||0)+perTenant).toLocaleString('en-IN')}</div>
                       </div>
                     ))}
                   </div>
