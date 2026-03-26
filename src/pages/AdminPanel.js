@@ -43,6 +43,14 @@ function AdminPanel() {
         });
         owner.actualBedCount = bedCount;
         owner.usedBedCount = usedBeds;
+
+        const currentStored = owner.current_beds ?? owner.current_bed_count ?? 0;
+        if (currentStored !== bedCount) {
+          try {
+            await updateDoc(doc(db, 'pgOwners', owner.id), { current_beds: bedCount });
+            owner.current_beds = bedCount;
+          } catch (e) { console.warn('Failed to sync current_beds for owner', owner.id); }
+        }
       }
       setOwners(ownersList);
       

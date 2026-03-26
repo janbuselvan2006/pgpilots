@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from '../firebase';
 import { doc, getDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -388,6 +387,26 @@ export default function SettingsPage() {
   },[activeTab]);
 
   useEffect(()=>{
+    const refreshBeds = async () => {
+      if (activeTab !== 'billing') return;
+      try {
+        const rSnap = await getDocs(query(collection(db, 'rooms'), where('ownerId', '==', user.uid)));
+        let totalBeds = 0;
+        rSnap.forEach(r => { totalBeds += (r.data().totalBeds || 0); });
+        const ownerRef = doc(db, 'pgOwners', user.uid);
+        const ownerSnap = await getDoc(ownerRef);
+        const ownerData = ownerSnap.exists() ? ownerSnap.data() : {};
+        const currentMax = ownerData.max_beds_this_month ?? 0;
+        const updates = { current_beds: totalBeds };
+        if (totalBeds > currentMax) updates.max_beds_this_month = totalBeds;
+        await updateDoc(ownerRef, updates);
+        fetchOwner();
+      } catch (e) { console.warn('Failed to refresh beds:', e); }
+    };
+    refreshBeds();
+  },[activeTab]);
+
+  useEffect(()=>{
     const next = {};
     pgList.forEach((pg) => {
       next[pg.id] = {
@@ -550,15 +569,7 @@ export default function SettingsPage() {
         if (data?.staffUid) staffUids.add(data.staffUid);
       });
 
-      // Best-effort: delete staff auth users (must run before staffAccounts are deleted)
-      if (staffUids.size > 0) {
-        try {
-          const fn = httpsCallable(getFunctions(), 'deleteStaffAccounts');
-          await fn({ staffUids: Array.from(staffUids) });
-        } catch (err) {
-          console.warn('Failed to delete staff auth users:', err);
-        }
-      }
+      // Note: Auth user deletion requires Cloud Functions/Admin SDK (Blaze).
 
       // Delete staffAccounts lookup
       await Promise.all(staffAccSnap.docs.map(d => deleteDoc(d.ref)));

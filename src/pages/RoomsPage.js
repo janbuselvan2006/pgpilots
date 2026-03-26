@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import {
   collection, addDoc, getDocs,
-  deleteDoc, doc, query, where
+  deleteDoc, doc, query, where, getDoc, updateDoc
 } from 'firebase/firestore';
 
 const css = `
@@ -286,17 +286,40 @@ export default function Rooms({ pgId }) {
       resetForm();
       setShowForm(false);
       fetchData();
+      recalcBeds();
     } catch (err) { console.error(err); alert('Something went wrong!'); }
     setSaving(false);
+  };
+
+  const recalcBeds = async () => {
+    try {
+      const rSnap = await getDocs(query(collection(db, 'rooms'), where('ownerId', '==', user.uid)));
+      let totalBeds = 0;
+      rSnap.forEach(r => { totalBeds += (r.data().totalBeds || 0); });
+      const ownerRef = doc(db, 'pgOwners', user.uid);
+      const ownerSnap = await getDoc(ownerRef);
+      const ownerData = ownerSnap.exists() ? ownerSnap.data() : {};
+      const currentMax = ownerData.max_beds_this_month ?? 0;
+      const updates = { current_beds: totalBeds };
+      if (totalBeds > currentMax) updates.max_beds_this_month = totalBeds;
+      await updateDoc(ownerRef, updates);
+    } catch (e) { console.warn('Failed to recalculate beds:', e); }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
 
-    await deleteDoc(doc(db, 'rooms', deleteTarget));
+    const hasTenants = tenants.some(t => t.roomNumber === deleteTarget.roomNumber && t.status !== 'deleted');
+    if (hasTenants) {
+      alert('Please move tenants to another room before deleting this room.');
+      return;
+    }
+
+    await deleteDoc(doc(db, 'rooms', deleteTarget.id));
 
     setDeleteTarget(null);
     fetchData();
+    recalcBeds();
   };
 
   const getOccupiedBeds = (roomNumber) =>
@@ -457,7 +480,7 @@ export default function Rooms({ pgId }) {
                         <span className="room-rent">₹{room.rentPerBed.toLocaleString()}</span>
                         <span className="room-rent-sub"> /bed/mo</span>
                       </div>
-                      <button className="room-delete-btn" onClick={() => setDeleteTarget(room.id)}>
+                      <button className="room-delete-btn" onClick={() => setDeleteTarget(room)}>
                         🗑️ Delete
                       </button>
                     </div>
@@ -545,10 +568,22 @@ export default function Rooms({ pgId }) {
               <div className="del-sheet">
                 <div className="del-icon">🗑️</div>
                 <p className="del-title">Delete this room?</p>
-                <p className="del-sub">This action cannot be undone.</p>
+                {tenants.some(t => t.roomNumber === deleteTarget.roomNumber && t.status !== 'deleted') ? (
+  <p className="del-sub" style={{ color:'#dc2626', fontWeight:'700' }}>
+    Please move tenants to another room before deleting this room.
+  </p>
+) : (
+  <p className="del-sub">This action cannot be undone.</p>
+)}
                 <div className="del-btn-row">
                   <button className="del-cancel"  onClick={() => setDeleteTarget(null)}>Cancel</button>
-                  <button className="del-confirm" onClick={handleDelete}>Yes, Delete</button>
+                  <button
+  className="del-confirm"
+  onClick={handleDelete}
+  disabled={tenants.some(t => t.roomNumber === deleteTarget.roomNumber && t.status !== 'deleted')}
+>
+  Yes, Delete
+</button>
                 </div>
               </div>
             </div>
@@ -559,3 +594,4 @@ export default function Rooms({ pgId }) {
     </>
   );
 }
+
