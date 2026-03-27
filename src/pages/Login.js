@@ -6,6 +6,8 @@ import {
   browserSessionPersistence,
   browserLocalPersistence,
   setPersistence,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
@@ -261,6 +263,17 @@ const css = `
     display: flex; align-items: center; gap: 10px;
     margin-top: 20px; margin-bottom: 16px;
   }
+  
+  .lg-google-btn {
+    width: 100%; padding: 14px; background: white; color: #1a1a2e; border: 1.5px solid #e2e8f0;
+    border-radius: 14px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.03); -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-bottom: 16px; margin-top: 10px;
+  }
+  .lg-google-btn:hover { border-color: #cbd5e0; background: #f8fafc; }
+  .lg-google-btn:active { transform: scale(0.98); }
+  .lg-google-icon { width: 18px; height: 18px; }
   .lg-staff-divider span {
     flex: 1; height: 1px; background: #e2e8f0;
   }
@@ -409,7 +422,28 @@ export default function Login() {
     setLoading(false);
   };
 
-  // ── Forgot password ──
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const snap = await getDocs(query(collection(db, 'pgOwners'), where('email', '==', result.user.email)));
+      if (snap.empty) {
+        auth.signOut();
+        setLoading(false);
+        return showErr('🚫 No account found for this Google email. Please sign up first.');
+      }
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        console.error(err);
+        showErr('Google Sign-In failed.');
+      }
+    }
+    setLoading(false);
+  };
+
   const handleForgot = async () => {
     if (!forgotInput.trim()) return showErr('Enter your email, PG Code, or mobile number.');
     setLoading(true);
@@ -616,6 +650,17 @@ export default function Login() {
         </>
       )}
 
+      <div style={{display:'flex', alignItems:'center', margin:'20px 0', gap:'10px'}}>
+        <span style={{flex:1, height:'1px', background:'#e2e8f0'}} />
+        <span style={{fontSize:'11px', color:'#cbd5e1', fontWeight:'600'}}>OR</span>
+        <span style={{flex:1, height:'1px', background:'#e2e8f0'}} />
+      </div>
+
+      <button className="lg-google-btn" onClick={handleGoogleLogin} disabled={loading}>
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="lg-google-icon" />
+        Continue with Google
+      </button>
+
       <p className="lg-switch">
         Don't have an account?{' '}
         <Link to="/signup">Create one free</Link>
@@ -623,6 +668,7 @@ export default function Login() {
 
       {/* Staff Login */}
       <div className="lg-staff-divider">
+
         <span /><p>Staff Access</p><span />
       </div>
       <Link to="/staff-login" className="lg-staff-btn" id="staff-login-btn">

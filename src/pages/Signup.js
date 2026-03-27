@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import {
   doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, increment,
 } from 'firebase/firestore';
@@ -280,6 +280,17 @@ const css = `
   .pg-copy-btn { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 9px 20px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
   .pg-warning-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 14px; padding: 14px; margin-bottom: 24px; font-size: 13px; color: #92400e; text-align: left; line-height: 1.6; }
 
+  .pg-google-btn {
+    width: 100%; padding: 14px; background: white; color: #1a1a2e; border: 1.5px solid #e2e8f0;
+    border-radius: 14px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.03); -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-bottom: 16px; margin-top: 10px;
+  }
+  .pg-google-btn:hover { border-color: #cbd5e0; background: #f8fafc; }
+  .pg-google-btn:active { transform: scale(0.98); }
+  .pg-google-icon { width: 20px; height: 20px; }
+
   @media (min-width: 769px) {
     .pg-signup-root { flex-direction: row; background: #fff; }
     .pg-hero { flex: 1; display: flex; align-items: center; justify-content: center; padding: 60px; border-radius: 0; }
@@ -301,6 +312,7 @@ const css = `
 // ─────────────────────────────────────────────
 export default function Signup() {
   const [step, setStep]                   = useState(1);
+  const [isGoogleAuth, setIsGoogleAuth]   = useState(false);
   const [phone, setPhone]                 = useState('');
   const [phoneBlocked, setPhoneBlocked]   = useState(false);
   const [otp, setOtp]                     = useState(['', '', '', '', '', '']);
@@ -391,6 +403,33 @@ export default function Signup() {
     setLoading(false);
   };
 
+  const handleGoogleSignup = async () => {
+    setError(''); setSuccess(''); setFailWarn('');
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const snap = await getDoc(doc(db, 'pgOwners', result.user.uid));
+      if (snap.exists()) {
+        auth.signOut();
+        setError('Google account already registered. Please sign in.');
+        setLoading(false);
+        return;
+      }
+      setEmail(result.user.email || '');
+      setOwnerName(result.user.displayName || '');
+      setIsGoogleAuth(true);
+      sessionStorage.setItem('signingUp', 'true');
+      setStep(3); // Jump to details
+    } catch (err) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        console.error(err);
+        setError('Google Sign-Up failed.');
+      }
+    }
+    setLoading(false);
+  };
+
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
     const newOtp = [...otp];
@@ -437,21 +476,28 @@ export default function Signup() {
   };
 
   // ── Step 3: Details
-  const handleDetailsNext = () => {
+  const handleDetailsNext = async () => {
     setError('');
     if (!ownerName.trim()) return setError('Please enter your full name.');
     if (!pgName.trim())    return setError('Please enter your PG name.');
     if (!city.trim())      return setError('Please enter your city.');
     if (!pgState.trim())   return setError('Please enter your state.');
     if (!email.trim())     return setError('Please enter your email.');
-    setStep(4);
+    if (isGoogleAuth && (!phone || phone.length < 10)) return setError('Please enter a valid 10-digit mobile number.');
+    
+    if (isGoogleAuth) {
+      await handleCreateAccount(true);
+    } else {
+      setStep(4);
+    }
   };
 
   // ── Step 4: Create Account
-  const handleCreateAccount = async () => {
+  const handleCreateAccount = async (skipPassword = false) => {
     setError(''); setFailWarn('');
 
-    if (!password)             return setError('Please enter a password.');
+    if (!skipPassword) {
+      if (!password)             return setError('Please enter a password.');
     if (!isStrongPw(password)) return setError('Password does not meet all requirements. Please check the rules below.');
     if (password !== confirmPass) {
       const result = await recordPassFail(phone);
@@ -462,6 +508,7 @@ export default function Signup() {
       setError(`❌ Passwords do not match! ${result.remaining} attempt${result.remaining !== 1 ? 's' : ''} remaining before block.`);
       setFailWarn(`⚠️ ${result.remaining} attempt${result.remaining !== 1 ? 's' : ''} left before your account gets blocked.`);
       return;
+    }
     }
 
     if (await isAdminBlocked(phone)) {
@@ -496,6 +543,7 @@ export default function Signup() {
       });
 
       // ✅ Link email+password to phone auth user so all 3 login methods work
+      if (!skipPassword) {
       const { updatePassword, linkWithCredential, EmailAuthProvider } = await import('firebase/auth');
       const emailCredential = EmailAuthProvider.credential(resolvedEmail, password);
       try {
@@ -510,6 +558,7 @@ export default function Signup() {
         } else {
           throw linkErr;
         }
+      }
       }
 
       // ✅ Signup fully complete — remove flag so dashboard redirect works normally
@@ -537,6 +586,7 @@ export default function Signup() {
   // ✅ Clean up flag when user goes back to step 1
   const resetToStep1 = () => {
     sessionStorage.removeItem('signingUp');
+    setIsGoogleAuth(false);
     setStep(1);
     setOtp(['', '', '', '', '', '']);
     setError('');
@@ -633,8 +683,21 @@ export default function Signup() {
                   </div>
                 </div>
                 <button className="pg-btn" onClick={handleSendOTP} disabled={loading || phoneBlocked}>
-                  {loading ? 'Checking…' : <>Send OTP <span>→</span></>}
+                  {loading ? 'Checking...' : <>Send OTP &rarr;</>}
                 </button>
+
+                <div style={{display:'flex', alignItems:'center', margin:'20px 0', gap:'10px'}}>
+                  <span style={{flex:1, height:'1px', background:'#e2e8f0'}} />
+                  <span style={{fontSize:'12px', color:'#94a3b8', fontWeight:'600'}}>OR</span>
+                  <span style={{flex:1, height:'1px', background:'#e2e8f0'}} />
+                </div>
+
+                <button className="pg-google-btn" onClick={handleGoogleSignup} disabled={loading}>
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="pg-google-icon" />
+                  Continue with Google
+                </button>
+
+
                 <p className="pg-switch">Already have an account? <Link to="/login">Sign in</Link></p>
               </>
             )}
@@ -688,7 +751,14 @@ export default function Signup() {
                       value={val} onChange={e => set(e.target.value)} />
                   </div>
                 ))}
-                <button className="pg-btn" onClick={handleDetailsNext} disabled={loading}>Continue →</button>
+                {isGoogleAuth && (
+                  <div className="pg-field">
+                    <label className="pg-label">Mobile Number *</label>
+                    <input className="pg-input" type="tel" maxLength={10} placeholder="9876543210"
+                      value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} />
+                  </div>
+                )}
+                <button className="pg-btn" onClick={handleDetailsNext} disabled={loading}>{loading ? 'Creating...' : <>Continue &rarr;</>}</button>
               </>
             )}
 

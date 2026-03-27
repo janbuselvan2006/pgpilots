@@ -349,16 +349,17 @@ function TenantDocsSheet({ tenant, onClose }) {
   };
 
   const handleDownload = (docItem) => {
-    fetch(docItem.url)
-      .then(r => r.blob())
-      .then(blob => {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = docItem.name;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      })
-      .catch(() => window.open(docItem.url, '_blank'));
+    let dlUrl = docItem.url;
+    if (dlUrl.includes('cloudinary.com') && !dlUrl.includes('fl_attachment')) {
+      dlUrl = dlUrl.replace('/upload/', '/upload/fl_attachment/');
+    }
+    const a = document.createElement('a');
+    a.href = dlUrl;
+    a.target = '_blank';
+    a.download = docItem.name || 'document';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
