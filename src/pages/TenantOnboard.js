@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { db, storage } from '../firebase';
+import { db } from '../firebase';
 import {
   doc, getDoc, collection, getDocs, query, where, addDoc, updateDoc,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
@@ -82,6 +81,9 @@ const DISTRICTS = {
   'Maharashtra': ['Mumbai','Pune','Nagpur','Nashik','Thane'],
   'Delhi': ['Central Delhi','East Delhi','North Delhi','South Delhi','West Delhi'],
 };
+
+const CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
+const UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
 
 export default function TenantOnboard() {
   const params = new URLSearchParams(window.location.search);
@@ -288,11 +290,26 @@ export default function TenantOnboard() {
       const docPdf = buildPdf(tenantDoc);
       const pdfBlob = docPdf.output('blob');
 
+      if (!CLOUD_NAME || !UPLOAD_PRESET) {
+        throw new Error('Cloudinary is not configured');
+      }
       const fileName = `${form.admissionNumber || form.name || 'tenant'}_${Date.now()}.pdf`.replace(/\s+/g, '_');
-      const pdfRef = ref(storage, `tenantForms/${ownerId}/${pgId}/${fileName}`);
-      await uploadBytes(pdfRef, pdfBlob);
-      const url = await getDownloadURL(pdfRef);
-      tenantDoc.onboardingPdfUrl = url;
+      const formData = new FormData();
+      formData.append('file', pdfBlob, fileName);
+      formData.append('upload_preset', UPLOAD_PRESET);
+      formData.append('folder', `tenantForms/${ownerId}/${pgId}`);
+
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData?.error?.message || 'Cloudinary upload failed');
+      }
+
+      tenantDoc.onboardingPdfUrl = uploadData.secure_url;
+      tenantDoc.onboardingPdfPublicId = uploadData.public_id;
 
       await addDoc(collection(db, 'tenants'), {
         ...tenantDoc,
@@ -307,7 +324,7 @@ export default function TenantOnboard() {
         await updateDoc(doc(db, 'rooms', room.id), { occupiedBeds: (room.occupiedBeds || 0) + 1 });
       }
 
-      setPdfUrl(url);
+      setPdfUrl(uploadData.secure_url);
       setSuccess('✅ Submitted successfully! Your onboarding is complete.');
     } catch (e) {
       console.error(e);

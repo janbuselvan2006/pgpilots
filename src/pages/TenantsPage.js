@@ -1,24 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { db, auth } from '../firebase';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   collection, addDoc, getDocs,
-  doc, query, where, updateDoc
+  doc, query, where, updateDoc, getDoc, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 
-const RELATIONS = ['Father','Mother','Brother','Sister','Grandfather','Grandmother','Guardian','Other'];
+// ── Cloudinary config ──
+const CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
+const UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
+
+const DOC_LABELS = [
+  'Aadhaar Card', 'PAN Card', 'Rent Agreement',
+  'Police Verification', 'Passport', 'Driving License', 'Other',
+];
+
+const RELATIONS = ['Father', 'Mother', 'Brother', 'Sister', 'Grandfather', 'Grandmother', 'Guardian', 'Other'];
 const STATES = [
-  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh',
-  'Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland',
-  'Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
-  'Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh',
+  'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland',
+  'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
 ];
 const DISTRICTS = {
-  'Tamil Nadu': ['Chennai','Coimbatore','Madurai','Salem','Tiruchirappalli'],
-  'Karnataka': ['Bengaluru Urban','Mysuru','Mangaluru','Hubballi','Belagavi'],
-  'Maharashtra': ['Mumbai','Pune','Nagpur','Nashik','Thane'],
-  'Delhi': ['Central Delhi','East Delhi','North Delhi','South Delhi','West Delhi'],
+  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Salem', 'Tiruchirappalli'],
+  'Karnataka': ['Bengaluru Urban', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi'],
+  'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Thane'],
+  'Delhi': ['Central Delhi', 'East Delhi', 'North Delhi', 'South Delhi', 'West Delhi'],
 };
 
 const css = `
@@ -72,14 +80,6 @@ const css = `
 
   .tn-content { padding: 20px 16px 100px; }
 
-  .tn-banner {
-    border-radius: 14px; padding: 12px 16px;
-    margin-bottom: 14px; display: flex; align-items: center; gap: 12px;
-  }
-  .tn-banner-icon  { font-size: 20px; flex-shrink: 0; }
-  .tn-banner-title { font-size: 13px; font-weight: 700; }
-  .tn-banner-sub   { font-size: 11px; margin-top: 2px; }
-
   .tn-search {
     width: 100%; padding: 13px 16px;
     border: 1.5px solid #e2e8f0; border-radius: 14px;
@@ -108,10 +108,11 @@ const css = `
   .tc-detail-key  { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
   .tc-detail-val  { font-size: 13px; color: #1e293b; font-weight: 700; margin-top: 2px; }
   .tc-company { font-size: 12px; color: #64748b; padding: 7px 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 12px; }
-  .tc-footer  { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+  .tc-footer  { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #f1f5f9; flex-wrap: wrap; }
   .tc-edit-btn { flex: 1; padding: 10px; background: #eef2ff; color: #4f46e5; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
   .tc-del-btn  { flex: 1; padding: 10px; background: #fef2f2; color: #dc2626; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
   .tc-pdf-btn  { flex: 1; padding: 10px; background: #f0fdf4; color: #059669; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  .tc-docs-btn { flex: 1; padding: 10px; background: #fff7ed; color: #c2410c; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
 
   .tn-empty       { text-align: center; padding: 50px 20px; background: white; border-radius: 18px; }
   .tn-empty-icon  { font-size: 48px; margin-bottom: 12px; }
@@ -179,10 +180,9 @@ const css = `
 
   .fs-hint { font-size: 11px; color: #94a3b8; margin-top: 4px; }
 
-  /* Family rows */
   .fs-family-row { display: grid; grid-template-columns: 1fr 1fr 0.5fr 1fr auto; gap: 8px; align-items: end; margin-bottom: 10px; }
   .fs-family-row .fs-input, .fs-family-row select { font-size: 13px; padding: 10px 10px; }
-  .fs-add-btn { padding: 8px 14px; background: #eef2ff; color: #4f46e5; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .fs-add-btn    { padding: 8px 14px; background: #eef2ff; color: #4f46e5; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .fs-remove-btn { padding: 8px 10px; background: #fef2f2; color: #dc2626; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; min-width: 32px; height: 40px; display: flex; align-items: center; justify-content: center; }
 
   @media (max-width: 639px) {
@@ -212,11 +212,8 @@ const css = `
   .qr-sub   { font-size: 12px; color: #94a3b8; margin-bottom: 14px; }
   .qr-img   { width: 200px; height: 200px; object-fit: contain; margin: 0 auto 12px; }
   .qr-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .qr-btn {
-    padding: 10px; border-radius: 10px; border: none; cursor: pointer;
-    font-size: 12px; font-weight: 700; font-family: inherit;
-  }
-  .qr-copy { background: #eef2ff; color: #4f46e5; }
+  .qr-btn { padding: 10px; border-radius: 10px; border: none; cursor: pointer; font-size: 12px; font-weight: 700; font-family: inherit; }
+  .qr-copy   { background: #eef2ff; color: #4f46e5; }
   .qr-manual { background: #e94560; color: white; }
 
   @media (min-width: 640px) {
@@ -226,55 +223,263 @@ const css = `
   @media (min-width: 1024px) {
     .tn-tenants-grid { grid-template-columns: repeat(3,1fr); }
   }
+
+  /* ── Docs Sheet ── */
+  .docs-upload-box {
+    background: #fafbff; border: 2px dashed #c7d2fe;
+    border-radius: 14px; padding: 16px; margin-bottom: 20px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .docs-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .docs-select {
+    flex: 1; min-width: 140px; padding: 10px 12px;
+    border-radius: 10px; border: 1.5px solid #e2e8f0;
+    font-size: 13px; font-family: inherit; background: white; outline: none;
+  }
+  .docs-file-label {
+    flex: 2; min-width: 160px; display: flex; align-items: center; gap: 6px;
+    padding: 10px 12px; border-radius: 10px; border: 1.5px solid #e2e8f0;
+    background: white; cursor: pointer; font-size: 13px; color: #64748b;
+  }
+  .docs-upload-btn {
+    padding: 10px 18px; border-radius: 10px; background: #4f46e5;
+    color: white; border: none; font-weight: 700; font-size: 13px;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+    transition: opacity 0.2s;
+  }
+  .docs-upload-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .docs-progress { height: 5px; background: #e0e7ff; border-radius: 99px; overflow: hidden; }
+  .docs-progress-fill { height: 100%; background: linear-gradient(90deg, #4f46e5, #818cf8); border-radius: 99px; transition: width 0.3s ease; }
+
+  .docs-list { display: flex; flex-direction: column; gap: 10px; }
+  .docs-card {
+    background: white; border-radius: 12px; padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07); border: 1px solid #f1f5f9;
+  }
+  .docs-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .docs-info { flex: 1; min-width: 0; }
+  .docs-doc-label { font-size: 13px; font-weight: 700; color: #1e293b; }
+  .docs-doc-name  { font-size: 11px; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .docs-doc-date  { font-size: 10px; color: #cbd5e1; margin-top: 2px; }
+  .docs-actions   { display: flex; gap: 6px; flex-shrink: 0; }
+  .docs-action-btn { padding: 6px 11px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; font-family: inherit; }
+  .docs-empty { text-align: center; padding: 32px 20px; color: #94a3b8; font-size: 13px; background: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9; }
 `;
 
-const EMPTY_FORM = {
-  name:'', phone:'', email:'', company:'',
-  admissionNumber:'', dateOfJoining:'', dob:'', age:'', bloodGroup:'',
-  maritalStatus:'', nationality:'',
-  addressLine:'', state:'', district:'', city:'', pincode:'',
-  organizationType:'College', organizationName:'', designation:'',
-  organizationAddress:'', organizationPhone:'',
-  roomNumber:'', bedNumber:'', monthlyRent:'', deposit:'',
-  checkIn:'', idType:'Aadhaar', idNumber:'',
-  emergencyContact:'', emergencyPhone:'',
-  guardianName:'', guardianPhone:'',
-};
+function getDocIcon(type) {
+  if (type === 'application/pdf') return { emoji: '📄', bg: '#fff3e0' };
+  if (type?.startsWith('image/')) return { emoji: '🖼️', bg: '#e8f5e9' };
+  return { emoji: '📁', bg: '#f3e5f5' };
+}
+function formatDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
-export default function Tenants({ pgId }) {
-  const [tenants, setTenants]           = useState([]);
-  const [rooms, setRooms]               = useState([]);
-  const [showForm, setShowForm]         = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [loading, setLoading]           = useState(true);
-  const [saving, setSaving]             = useState(false);
-  const [search, setSearch]             = useState('');
-  const [editId, setEditId]             = useState(null);
-  const [showQr, setShowQr]             = useState(false);
-  const [qrDataUrl, setQrDataUrl]       = useState('');
-  const [qrToken, setQrToken]           = useState('');
-  const [qrLoading, setQrLoading]       = useState(false);
-  const [family, setFamily]             = useState([{ relation: 'Father', name: '', age: '', phone: '' }]);
-  const [form, setForm]                 = useState({ ...EMPTY_FORM });
+// ══════════════════════════════════════════
+//  TenantDocsSheet — inline docs manager
+// ══════════════════════════════════════════
+function TenantDocsSheet({ tenant, onClose }) {
+  const [documents, setDocuments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [selectedLabel, setSelectedLabel] = useState(DOC_LABELS[0]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [loadingDocs, setLoadingDocs] = useState(true);
+  const fileInputRef = useRef();
 
-  const user = auth.currentUser;
-  const qrLink = qrToken ? `${window.location.origin}/tenant-onboard?token=${qrToken}` : '';
+  // ✅ Root tenants collection path
+  const tenantRef = doc(db, 'tenants', tenant.id);
 
   useEffect(() => {
-    const generateToken = async () => {
-      if (!showQr || !pgId || !user) return;
-      setQrLoading(true);
+    const load = async () => {
+      setLoadingDocs(true);
       try {
-        const fn = httpsCallable(getFunctions(), 'createOnboardingToken');
-        const res = await fn({ pgId });
-        setQrToken(res.data?.token || '');
-      } catch (e) {
-        console.error(e);
-        setQrToken('');
-      }
-      setQrLoading(false);
+        const snap = await getDoc(tenantRef);
+        if (snap.exists()) setDocuments(snap.data().documents || []);
+      } catch (e) { console.error(e); }
+      setLoadingDocs(false);
     };
-    generateToken();
+    load();
+  }, [tenant.id]);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowed.includes(file.type)) { alert('Only JPG, PNG, PDF allowed'); return; }
+    if (file.size > 10 * 1024 * 1024) { alert('File must be under 10MB'); return; }
+    setSelectedFile(file);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) { alert('Please choose a file first'); return; }
+    setUploading(true); setProgress(20);
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('folder', `pgpilots/tenants/${tenant.id}`);
+    try {
+      setProgress(50);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, { method: 'POST', body: formData });
+      const data = await res.json();
+      setProgress(80);
+      if (data.secure_url) {
+        const newDoc = {
+          url: data.secure_url, name: selectedFile.name,
+          label: selectedLabel, type: selectedFile.type,
+          uploadedAt: new Date().toISOString(), publicId: data.public_id,
+        };
+        await updateDoc(tenantRef, { documents: arrayUnion(newDoc) });
+        setDocuments(prev => [...prev, newDoc]);
+        setProgress(100);
+        setSelectedFile(null);
+        fileInputRef.current.value = null;
+        setTimeout(() => setProgress(0), 800);
+      } else { alert('Upload failed'); setProgress(0); }
+    } catch (e) { console.error(e); alert('Upload error'); setProgress(0); }
+    setUploading(false);
+  };
+
+  const handleDelete = async (docItem) => {
+    if (!window.confirm(`Delete "${docItem.label}"?`)) return;
+    await updateDoc(tenantRef, { documents: arrayRemove(docItem) });
+    setDocuments(prev => prev.filter(d => d.url !== docItem.url));
+  };
+
+  const handleDownload = (docItem) => {
+    fetch(docItem.url)
+      .then(r => r.blob())
+      .then(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = docItem.name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch(() => window.open(docItem.url, '_blank'));
+  };
+
+  return (
+    <>
+      <div className="bso" onClick={onClose} />
+      <div className="bs">
+        <div className="bs-handle" />
+        <div className="bs-header">
+          <h2 className="bs-title">📂 {tenant.name}'s Docs</h2>
+          <button className="bs-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="bs-body">
+
+          {/* Upload box */}
+          <div className="docs-upload-box">
+            <div className="docs-row">
+              <select className="docs-select" value={selectedLabel}
+                onChange={e => setSelectedLabel(e.target.value)} disabled={uploading}>
+                {DOC_LABELS.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <label className="docs-file-label">
+                📎 {selectedFile ? selectedFile.name : 'Choose file'}
+                <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.pdf"
+                  style={{ display: 'none' }} onChange={handleFileSelect} disabled={uploading} />
+              </label>
+              <button className="docs-upload-btn" onClick={handleUpload} disabled={uploading}>
+                {uploading ? 'Uploading…' : '⬆ Upload'}
+              </button>
+            </div>
+            {progress > 0 && (
+              <div className="docs-progress">
+                <div className="docs-progress-fill" style={{ width: `${progress}%` }} />
+              </div>
+            )}
+            <div style={{ fontSize: '11px', color: '#94a3b8' }}>JPG, PNG, PDF · Max 10MB</div>
+          </div>
+
+          {/* Doc list */}
+          {loadingDocs ? (
+            <div className="docs-empty">Loading documents…</div>
+          ) : documents.length === 0 ? (
+            <div className="docs-empty">
+              No documents yet.<br />
+              <span style={{ fontSize: '11px' }}>Upload Aadhaar, Rent Agreement, or any tenant doc above.</span>
+            </div>
+          ) : (
+            <div className="docs-list">
+              {documents.map((docItem, i) => {
+                const icon = getDocIcon(docItem.type);
+                return (
+                  <div key={i} className="docs-card">
+                    <div className="docs-icon" style={{ background: icon.bg }}>{icon.emoji}</div>
+                    <div className="docs-info">
+                      <div className="docs-doc-label">{docItem.label}</div>
+                      <div className="docs-doc-name">{docItem.name}</div>
+                      <div className="docs-doc-date">Uploaded {formatDate(docItem.uploadedAt)}</div>
+                    </div>
+                    <div className="docs-actions">
+                      <button className="docs-action-btn"
+                        style={{ background: '#eef2ff', color: '#4f46e5' }}
+                        onClick={() => window.open(docItem.url, '_blank')}>👁</button>
+                      <button className="docs-action-btn"
+                        style={{ background: '#e8f5e9', color: '#2e7d32' }}
+                        onClick={() => handleDownload(docItem)}>⬇</button>
+                      <button className="docs-action-btn"
+                        style={{ background: '#fce4ec', color: '#c62828' }}
+                        onClick={() => handleDelete(docItem)}>🗑</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ══════════════════════════════════════════
+//  EMPTY FORM
+// ══════════════════════════════════════════
+const EMPTY_FORM = {
+  name: '', phone: '', email: '', company: '',
+  admissionNumber: '', dateOfJoining: '', dob: '', age: '', bloodGroup: '',
+  maritalStatus: '', nationality: '',
+  addressLine: '', state: '', district: '', city: '', pincode: '',
+  organizationType: 'College', organizationName: '', designation: '',
+  organizationAddress: '', organizationPhone: '',
+  roomNumber: '', bedNumber: '', monthlyRent: '', deposit: '',
+  checkIn: '', idType: 'Aadhaar', idNumber: '',
+  emergencyContact: '', emergencyPhone: '',
+  guardianName: '', guardianPhone: '',
+};
+
+// ══════════════════════════════════════════
+//  MAIN COMPONENT
+// ══════════════════════════════════════════
+export default function Tenants({ pgId }) {
+  const [tenants, setTenants] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [editId, setEditId] = useState(null);
+  const [showQr, setShowQr] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [family, setFamily] = useState([{ relation: 'Father', name: '', age: '', phone: '' }]);
+  const [form, setForm] = useState({ ...EMPTY_FORM });
+
+  // ── NEW: which tenant's docs are open ──
+  const [docsTenant, setDocsTenant] = useState(null);
+
+  const user = auth.currentUser;
+  const qrLink = user && pgId ? `${window.location.origin}/tenant-onboard?ownerId=${user.uid}&pgId=${pgId}` : '';
+
+  useEffect(() => {
+    if (!showQr || !pgId || !user) return;
   }, [showQr, pgId, user]);
 
   useEffect(() => {
@@ -323,27 +528,27 @@ export default function Tenants({ pgId }) {
 
   const handleEdit = (tenant) => {
     setForm({
-      name: tenant.name||'', phone: tenant.phone||'', email: tenant.email||'',
-      company: tenant.company||'',
-      admissionNumber: tenant.admissionNumber||'', dateOfJoining: tenant.dateOfJoining||'',
-      dob: tenant.dob||'', age: tenant.age||'', bloodGroup: tenant.bloodGroup||'',
-      maritalStatus: tenant.maritalStatus||'', nationality: tenant.nationality||'',
-      addressLine: tenant.addressLine || tenant.address ||'',
-      state: tenant.state||'', district: tenant.district||'',
-      city: tenant.city||'', pincode: tenant.pincode||'',
-      organizationType: tenant.organizationType||'College',
-      organizationName: tenant.organizationName || tenant.company ||'',
-      designation: tenant.designation||'',
-      organizationAddress: tenant.organizationAddress||'',
-      organizationPhone: tenant.organizationPhone||'',
-      roomNumber: tenant.roomNumber||'', bedNumber: tenant.bedNumber||'',
-      monthlyRent: tenant.monthlyRent||'', deposit: tenant.deposit||'',
-      checkIn: tenant.checkIn||'', idType: tenant.idType||'Aadhaar',
-      idNumber: tenant.idNumber||'',
-      emergencyContact: tenant.emergencyContact||'',
-      emergencyPhone: tenant.emergencyPhone||'',
-      guardianName: tenant.guardianName||'',
-      guardianPhone: tenant.guardianPhone||'',
+      name: tenant.name || '', phone: tenant.phone || '', email: tenant.email || '',
+      company: tenant.company || '',
+      admissionNumber: tenant.admissionNumber || '', dateOfJoining: tenant.dateOfJoining || '',
+      dob: tenant.dob || '', age: tenant.age || '', bloodGroup: tenant.bloodGroup || '',
+      maritalStatus: tenant.maritalStatus || '', nationality: tenant.nationality || '',
+      addressLine: tenant.addressLine || tenant.address || '',
+      state: tenant.state || '', district: tenant.district || '',
+      city: tenant.city || '', pincode: tenant.pincode || '',
+      organizationType: tenant.organizationType || 'College',
+      organizationName: tenant.organizationName || tenant.company || '',
+      designation: tenant.designation || '',
+      organizationAddress: tenant.organizationAddress || '',
+      organizationPhone: tenant.organizationPhone || '',
+      roomNumber: tenant.roomNumber || '', bedNumber: tenant.bedNumber || '',
+      monthlyRent: tenant.monthlyRent || '', deposit: tenant.deposit || '',
+      checkIn: tenant.checkIn || '', idType: tenant.idType || 'Aadhaar',
+      idNumber: tenant.idNumber || '',
+      emergencyContact: tenant.emergencyContact || '',
+      emergencyPhone: tenant.emergencyPhone || '',
+      guardianName: tenant.guardianName || '',
+      guardianPhone: tenant.guardianPhone || '',
     });
     setFamily(
       Array.isArray(tenant.family) && tenant.family.length > 0
@@ -363,7 +568,7 @@ export default function Tenants({ pgId }) {
       const data = {
         ...form,
         monthlyRent: parseInt(form.monthlyRent) || 0,
-        deposit:     parseInt(form.deposit)     || 0,
+        deposit: parseInt(form.deposit) || 0,
         family: family.filter(f => f.name || f.phone),
       };
       if (editId) {
@@ -377,11 +582,7 @@ export default function Tenants({ pgId }) {
         await updateDoc(doc(db, 'tenants', editId), data);
       } else {
         await addDoc(collection(db, 'tenants'), {
-          ...data,
-          ownerId:   user.uid,
-          pgId:      pgId,
-          status:    'Active',
-          createdAt: new Date(),
+          ...data, ownerId: user.uid, pgId, status: 'Active', createdAt: new Date(),
         });
         const room = rooms.find(r => r.roomNumber === form.roomNumber);
         if (room) await updateDoc(doc(db, 'rooms', room.id), { occupiedBeds: (room.occupiedBeds || 0) + 1 });
@@ -399,8 +600,7 @@ export default function Tenants({ pgId }) {
         status: 'deleted', deletedAt: new Date().toISOString(),
       });
       const rSnap = await getDocs(query(collection(db, 'rooms'),
-        where('pgId', '==', pgId),
-        where('roomNumber', '==', deleteTarget.roomNumber)
+        where('pgId', '==', pgId), where('roomNumber', '==', deleteTarget.roomNumber)
       ));
       if (!rSnap.empty) {
         const rd = rSnap.docs[0];
@@ -417,23 +617,14 @@ export default function Tenants({ pgId }) {
     t.roomNumber?.includes(search)
   );
 
-  const beds         = getVacantBeds(form.roomNumber);
+  const beds = getVacantBeds(form.roomNumber);
   const selectedRoom = rooms.find(r => r.roomNumber === form.roomNumber);
 
-  // Family helpers
-  const addFamilyRow = () => {
-    setFamily(rows => [...rows, { relation: 'Father', name: '', age: '', phone: '' }]);
-  };
-  const removeFamilyRow = (idx) => {
-    setFamily(rows => rows.filter((_, i) => i !== idx));
-  };
-  const updateFamily = (idx, field, value) => {
-    setFamily(rows => {
-      const next = [...rows];
-      next[idx] = { ...next[idx], [field]: value };
-      return next;
-    });
-  };
+  const addFamilyRow = () => setFamily(rows => [...rows, { relation: 'Father', name: '', age: '', phone: '' }]);
+  const removeFamilyRow = (idx) => setFamily(rows => rows.filter((_, i) => i !== idx));
+  const updateFamily = (idx, field, value) => setFamily(rows => {
+    const next = [...rows]; next[idx] = { ...next[idx], [field]: value }; return next;
+  });
 
   if (!pgId) {
     return (
@@ -460,20 +651,17 @@ export default function Tenants({ pgId }) {
               <h1 className="tn-page-title">Tenants</h1>
               <p className="tn-page-sub">{tenantCount} active tenants</p>
             </div>
-            <button className="tn-add-fab"
-              onClick={() => setShowQr(true)}>
-              ＋
-            </button>
+            <button className="tn-add-fab" onClick={() => setShowQr(true)}>＋</button>
           </div>
         </div>
 
         {/* Stats strip */}
         <div className="tn-stats">
           {[
-            { label:'Tenants', value: tenantCount, color: '#4f46e5' },
-            { label:'Active',   value: tenants.filter(t => t.status === 'Active').length, color:'#059669' },
-            { label:'Deposits', value:`₹${tenants.reduce((a,t) => a+(t.deposit||0), 0).toLocaleString('en-IN')}`, color:'#d97706' },
-            { label:'Revenue',  value:`₹${tenants.reduce((a,t) => a+(t.monthlyRent||0), 0).toLocaleString('en-IN')}`, color:'#0891b2' },
+            { label: 'Tenants', value: tenantCount, color: '#4f46e5' },
+            { label: 'Active', value: tenants.filter(t => t.status === 'Active').length, color: '#059669' },
+            { label: 'Deposits', value: `₹${tenants.reduce((a, t) => a + (t.deposit || 0), 0).toLocaleString('en-IN')}`, color: '#d97706' },
+            { label: 'Revenue', value: `₹${tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0).toLocaleString('en-IN')}`, color: '#0891b2' },
           ].map(({ label, value, color }) => (
             <div key={label} className="tn-stat">
               <div className="tn-stat-num" style={{ color }}>{value}</div>
@@ -484,7 +672,6 @@ export default function Tenants({ pgId }) {
 
         {/* Content */}
         <div className="tn-content">
-
           <input className="tn-search" type="text"
             placeholder="🔍 Search by name, phone or room…"
             value={search} onChange={e => setSearch(e.target.value)} />
@@ -506,11 +693,11 @@ export default function Tenants({ pgId }) {
             <div className="tn-tenants-grid">
               {filtered.map(tenant => (
                 <div key={tenant.id} className="tc">
-                  <div className="tc-accent" style={{ background:'linear-gradient(90deg,#4f46e5,#0891b2)' }} />
+                  <div className="tc-accent" style={{ background: 'linear-gradient(90deg,#4f46e5,#0891b2)' }} />
                   <div className="tc-body">
                     <div className="tc-header">
                       <div className="tc-avatar">{tenant.name?.charAt(0).toUpperCase()}</div>
-                      <div style={{ flex:1 }}>
+                      <div style={{ flex: 1 }}>
                         <div className="tc-name">{tenant.name}</div>
                         <div className="tc-phone">📞 {tenant.phone}</div>
                       </div>
@@ -519,12 +706,12 @@ export default function Tenants({ pgId }) {
 
                     <div className="tc-details">
                       {[
-                        ['🛏️ Room',    `Room ${tenant.roomNumber}`],
-                        ['🪑 Bed',     `Bed ${tenant.bedNumber || 'N/A'}`],
-                        ['💰 Rent',    `₹${(tenant.monthlyRent||0).toLocaleString('en-IN')}/mo`],
-                        ['💵 Deposit', `₹${(tenant.deposit||0).toLocaleString('en-IN')}`],
+                        ['🛏️ Room', `Room ${tenant.roomNumber}`],
+                        ['🪑 Bed', `Bed ${tenant.bedNumber || 'N/A'}`],
+                        ['💰 Rent', `₹${(tenant.monthlyRent || 0).toLocaleString('en-IN')}/mo`],
+                        ['💵 Deposit', `₹${(tenant.deposit || 0).toLocaleString('en-IN')}`],
                         ['📅 Check-in', tenant.checkIn || tenant.dateOfJoining || 'N/A'],
-                        ['🪪 ID',      tenant.idType],
+                        ['🪪 ID', tenant.idType],
                       ].map(([k, v]) => (
                         <div key={k} className="tc-detail-item">
                           <span className="tc-detail-key">{k}</span>
@@ -533,14 +720,31 @@ export default function Tenants({ pgId }) {
                       ))}
                     </div>
 
-                    {(tenant.company || tenant.organizationName) && <div className="tc-company">🏢 {tenant.organizationName || tenant.company}</div>}
+                    {(tenant.company || tenant.organizationName) && (
+                      <div className="tc-company">🏢 {tenant.organizationName || tenant.company}</div>
+                    )}
 
                     <div className="tc-footer">
+                      {/* ── 📂 Docs button ── */}
+                      <button className="tc-docs-btn" onClick={() => setDocsTenant(tenant)}>
+                        📂 Docs
+                      </button>
                       {tenant.onboardingPdfUrl && (
-                        <button className="tc-pdf-btn" onClick={() => window.open(tenant.onboardingPdfUrl, '_blank')}>⬇️ PDF</button>
+                        <button
+                          className="tc-pdf-btn"
+                          onClick={async () => {
+                            try {
+                              window.open(tenant.onboardingPdfUrl, '_blank', 'noopener,noreferrer');
+                            } catch (e) {
+                              alert('Failed to open PDF. Please try again.');
+                            }
+                          }}
+                        >
+                          ⬇️ PDF
+                        </button>
                       )}
                       <button className="tc-edit-btn" onClick={() => handleEdit(tenant)}>✏️ Edit</button>
-                      <button className="tc-del-btn"  onClick={() => setDeleteTarget(tenant)}>🗑️ Remove</button>
+                      <button className="tc-del-btn" onClick={() => setDeleteTarget(tenant)}>🗑️</button>
                     </div>
                   </div>
                 </div>
@@ -549,37 +753,34 @@ export default function Tenants({ pgId }) {
           )}
         </div>
 
+        {/* ── Docs Sheet ── */}
+        {docsTenant && (
+          <TenantDocsSheet
+            tenant={docsTenant}
+            onClose={() => setDocsTenant(null)}
+          />
+        )}
+
         {/* QR Modal */}
         {showQr && (
-          <div className="qr-overlay" onClick={() => { setShowQr(false); setQrToken(''); setQrDataUrl(''); }}>
-            <div className="qr-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="qr-overlay" onClick={() => { setShowQr(false); setQrDataUrl(''); }}>
+            <div className="qr-modal" onClick={e => e.stopPropagation()}>
               <div className="qr-title">Tenant Self Onboarding</div>
               <div className="qr-sub">Ask tenant to scan and fill the form</div>
-              {qrLoading ? (
-                <div className="tn-loading">Generating QR…</div>
-              ) : qrDataUrl ? (
+              {qrDataUrl ? (
                 <img className="qr-img" alt="Tenant QR" src={qrDataUrl} />
               ) : (
                 <div className="tn-loading">QR unavailable</div>
               )}
               <div className="qr-actions">
-                <button className="qr-btn qr-copy"
-                  onClick={() => {
-                    if (!qrLink) return;
-                    navigator.clipboard.writeText(qrLink);
-                  }}>
-                  Copy Link
-                </button>
-                <button className="qr-btn qr-manual"
-                  onClick={() => { setShowQr(false); resetForm(); setShowForm(true); }}>
-                  Add Manually
-                </button>
+                <button className="qr-btn qr-copy" onClick={() => { if (qrLink) navigator.clipboard.writeText(qrLink); }}>Copy Link</button>
+                <button className="qr-btn qr-manual" onClick={() => { setShowQr(false); resetForm(); setShowForm(true); }}>Add Manually</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ══════════ Add / Edit Sheet — Full Form (matches TenantOnboard) ══════════ */}
+        {/* Add / Edit Sheet */}
         {showForm && (
           <>
             <div className="bso" onClick={resetForm} />
@@ -591,125 +792,101 @@ export default function Tenants({ pgId }) {
               </div>
               <div className="bs-body">
 
-                {/* ── Personal Details ── */}
                 <div className="fs-section">
                   <div className="fs-section-title">👤 Personal Details</div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">Admission Number</label>
-                      <input className="fs-input" placeholder="ADM001"
-                        value={form.admissionNumber} onChange={e => setForm({ ...form, admissionNumber: e.target.value })} />
+                      <input className="fs-input" placeholder="ADM001" value={form.admissionNumber} onChange={e => setForm({ ...form, admissionNumber: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Date of Joining</label>
-                      <input className="fs-input" type="date"
-                        value={form.dateOfJoining} onChange={e => setForm({ ...form, dateOfJoining: e.target.value })} />
+                      <input className="fs-input" type="date" value={form.dateOfJoining} onChange={e => setForm({ ...form, dateOfJoining: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">Full Name *</label>
-                      <input className="fs-input" placeholder="John Doe"
-                        value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                      <input className="fs-input" placeholder="John Doe" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Phone *</label>
-                      <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
-                        value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                      <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-row-3">
                     <div className="fs-field">
                       <label className="fs-label">DOB</label>
-                      <input className="fs-input" type="date"
-                        value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} />
+                      <input className="fs-input" type="date" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Age</label>
-                      <input className="fs-input" placeholder="25"
-                        value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} />
+                      <input className="fs-input" placeholder="25" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Blood Group</label>
-                      <input className="fs-input" placeholder="O+"
-                        value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })} />
+                      <input className="fs-input" placeholder="O+" value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">Email</label>
-                      <input className="fs-input" type="email" placeholder="john@email.com"
-                        value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                      <input className="fs-input" type="email" placeholder="john@email.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Marital Status</label>
-                      <input className="fs-input" placeholder="Single / Married"
-                        value={form.maritalStatus} onChange={e => setForm({ ...form, maritalStatus: e.target.value })} />
+                      <input className="fs-input" placeholder="Single / Married" value={form.maritalStatus} onChange={e => setForm({ ...form, maritalStatus: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-field">
                     <label className="fs-label">Nationality</label>
-                    <input className="fs-input" placeholder="Indian"
-                      value={form.nationality} onChange={e => setForm({ ...form, nationality: e.target.value })} />
+                    <input className="fs-input" placeholder="Indian" value={form.nationality} onChange={e => setForm({ ...form, nationality: e.target.value })} />
                   </div>
                 </div>
 
-                {/* ── Address Details ── */}
                 <div className="fs-section">
                   <div className="fs-section-title">📍 Address Details</div>
                   <div className="fs-field">
                     <label className="fs-label">Address Line</label>
-                    <input className="fs-input" placeholder="Door No, Street, Area"
-                      value={form.addressLine} onChange={e => setForm({ ...form, addressLine: e.target.value })} />
+                    <input className="fs-input" placeholder="Door No, Street, Area" value={form.addressLine} onChange={e => setForm({ ...form, addressLine: e.target.value })} />
                   </div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">State</label>
-                      <select className="fs-input" value={form.state}
-                        onChange={e => setForm({ ...form, state: e.target.value, district: '' })}>
+                      <select className="fs-input" value={form.state} onChange={e => setForm({ ...form, state: e.target.value, district: '' })}>
                         <option value="">Select State</option>
                         {STATES.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">District</label>
-                      <input className="fs-input" list="fs-districts" placeholder="Type district"
-                        value={form.district} onChange={e => setForm({ ...form, district: e.target.value })} />
-                      <datalist id="fs-districts">
-                        {(DISTRICTS[form.state] || []).map(d => <option key={d} value={d} />)}
-                      </datalist>
+                      <input className="fs-input" list="fs-districts" placeholder="Type district" value={form.district} onChange={e => setForm({ ...form, district: e.target.value })} />
+                      <datalist id="fs-districts">{(DISTRICTS[form.state] || []).map(d => <option key={d} value={d} />)}</datalist>
                       <div className="fs-hint">Type to enter if not listed</div>
                     </div>
                   </div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">City</label>
-                      <input className="fs-input" placeholder="City / Town"
-                        value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
+                      <input className="fs-input" placeholder="City / Town" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Pincode</label>
-                      <input className="fs-input" placeholder="600001"
-                        value={form.pincode} onChange={e => setForm({ ...form, pincode: e.target.value })} />
+                      <input className="fs-input" placeholder="600001" value={form.pincode} onChange={e => setForm({ ...form, pincode: e.target.value })} />
                     </div>
                   </div>
                 </div>
 
-                {/* ── Family Information ── */}
                 <div className="fs-section">
                   <div className="fs-section-title">👨‍👩‍👧 Family Information</div>
                   {family.map((row, idx) => (
                     <div key={idx} className="fs-family-row">
-                      <select className="fs-input" value={row.relation}
-                        onChange={e => updateFamily(idx, 'relation', e.target.value)}>
+                      <select className="fs-input" value={row.relation} onChange={e => updateFamily(idx, 'relation', e.target.value)}>
                         {RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
-                      <input className="fs-input" placeholder="Name" value={row.name}
-                        onChange={e => updateFamily(idx, 'name', e.target.value)} />
-                      <input className="fs-input" placeholder="Age" value={row.age}
-                        onChange={e => updateFamily(idx, 'age', e.target.value)} />
-                      <input className="fs-input" placeholder="Mobile No" value={row.phone}
-                        onChange={e => updateFamily(idx, 'phone', e.target.value)} />
+                      <input className="fs-input" placeholder="Name" value={row.name} onChange={e => updateFamily(idx, 'name', e.target.value)} />
+                      <input className="fs-input" placeholder="Age" value={row.age} onChange={e => updateFamily(idx, 'age', e.target.value)} />
+                      <input className="fs-input" placeholder="Mobile No" value={row.phone} onChange={e => updateFamily(idx, 'phone', e.target.value)} />
                       {family.length > 1 && (
                         <button type="button" className="fs-remove-btn" onClick={() => removeFamilyRow(idx)}>✕</button>
                       )}
@@ -718,64 +895,54 @@ export default function Tenants({ pgId }) {
                   <button type="button" className="fs-add-btn" onClick={addFamilyRow}>+ Add Family Member</button>
                 </div>
 
-                {/* ── Professional Details ── */}
                 <div className="fs-section">
                   <div className="fs-section-title">💼 Professional Details</div>
                   <div className="fs-field">
                     <label className="fs-label">Organization Type</label>
                     <div className="fs-seg">
                       {['College', 'Company', 'Other'].map(t => (
-                        <button key={t} className={`fs-seg-btn${form.organizationType === t ? ' active' : ''}`}
-                          onClick={() => setForm({ ...form, organizationType: t })}>{t}</button>
+                        <button key={t} className={`fs-seg-btn${form.organizationType === t ? ' active' : ''}`} onClick={() => setForm({ ...form, organizationType: t })}>{t}</button>
                       ))}
                     </div>
                   </div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">College / Company Name</label>
-                      <input className="fs-input" placeholder="ABC College / XYZ Corp"
-                        value={form.organizationName} onChange={e => setForm({ ...form, organizationName: e.target.value })} />
+                      <input className="fs-input" placeholder="ABC College / XYZ Corp" value={form.organizationName} onChange={e => setForm({ ...form, organizationName: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Designation</label>
-                      <input className="fs-input" placeholder="Student / Engineer"
-                        value={form.designation} onChange={e => setForm({ ...form, designation: e.target.value })} />
+                      <input className="fs-input" placeholder="Student / Engineer" value={form.designation} onChange={e => setForm({ ...form, designation: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">Organization Address</label>
-                      <input className="fs-input" placeholder="Org address"
-                        value={form.organizationAddress} onChange={e => setForm({ ...form, organizationAddress: e.target.value })} />
+                      <input className="fs-input" placeholder="Org address" value={form.organizationAddress} onChange={e => setForm({ ...form, organizationAddress: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Organization Phone</label>
-                      <input className="fs-input" type="tel" placeholder="044-12345678"
-                        value={form.organizationPhone} onChange={e => setForm({ ...form, organizationPhone: e.target.value })} />
+                      <input className="fs-input" type="tel" placeholder="044-12345678" value={form.organizationPhone} onChange={e => setForm({ ...form, organizationPhone: e.target.value })} />
                     </div>
                   </div>
                 </div>
 
-                {/* ── Room & Bed ── */}
                 <div className="fs-section">
                   <div className="fs-section-title">🛏️ Room & Bed</div>
                   <div className="fs-field">
                     <label className="fs-label">Room Number *</label>
-                    <select className="fs-input" value={form.roomNumber}
-                      onChange={e => setForm({ ...form, roomNumber: e.target.value, bedNumber: '' })}>
+                    <select className="fs-input" value={form.roomNumber} onChange={e => setForm({ ...form, roomNumber: e.target.value, bedNumber: '' })}>
                       <option value="">Select Room</option>
                       {rooms.map(r => {
                         const vacant = r.totalBeds - (r.occupiedBeds || 0);
                         return (
-                          <option key={r.id} value={r.roomNumber}
-                            disabled={vacant === 0 && r.roomNumber !== form.roomNumber}>
+                          <option key={r.id} value={r.roomNumber} disabled={vacant === 0 && r.roomNumber !== form.roomNumber}>
                             Room {r.roomNumber} ({r.roomType}) — {vacant} vacant
                           </option>
                         );
                       })}
                     </select>
                   </div>
-
                   {form.roomNumber && (
                     <div className="fs-field">
                       <label className="fs-label">Bed Number *</label>
@@ -795,93 +962,77 @@ export default function Tenants({ pgId }) {
                       )}
                     </div>
                   )}
-
                   {!form.roomNumber && <div className="fs-no-bed">← Select a room first</div>}
-
                   {selectedRoom && (
                     <div className="fs-room-preview">
                       <div className="fs-rp-title">📋 Room Info</div>
                       <div className="fs-rp-chips">
                         <span className="fs-rp-chip">🛏️ {selectedRoom.totalBeds} beds</span>
-                        <span className="fs-rp-chip" style={{ color:'#059669' }}>🟢 {selectedRoom.totalBeds-(selectedRoom.occupiedBeds||0)} vacant</span>
-                        <span className="fs-rp-chip" style={{ color:'#dc2626' }}>🔴 {selectedRoom.occupiedBeds||0} occupied</span>
+                        <span className="fs-rp-chip" style={{ color: '#059669' }}>🟢 {selectedRoom.totalBeds - (selectedRoom.occupiedBeds || 0)} vacant</span>
+                        <span className="fs-rp-chip" style={{ color: '#dc2626' }}>🔴 {selectedRoom.occupiedBeds || 0} occupied</span>
                         <span className="fs-rp-chip">💰 ₹{selectedRoom.rentPerBed?.toLocaleString('en-IN')}/bed</span>
                       </div>
                     </div>
                   )}
-
-                  <div className="fs-row" style={{ marginTop:'12px' }}>
+                  <div className="fs-row" style={{ marginTop: '12px' }}>
                     <div className="fs-field">
                       <label className="fs-label">Monthly Rent (₹)</label>
-                      <input className="fs-input" type="number" inputMode="numeric" placeholder="5000"
-                        value={form.monthlyRent} onChange={e => setForm({ ...form, monthlyRent: e.target.value })} />
+                      <input className="fs-input" type="number" inputMode="numeric" placeholder="5000" value={form.monthlyRent} onChange={e => setForm({ ...form, monthlyRent: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Deposit (₹)</label>
-                      <input className="fs-input" type="number" inputMode="numeric" placeholder="10000"
-                        value={form.deposit} onChange={e => setForm({ ...form, deposit: e.target.value })} />
+                      <input className="fs-input" type="number" inputMode="numeric" placeholder="10000" value={form.deposit} onChange={e => setForm({ ...form, deposit: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-field">
                     <label className="fs-label">Check-in Date</label>
-                    <input className="fs-input" type="date"
-                      value={form.checkIn} onChange={e => setForm({ ...form, checkIn: e.target.value })} />
+                    <input className="fs-input" type="date" value={form.checkIn} onChange={e => setForm({ ...form, checkIn: e.target.value })} />
                   </div>
                 </div>
 
-                {/* ── ID Proof ── */}
                 <div className="fs-section">
                   <div className="fs-section-title">🪪 ID Proof</div>
                   <div className="fs-field">
                     <label className="fs-label">ID Type</label>
                     <div className="fs-seg">
                       {['Aadhaar', 'PAN', 'Passport', 'Driving License', 'Voter ID'].map(t => (
-                        <button key={t} className={`fs-seg-btn${form.idType === t ? ' active' : ''}`}
-                          onClick={() => setForm({ ...form, idType: t })}>{t}</button>
+                        <button key={t} className={`fs-seg-btn${form.idType === t ? ' active' : ''}`} onClick={() => setForm({ ...form, idType: t })}>{t}</button>
                       ))}
                     </div>
                   </div>
                   <div className="fs-field">
                     <label className="fs-label">ID Number</label>
-                    <input className="fs-input" placeholder="Enter ID number"
-                      value={form.idNumber} onChange={e => setForm({ ...form, idNumber: e.target.value })} />
+                    <input className="fs-input" placeholder="Enter ID number" value={form.idNumber} onChange={e => setForm({ ...form, idNumber: e.target.value })} />
                   </div>
                 </div>
 
-                {/* ── Emergency / Guardian ── */}
                 <div className="fs-section">
                   <div className="fs-section-title">🆘 Emergency & Guardian</div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">Emergency Contact</label>
-                      <input className="fs-input" placeholder="Name"
-                        value={form.emergencyContact} onChange={e => setForm({ ...form, emergencyContact: e.target.value })} />
+                      <input className="fs-input" placeholder="Name" value={form.emergencyContact} onChange={e => setForm({ ...form, emergencyContact: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Emergency Phone</label>
-                      <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
-                        value={form.emergencyPhone} onChange={e => setForm({ ...form, emergencyPhone: e.target.value })} />
+                      <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210" value={form.emergencyPhone} onChange={e => setForm({ ...form, emergencyPhone: e.target.value })} />
                     </div>
                   </div>
                   <div className="fs-row">
                     <div className="fs-field">
                       <label className="fs-label">Guardian Name</label>
-                      <input className="fs-input" placeholder="Guardian name"
-                        value={form.guardianName} onChange={e => setForm({ ...form, guardianName: e.target.value })} />
+                      <input className="fs-input" placeholder="Guardian name" value={form.guardianName} onChange={e => setForm({ ...form, guardianName: e.target.value })} />
                     </div>
                     <div className="fs-field">
                       <label className="fs-label">Guardian Phone</label>
-                      <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210"
-                        value={form.guardianPhone} onChange={e => setForm({ ...form, guardianPhone: e.target.value })} />
+                      <input className="fs-input" type="tel" inputMode="numeric" placeholder="9876543210" value={form.guardianPhone} onChange={e => setForm({ ...form, guardianPhone: e.target.value })} />
                     </div>
                   </div>
                 </div>
 
-                <button className="fs-save-btn" onClick={handleSave}
-                  disabled={saving}>
+                <button className="fs-save-btn" onClick={handleSave} disabled={saving}>
                   {saving ? 'Saving…' : editId ? '✏️ Update Tenant' : '💾 Save Tenant'}
                 </button>
-
               </div>
             </div>
           </>
@@ -898,7 +1049,7 @@ export default function Tenants({ pgId }) {
                 <p className="del-title">Remove {deleteTarget.name}?</p>
                 <p className="del-sub">They will be removed from active tenants.<br />Their rent history will be preserved in Reports.</p>
                 <div className="del-btn-row">
-                  <button className="del-cancel"  onClick={() => setDeleteTarget(null)}>Cancel</button>
+                  <button className="del-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>
                   <button className="del-confirm" onClick={handleDelete}>Yes, Remove</button>
                 </div>
               </div>
