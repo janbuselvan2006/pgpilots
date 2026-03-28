@@ -11,6 +11,7 @@ import RentPage from './RentPage';
 import ElectricityPage from './ElectricityPage';
 import ReportsPage from './ReportsPage';
 import SettingsPage from './SettingsPage';
+import TodayDues from './TodayDues';
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -351,33 +352,33 @@ const css = `
 // ── Helper: time ago
 const timeAgo = (date) => {
   if (!date) return '';
-  const d   = date?.toDate ? date.toDate() : new Date(date);
+  const d = date?.toDate ? date.toDate() : new Date(date);
   const sec = Math.floor((Date.now() - d) / 1000);
-  if (sec < 60)   return 'Just now';
-  if (sec < 3600) return `${Math.floor(sec/60)}m ago`;
-  if (sec < 86400)return `${Math.floor(sec/3600)}h ago`;
-  return `${Math.floor(sec/86400)}d ago`;
+  if (sec < 60) return 'Just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  return `${Math.floor(sec / 86400)}d ago`;
 };
 
 export default function Dashboard() {
   const ALL_PGS_ID = '__all__';
-  const [pgOwner, setPgOwner]         = useState(null);
-  const [pgs, setPgs]                 = useState([]);
+  const [pgOwner, setPgOwner] = useState(null);
+  const [pgs, setPgs] = useState([]);
   const [selectedPgId, setSelectedPgId] = useState(null);
-  const [selectedPg, setSelectedPg]   = useState(null);
-  const [activeMenu, setActiveMenu]   = useState('Dashboard');
+  const [selectedPg, setSelectedPg] = useState(null);
+  const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showAddPg, setShowAddPg]     = useState(false);
-  const [dashStats, setDashStats]     = useState({ totalTenants:0, vacantBeds:0, monthlyRevenue:0, pendingRents:0 });
+  const [showAddPg, setShowAddPg] = useState(false);
+  const [dashStats, setDashStats] = useState({ totalTenants: 0, vacantBeds: 0, monthlyRevenue: 0, pendingRents: 0 });
   const [pendingList, setPendingList] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [statsLoading, setStatsLoading] = useState(true);
 
   // Add PG form
-  const [newPgName, setNewPgName]   = useState('');
-  const [newPgCity, setNewPgCity]   = useState('');
+  const [newPgName, setNewPgName] = useState('');
+  const [newPgCity, setNewPgCity] = useState('');
   const [newPgState, setNewPgState] = useState('');
-  const [addingPg, setAddingPg]     = useState(false);
+  const [addingPg, setAddingPg] = useState(false);
 
   const navigate = useNavigate();
   const primaryPgId = pgs[0]?.pgId || pgs[0]?.id || null;
@@ -412,13 +413,13 @@ export default function Dashboard() {
   const fetchStatsForPgIds = async (pgIds) => {
     if (!pgIds || pgIds.length === 0) return { tenants: [], rooms: [], payments: [] };
     const [tSnaps, rSnaps, pSnaps] = await Promise.all([
-      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'tenants'),  where('pgId', '==', id))))),
-      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'rooms'),    where('pgId', '==', id))))),
+      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
+      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'rooms'), where('pgId', '==', id))))),
       Promise.all(pgIds.map(id => getDocs(query(collection(db, 'payments'), where('pgId', '==', id))))),
     ]);
 
-    const tenants  = tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() })));
-    const rooms    = rSnaps.flatMap(s => s.docs.map(d => d.data()));
+    const tenants = tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() })));
+    const rooms = rSnaps.flatMap(s => s.docs.map(d => d.data()));
     const payments = pSnaps.flatMap(s => s.docs.map(d => d.data()));
     return { tenants, rooms, payments };
   };
@@ -426,13 +427,13 @@ export default function Dashboard() {
   const fetchStatsByOwnerId = async (ownerId) => {
     if (!ownerId) return { tenants: [], rooms: [], payments: [] };
     const [tSnap, rSnap, pSnap] = await Promise.all([
-      getDocs(query(collection(db, 'tenants'),  where('ownerId', '==', ownerId))),
-      getDocs(query(collection(db, 'rooms'),    where('ownerId', '==', ownerId))),
+      getDocs(query(collection(db, 'tenants'), where('ownerId', '==', ownerId))),
+      getDocs(query(collection(db, 'rooms'), where('ownerId', '==', ownerId))),
       getDocs(query(collection(db, 'payments'), where('ownerId', '==', ownerId))),
     ]);
 
-    const tenants  = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const rooms    = rSnap.docs.map(d => d.data());
+    const tenants = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const rooms = rSnap.docs.map(d => d.data());
     const payments = pSnap.docs.map(d => d.data());
     return { tenants, rooms, payments };
   };
@@ -452,20 +453,20 @@ export default function Dashboard() {
         // Legacy single-PG mode (documents may not have pgId).
         const res = await fetchStatsByOwnerId(ownerId);
         allTenants = res.tenants.filter(t => !t.pgId || t.pgId === ownerId);
-        rooms      = res.rooms.filter(r => !r.pgId || r.pgId === ownerId);
-        payments   = res.payments.filter(p => !p.pgId || p.pgId === ownerId);
+        rooms = res.rooms.filter(r => !r.pgId || r.pgId === ownerId);
+        payments = res.payments.filter(p => !p.pgId || p.pgId === ownerId);
       } else {
         ({ tenants: allTenants, rooms, payments } = await fetchStatsForPgIds([pgId]));
       }
 
       const tenants = allTenants.filter(t => t.status !== 'deleted');
 
-      const totalBeds    = rooms.reduce((a, r) => a + (r.totalBeds    || 0), 0);
+      const totalBeds = rooms.reduce((a, r) => a + (r.totalBeds || 0), 0);
       const occupiedBeds = rooms.reduce((a, r) => a + (r.occupiedBeds || 0), 0);
 
       const thisMonth = new Date().toLocaleString('en-US', { month: 'long' });
-      const thisYear  = new Date().getFullYear().toString();
-      const todayDay  = new Date().getDate();
+      const thisYear = new Date().getFullYear().toString();
+      const todayDay = new Date().getDate();
 
       const pending = [];
       tenants.forEach(t => {
@@ -479,7 +480,7 @@ export default function Dashboard() {
           pending.push({
             name: t.name,
             room: t.roomNumber || t.room || '—',
-            due:  (t.monthlyRent || 0) - paid,
+            due: (t.monthlyRent || 0) - paid,
             initial: (t.name || 'T').charAt(0).toUpperCase(),
           });
         }
@@ -494,17 +495,17 @@ export default function Dashboard() {
 
       setRecentActivity(sorted.map(t => ({
         icon: '👤',
-        bg:   '#eff6ff',
+        bg: '#eff6ff',
         text: `${t.name} joined — Room ${t.roomNumber || t.room || '?'}`,
         time: timeAgo(t.createdAt),
       })));
 
       setPendingList(pending.slice(0, 5));
       setDashStats({
-        totalTenants:   tenants.length,
-        vacantBeds:     totalBeds - occupiedBeds,
+        totalTenants: tenants.length,
+        vacantBeds: totalBeds - occupiedBeds,
         monthlyRevenue: tenants.reduce((a, t) => a + (t.monthlyRent || 0), 0),
-        pendingRents:   pending.length,
+        pendingRents: pending.length,
       });
 
     } catch (e) { console.error(e); }
@@ -587,9 +588,9 @@ export default function Dashboard() {
       const { doc: fsDoc, setDoc: fsSetDoc, collection: fsColl } = await import('firebase/firestore');
 
       // Generate PG code
-      const letters = newPgName.replace(/\s+/g,'').toUpperCase().slice(0,3).padEnd(3,'X');
-      const digits  = Math.floor(100 + Math.random() * 900);
-      const code    = `${letters}${digits}`;
+      const letters = newPgName.replace(/\s+/g, '').toUpperCase().slice(0, 3).padEnd(3, 'X');
+      const digits = Math.floor(100 + Math.random() * 900);
+      const code = `${letters}${digits}`;
 
       const pgRef = fsDoc(fsColl(db, 'pgOwners', user.uid, 'pgs'));
       const mainPg = pgs.find(p => p.is_main) || pgs[0];
@@ -598,8 +599,8 @@ export default function Dashboard() {
       const newPg = {
         pgId: pgRef.id,
         pgName: newPgName.trim(),
-        city:   newPgCity.trim(),
-        state:  newPgState.trim(),
+        city: newPgCity.trim(),
+        state: newPgState.trim(),
         pgCode: code,
         is_main: isMain,
         parent_pg_id: parentPgId,
@@ -618,33 +619,34 @@ export default function Dashboard() {
   };
 
   const menuItems = [
-    {icon:'📊',label:'Dashboard'},
-    {icon:'🛏️',label:'Rooms'},
-    {icon:'👥',label:'Tenants'},
-    {icon:'💰',label:'Rent'},
-    {icon:'⚡',label:'Electricity'},
-    {icon:'🍽️',label:'Food Menu'},
-    {icon:'📄',label:'ID Proofs'},
-    {icon:'📈',label:'Reports'},
-    {icon:'🔔',label:'Notifications'},
-    {icon:'⚙️',label:'Settings'},
+    { icon: '📊', label: 'Dashboard' },
+    { icon: '🛏️', label: 'Rooms' },
+    { icon: '👥', label: 'Tenants' },
+    { icon: '💰', label: 'Rent' },
+    { icon: '⚡', label: 'Electricity' },
+    { icon: '📅', label: 'Payment Dues' },
+    { icon: '🍽️', label: 'Food Menu' },
+    { icon: '📄', label: 'ID Proofs' },
+    { icon: '📈', label: 'Reports' },
+    { icon: '🔔', label: 'Notifications' },
+    { icon: '⚙️', label: 'Settings' },
   ];
 
   const statTiles = [
-    {icon:'👥', label:'Tenants', value: statsLoading ? '…' : dashStats.totalTenants,                            color:'#4f46e5', menu:'Tenants'},
-    {icon:'🛏️', label:'Vacant',  value: statsLoading ? '…' : dashStats.vacantBeds,                             color:'#059669', menu:'Rooms'},
-    {icon:'💰', label:'Revenue', value: statsLoading ? '…' : `₹${dashStats.monthlyRevenue.toLocaleString('en-IN')}`,color:'#d97706', menu:'Rent'},
-    {icon:'⏳', label:'Pending', value: statsLoading ? '…' : dashStats.pendingRents,                           color:'#dc2626', menu:'Rent'},
+    { icon: '👥', label: 'Tenants', value: statsLoading ? '…' : dashStats.totalTenants, color: '#4f46e5', menu: 'Tenants' },
+    { icon: '🛏️', label: 'Vacant', value: statsLoading ? '…' : dashStats.vacantBeds, color: '#059669', menu: 'Rooms' },
+    { icon: '💰', label: 'Revenue', value: statsLoading ? '…' : `₹${dashStats.monthlyRevenue.toLocaleString('en-IN')}`, color: '#d97706', menu: 'Rent' },
+    { icon: '⏳', label: 'Pending', value: statsLoading ? '…' : dashStats.pendingRents, color: '#dc2626', menu: 'Rent' },
   ];
 
   const quickActions = [
-    {icon:'➕', label:'Add Tenant',     menu:'Tenants',     accent:'#4f46e5'},
-    {icon:'🛏️', label:'Add Room',       menu:'Rooms',       accent:'#059669'},
-    {icon:'💰', label:'Record Payment', menu:'Rent',        accent:'#d97706'},
-    {icon:'⚡', label:'Electricity',    menu:'Electricity', accent:'#dc2626'},
+    { icon: '➕', label: 'Add Tenant', menu: 'Tenants', accent: '#4f46e5' },
+    { icon: '🛏️', label: 'Add Room', menu: 'Rooms', accent: '#059669' },
+    { icon: '💰', label: 'Record Payment', menu: 'Rent', accent: '#d97706' },
+    { icon: '⚡', label: 'Electricity', menu: 'Electricity', accent: '#dc2626' },
   ];
 
-  const knownPages = ['Dashboard','Rooms','Tenants','Rent','Electricity','Reports','Settings'];
+  const knownPages = ['Dashboard', 'Rooms', 'Tenants', 'Rent', 'Electricity', 'Payment Dues', 'Reports', 'Settings'];
 
   const PgSwitcherSelect = ({ className }) => (
     <select
@@ -673,7 +675,7 @@ export default function Dashboard() {
           <button className="db-hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? '✕' : '☰'}
           </button>
-          <div style={{textAlign:'center'}}>
+          <div style={{ textAlign: 'center' }}>
             <div className="db-mobile-logo">🏠 PGpilots</div>
             <div className="db-mobile-pg-name">{isAllSelected ? 'All PGs' : (selectedPg?.pgName || '')}</div>
           </div>
@@ -707,7 +709,7 @@ export default function Dashboard() {
               <PgSwitcherSelect className="db-pg-select" />
             </div>
           )}
-          <div style={{padding:'8px 20px 0'}}>
+          <div style={{ padding: '8px 20px 0' }}>
             <button className="db-pg-add-btn" onClick={() => { setShowAddPg(true); setSidebarOpen(false); }}>
               ＋ Add New PG
             </button>
@@ -734,10 +736,10 @@ export default function Dashboard() {
             <div>
               <div className="db-desktop-title">{activeMenu}</div>
               <div className="db-desktop-sub">
-                {new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
+                {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </div>
             </div>
-            <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {/* Desktop PG switcher */}
               {pgs.length > 1 && (
                 <select
@@ -748,10 +750,10 @@ export default function Dashboard() {
                     setSelectedPgId(next);
                   }}
                   style={{
-                    padding:'8px 14px', borderRadius:'10px',
-                    border:'1.5px solid #e2e8f0', fontSize:'13px',
-                    fontWeight:'700', color:'#1e293b', background:'white',
-                    cursor:'pointer', outline:'none', fontFamily:'inherit',
+                    padding: '8px 14px', borderRadius: '10px',
+                    border: '1.5px solid #e2e8f0', fontSize: '13px',
+                    fontWeight: '700', color: '#1e293b', background: 'white',
+                    cursor: 'pointer', outline: 'none', fontFamily: 'inherit',
                   }}
                 >
                   <option value={ALL_PGS_ID}>All PGs (Overview)</option>
@@ -763,9 +765,9 @@ export default function Dashboard() {
               <button
                 onClick={() => setShowAddPg(true)}
                 style={{
-                  padding:'8px 16px', borderRadius:'10px',
-                  background:'#e94560', color:'white', border:'none',
-                  fontSize:'13px', fontWeight:'700', cursor:'pointer', fontFamily:'inherit',
+                  padding: '8px 16px', borderRadius: '10px',
+                  background: '#e94560', color: 'white', border: 'none',
+                  fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
                 ＋ Add PG
@@ -779,12 +781,13 @@ export default function Dashboard() {
           <div className="db-page-content">
 
             {/* ── Routed pages ── */}
-            {activeMenu === 'Rooms'       && <Rooms       pgId={effectivePgId} />}
-            {activeMenu === 'Tenants'     && <Tenants     pgId={effectivePgId} />}
-            {activeMenu === 'Rent'        && <RentPage    pgId={effectivePgId} />}
+            {activeMenu === 'Rooms' && <Rooms pgId={effectivePgId} />}
+            {activeMenu === 'Tenants' && <Tenants pgId={effectivePgId} />}
+            {activeMenu === 'Rent' && <RentPage pgId={effectivePgId} />}
             {activeMenu === 'Electricity' && <ElectricityPage pgId={effectivePgId} />}
-            {activeMenu === 'Reports'     && <ReportsPage pgId={effectivePgId} />}
-            {activeMenu === 'Settings'    && <SettingsPage pgId={effectivePgId} />}
+            {activeMenu === 'Reports' && <ReportsPage pgId={effectivePgId} />}
+            {activeMenu === 'Settings' && <SettingsPage pgId={effectivePgId} />}
+            {activeMenu === 'Payment Dues' && <TodayDues pgId={effectivePgId} />}
 
             {/* ── Dashboard Home ── */}
             {activeMenu === 'Dashboard' && (
@@ -795,7 +798,7 @@ export default function Dashboard() {
                     👋 {pgOwner ? `Hey, ${(pgOwner.ownerName || pgOwner.name || '').split(' ')[0]}!` : 'Welcome back!'}
                   </div>
                   <div className="db-dash-sub">
-                    {new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' })}
+                    {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </div>
                   {/* ✅ Mobile PG switcher */}
                   <div className="db-mobile-pg-pill">
@@ -869,9 +872,9 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="db-activity-empty">
-                      <div style={{ fontSize:'40px', marginBottom:'10px' }}>📋</div>
-                      <p style={{ fontSize:'15px', fontWeight:'700', color:'#1e293b', margin:'0 0 4px' }}>No activity yet</p>
-                      <p style={{ fontSize:'13px', color:'#94a3b8', margin:0 }}>Start by adding rooms and tenants</p>
+                      <div style={{ fontSize: '40px', marginBottom: '10px' }}>📋</div>
+                      <p style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b', margin: '0 0 4px' }}>No activity yet</p>
+                      <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>Start by adding rooms and tenants</p>
                     </div>
                   )}
                 </div>
@@ -880,11 +883,11 @@ export default function Dashboard() {
 
             {/* Coming soon */}
             {!knownPages.includes(activeMenu) && (
-              <div style={{ padding:'20px 16px' }}>
-                <div style={{ background:'white', borderRadius:'18px', padding:'60px 20px', textAlign:'center', boxShadow:'0 2px 10px rgba(0,0,0,0.06)' }}>
-                  <div style={{ fontSize:'48px', marginBottom:'14px' }}>🚧</div>
-                  <div style={{ fontSize:'17px', fontWeight:'700', color:'#1e293b', marginBottom:'6px' }}>{activeMenu}</div>
-                  <div style={{ fontSize:'13px', color:'#94a3b8' }}>This feature is coming soon!</div>
+              <div style={{ padding: '20px 16px' }}>
+                <div style={{ background: 'white', borderRadius: '18px', padding: '60px 20px', textAlign: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '14px' }}>🚧</div>
+                  <div style={{ fontSize: '17px', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>{activeMenu}</div>
+                  <div style={{ fontSize: '13px', color: '#94a3b8' }}>This feature is coming soon!</div>
                 </div>
               </div>
             )}

@@ -4,12 +4,27 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, query, where, getDoc } 
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 
+const DEFAULT_TEMPLATE = `🏠 PGPilots
+
+Hi {{name}},
+
+Your rent of ₹{{amount}} is due today.
+
+Please complete the payment today to avoid any late charges.
+
+For any queries, feel free to reply to this message.
+
+Thank you,  
+Team PGPilots`;
+
 function AdminPanel() {
   const [owners, setOwners] = useState([]);
   const [allTenants, setAllTenants] = useState([]);
   const [allPayments, setAllPayments] = useState([]);
+  const [allElecBills, setAllElecBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [duesList, setDuesList] = useState([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedOwner, setSelectedOwner] = useState(null);
@@ -21,19 +36,32 @@ function AdminPanel() {
   const [ownerPriceInputs, setOwnerPriceInputs] = useState({});
   const navigate = useNavigate();
 
+  // Dues state
+  const [template, setTemplate] = useState(() => localStorage.getItem('pgp_rent_template') || DEFAULT_TEMPLATE);
+  const [sentStatus, setSentStatus] = useState({});
+  const [copiedId, setCopiedId] = useState(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayDay = new Date().getDate();
+  const thisMonth = new Date().toLocaleString('default', { month: 'long' });
+  const thisYear = new Date().getFullYear().toString();
+
+  useEffect(() => {
+    const saved = localStorage.getItem(`pgp_admin_sent_${todayStr}`);
+    if (saved) setSentStatus(JSON.parse(saved));
+  }, [todayStr]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
       const oSnap = await getDocs(collection(db, 'pgOwners'));
       let ownersList = oSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       
-      // Fetch PG counts and actual beds counts for each owner
       for (let owner of ownersList) {
         const pSnap = await getDocs(collection(db, 'pgOwners', owner.id, 'pgs'));
         owner.totalPGs = pSnap.size;
         owner.branchPGsCount = Math.max(0, pSnap.size - 1);
         
-        // Also ensure bed count is accurate by summing rooms if needed, or just relying on current_bed_count
         let bedCount = 0;
         let usedBeds = 0;
         const rSnap = await getDocs(query(collection(db, 'rooms'), where('ownerId', '==', owner.id)));
@@ -54,13 +82,33 @@ function AdminPanel() {
       }
       setOwners(ownersList);
       
-      const tSnap = await getDocs(collection(db, 'tenants'));
-      setAllTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      const pSnap = await getDocs(collection(db, 'payments'));
-      setAllPayments(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      try {
+        const tSnap = await getDocs(collection(db, 'tenants'));
+        const tenants = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllTenants(tenants);
+        
+        const todayDues = tenants.filter(t => {
+          if (!t.checkIn || t.status === 'deleted') return false;
+          return new Date(t.checkIn).getDate() === todayDay;
+        });
+        setDuesList(todayDues);
+      } catch (e) { console.error('Error fetching tenants:', e); }
+
+      try {
+        const pSnap = await getDocs(collection(db, 'payments'));
+        setAllPayments(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) { console.error('Error fetching payments:', e); }
+
+      try {
+        const eSnap = await getDocs(query(collection(db, 'electricityBills'), where('month', '==', thisMonth), where('year', '==', thisYear)));
+        setAllElecBills(eSnap.docs.map(d => d.data()));
+      } catch (e) { console.error('Error fetching elecBills:', e); }
       
-      const bSnap = await getDoc(doc(db, 'settings', 'billing'));
-      if (bSnap.exists()) setBillingSettings(bSnap.data());
+      try {
+        const bSnap = await getDoc(doc(db, 'settings', 'billing'));
+        if (bSnap.exists()) setBillingSettings(bSnap.data());
+      } catch (e) { console.error('Error fetching settings:', e); }
+
     } catch (err) { console.error(err); }
     setLoading(false);
   };
@@ -113,7 +161,6 @@ function AdminPanel() {
       setNewPrice('');
       showSuccess(`✅ Price updated! New price ₹${newPrice} applies from ${updates.effective_date}`);
     } catch (err) { 
-      // If doc doesn't exist, create it
       try {
         const { setDoc } = await import('firebase/firestore');
         const effectiveDate = new Date();
@@ -134,13 +181,41 @@ function AdminPanel() {
     setSaving(false);
   };
 
+  const handleLogout = async () => { await signOut(auth); navigate('/login'); };
+
+  const getElec = (t) => {
+    const b = allElecBills.find(b => b.roomNumber === t.roomNumber && b.pgId === t.pgId);
+    return b ? Math.round((b.amount || 0) / (b.tenantCount || 1)) : 0;
+  };
+
+  const handleCopy = (t) => {
+    const rent = t.monthlyRent || 0;
+    const elec = getElec(t);
+    const total = rent + elec;
+    
+    const msg = template
+      .replace(/{{name}}/g, t.name || 'Tenant')
+      .replace(/{{amount}}/g, total.toLocaleString('en-IN'))
+      .replace(/{{rent}}/g, rent.toLocaleString('en-IN'))
+      .replace(/{{electricity}}/g, elec.toLocaleString('en-IN'));
+
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopiedId(t.id);
+      setTimeout(() => setCopiedId(null), 1500);
+    });
+  };
+
+  const toggleSent = (tid) => {
+    const next = { ...sentStatus, [tid]: !sentStatus[tid] };
+    setSentStatus(next);
+    localStorage.setItem(`pgp_admin_sent_${todayStr}`, JSON.stringify(next));
+  };
+
   const nonAdmin = owners.filter(o => !o.isAdmin);
   const totalOwners = nonAdmin.length;
   const activeOwners = nonAdmin.filter(o => o.isActive !== false).length;
   const blockedOwners = nonAdmin.filter(o => o.isActive === false).length;
   const totalTenants = allTenants.length;
-  const thisMonth = new Date().toLocaleString('default', { month: 'long' });
-  const thisYear = new Date().getFullYear().toString();
   const monthlyRevenue = allPayments.filter(p => p.month === thisMonth && p.year === thisYear).reduce((a, p) => a + (p.amount || 0), 0);
 
   const filteredOwners = nonAdmin.filter(o => {
@@ -159,8 +234,6 @@ function AdminPanel() {
   };
   const selectedOwnerBilling = selectedOwner ? getOwnerBilling(selectedOwner) : null;
 
-  const handleLogout = async () => { await signOut(auth); navigate('/login'); };
-
   return (
     <div style={s.wrapper}>
       <div style={s.sidebar}>
@@ -172,6 +245,7 @@ function AdminPanel() {
           {[
             { id: 'dashboard', icon: '📊', label: 'Dashboard' },
             { id: 'owners', icon: '👥', label: 'PG Owners' },
+            { id: 'dues', icon: '📅', label: 'Today’s Dues' },
             { id: 'revenue', icon: '💰', label: 'Revenue' },
             { id: 'billing', icon: '💳', label: 'Billing Settings' },
           ].map(({ id, icon, label }) => (
@@ -188,6 +262,7 @@ function AdminPanel() {
           <h1 style={s.pageTitle}>
             {activeTab === 'dashboard' && '📊 Admin Dashboard'}
             {activeTab === 'owners' && '👥 PG Owners'}
+            {activeTab === 'dues' && '📅 Today’s Payment Dues'}
             {activeTab === 'revenue' && '💰 Revenue'}
             {activeTab === 'billing' && '💳 Billing Settings'}
           </h1>
@@ -243,7 +318,7 @@ function AdminPanel() {
             <div>
               <div style={s.filterRow}>
                 <input style={s.searchInput} type="text" placeholder="🔍 Search..." value={search} onChange={e => setSearch(e.target.value)} />
-<select style={s.filterSelect} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                <select style={s.filterSelect} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                   <option value="">All Status</option>
                   <option value="active">Active</option><option value="blocked">Blocked</option>
                 </select>
@@ -295,6 +370,75 @@ function AdminPanel() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* ── TODAY'S DUES ── */}
+          {activeTab === 'dues' && (
+            <div>
+              <div style={s.card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b', textTransform: 'uppercase' }}>Message Template</div>
+                  <button style={{ ...s.viewBtn, fontSize: '10px' }} onClick={() => { setTemplate(DEFAULT_TEMPLATE); localStorage.setItem('pgp_rent_template', DEFAULT_TEMPLATE); }}>Reset</button>
+                </div>
+                <textarea 
+                  style={{ width: '100%', minHeight: '120px', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '12px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: '#f8fafc' }}
+                  value={template}
+                  onChange={e => { setTemplate(e.target.value); localStorage.setItem('pgp_rent_template', e.target.value); }}
+                />
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '8px' }}>Variables: {`{{name}}, {{amount}}, {{rent}}, {{electricity}}`}</div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ fontSize: '14px', color: '#64748b' }}>Due on {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}</div>
+                <div style={{ background: '#e94560', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '800' }}>{duesList.length} Dues</div>
+              </div>
+
+              {duesList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px', background: 'white', borderRadius: '16px' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎉</div>
+                  <div style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>No Dues Today</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {duesList.map(t => {
+                    const owner = owners.find(o => o.id === t.ownerId);
+                    const isSent = !!sentStatus[t.id];
+                    const elec = getElec(t);
+                    const total = (t.monthlyRent || 0) + elec;
+                    const isCopied = copiedId === t.id;
+
+                    return (
+                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px', background: isSent ? '#f8fafc' : 'white', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', opacity: isSent ? 0.7 : 1 }}>
+                        <div 
+                          onClick={() => toggleSent(t.id)}
+                          style={{ width: '22px', height: '22px', borderRadius: '6px', border: `2px solid ${isSent ? '#059669' : '#cbd5e1'}`, background: isSent ? '#059669' : 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          {isSent && <span style={{ color: 'white', fontSize: '14px' }}>✓</span>}
+                        </div>
+                        
+                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg,#e94560,#0f3460)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '800' }}>
+                          {t.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b' }}>{t.name}</div>
+                          <div style={{ fontSize: '12px', color: '#94a3b8' }}>📱 {t.phone || 'No Phone'} • Room {t.roomNumber} • {owner?.pgName || 'PG'}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', marginRight: '16px' }}>
+                          <div style={{ fontSize: '14px', fontWeight: '800', color: '#1e293b' }}>₹{total.toLocaleString('en-IN')}</div>
+                          <div style={{ fontSize: '10px', color: '#94a3b8' }}>R{t.monthlyRent}+E{elec}</div>
+                        </div>
+                        <button 
+                          onClick={() => handleCopy(t)}
+                          style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: isCopied ? '#ecfdf5' : '#eef2ff', color: isCopied ? '#059669' : '#4f46e5', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          {isCopied ? '✅ Copied' : '📋 Copy'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -484,42 +628,8 @@ const s = {
   statIcon: { fontSize: '28px', marginBottom: '8px' },
   statValue: { fontSize: '24px', fontWeight: '800', marginBottom: '4px' },
   statLabel: { color: '#64748b', fontSize: '13px' },
-  rowGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' },
   card: { background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '24px' },
   cardTitle: { fontSize: '16px', fontWeight: '700', color: '#1e293b', marginBottom: '20px', marginTop: 0 },
-  bigRevenue: { fontSize: '40px', fontWeight: '800', color: '#059669' },
-  revenueMonth: { color: '#94a3b8', fontSize: '13px', marginTop: '4px' },
-  recentList: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  recentRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: '#f8fafc', borderRadius: '10px' },
-  recentLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
-  recentAvatar: { width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg,#e94560,#0f3460)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '14px' },
-  recentName: { fontSize: '13px', fontWeight: '700', color: '#1e293b' },
-  recentPg: { fontSize: '12px', color: '#94a3b8' },
-  recentRight: { display: 'flex', alignItems: 'center', gap: '8px' },
-  statusDot: { width: '8px', height: '8px', borderRadius: '50%' },
-  filterRow: { display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' },
-  searchInput: { flex: 1, minWidth: '200px', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: 'white' },
-  filterSelect: { padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '13px', outline: 'none', background: 'white', cursor: 'pointer' },
-  clearBtn: { padding: '10px 16px', borderRadius: '10px', border: 'none', background: '#fef2f2', color: '#dc2626', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
-  resultCount: { fontSize: '13px', color: '#94a3b8', marginBottom: '16px' },
-  ownersList: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  ownerCard: { background: 'white', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
-  ownerCardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' },
-  ownerLeft: { display: 'flex', alignItems: 'flex-start', gap: '12px' },
-  ownerAvatar: { width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '20px', flexShrink: 0 },
-  ownerName: { fontSize: '16px', fontWeight: '700', color: '#1e293b' },
-  ownerPg: { fontSize: '13px', color: '#64748b', marginTop: '2px' },
-  ownerEmail: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
-  ownerCity: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
-  ownerRight: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' },
-  statusBadge: { padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' },
-  ownerStats: { display: 'flex', gap: '12px', fontSize: '12px', color: '#64748b' },
-  ownerActions: { display: 'flex', gap: '8px', flexWrap: 'wrap', paddingTop: '16px', borderTop: '1px solid #f1f5f9' },
-  viewBtn: { padding: '8px 14px', background: '#eef2ff', color: '#4f46e5', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
-  activateBtn: { padding: '8px 14px', background: '#ecfdf5', color: '#059669', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
-  blockBtn: { padding: '8px 14px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
-  deleteBtn: { padding: '8px 14px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginLeft: 'auto' },
-  loading: { textAlign: 'center', padding: '80px', color: '#94a3b8', fontSize: '16px' },
   revenueList: { display: 'flex', flexDirection: 'column', gap: '12px' },
   revenueRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: '#f8fafc', borderRadius: '12px' },
   revenueLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
@@ -545,21 +655,45 @@ const s = {
   actionSelect: { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '14px', background: 'white', cursor: 'pointer' },
   statusBtns: { display: 'flex', gap: '8px' },
   deleteBtnFull: { width: '100%', padding: '10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' },
+  ownersList: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  ownerCard: { background: 'white', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
+  ownerCardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' },
+  ownerLeft: { display: 'flex', alignItems: 'flex-start', gap: '12px' },
+  ownerAvatar: { width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '20px', flexShrink: 0 },
+  ownerName: { fontSize: '16px', fontWeight: '700', color: '#1e293b' },
+  ownerPg: { fontSize: '13px', color: '#64748b', marginTop: '2px' },
+  ownerEmail: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
+  ownerCity: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
+  ownerRight: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' },
+  statusBadge: { padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' },
+  ownerStats: { display: 'flex', gap: '12px', fontSize: '12px', color: '#64748b' },
+  ownerActions: { display: 'flex', gap: '8px', flexWrap: 'wrap', paddingTop: '16px', borderTop: '1px solid #f1f5f9' },
+  activateBtn: { padding: '8px 14px', background: '#ecfdf5', color: '#059669', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
+  blockBtn: { padding: '8px 14px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
+  deleteBtn: { padding: '8px 14px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginLeft: 'auto' },
+  viewBtn: { padding: '8px 14px', background: '#eef2ff', color: '#4f46e5', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
+  loading: { textAlign: 'center', padding: '80px', color: '#94a3b8', fontSize: '16px' },
+  searchInput: { flex: 1, minWidth: '200px', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', background: 'white' },
+  filterSelect: { padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '13px', outline: 'none', background: 'white', cursor: 'pointer' },
+  clearBtn: { padding: '10px 16px', borderRadius: '10px', border: 'none', background: '#fef2f2', color: '#dc2626', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
+  resultCount: { fontSize: '13px', color: '#94a3b8', marginBottom: '16px' },
+  filterRow: { display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' },
+  revenueList: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  revenueRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: '#f8fafc', borderRadius: '12px' },
+  revenueLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
+  revenueAvatar: { width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg,#e94560,#0f3460)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '16px' },
+  revenueName: { fontSize: '14px', fontWeight: '700', color: '#1e293b' },
+  revenuePg: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
+  revenueRight: { display: 'flex', alignItems: 'center', gap: '12px' },
+  revenueAmount: { fontSize: '16px', fontWeight: '800', color: '#059669' },
+  recentList: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  recentRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: '#f8fafc', borderRadius: '10px' },
+  recentLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
+  recentAvatar: { width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg,#e94560,#0f3460)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '14px' },
+  recentName: { fontSize: '13px', fontWeight: '700', color: '#1e293b' },
+  recentPg: { fontSize: '12px', color: '#94a3b8' },
+  recentRight: { display: 'flex', alignItems: 'center', gap: '8px' },
+  statusDot: { width: '8px', height: '8px', borderRadius: '50%' },
 };
 
 export default AdminPanel;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
