@@ -88,8 +88,9 @@ function AdminPanel() {
         setAllTenants(tenants);
         
         const todayDues = tenants.filter(t => {
-          if (!t.checkIn || t.status === 'deleted') return false;
-          return new Date(t.checkIn).getDate() === todayDay;
+          if (!t.checkIn || t.status === 'deleted' || !t.reminderRequestedAt) return false;
+          const reqDate = t.reminderRequestedAt.toDate ? t.reminderRequestedAt.toDate() : new Date(t.reminderRequestedAt);
+          return reqDate.toDateString() === new Date().toDateString();
         });
         setDuesList(todayDues);
       } catch (e) { console.error('Error fetching tenants:', e); }

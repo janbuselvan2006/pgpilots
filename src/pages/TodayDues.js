@@ -168,9 +168,9 @@ export default function TodayDues({ pgId }) {
       const allTenants = tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted');
 
       const dueToday = allTenants.filter(t => {
-        if (!t.checkIn) return false;
-        const joinDate = new Date(t.checkIn);
-        return joinDate.getDate() === todayDate;
+        if (!t.checkIn || !t.reminderRequestedAt) return false;
+        const reqDate = t.reminderRequestedAt.toDate ? t.reminderRequestedAt.toDate() : new Date(t.reminderRequestedAt);
+        return reqDate.toDateString() === new Date().toDateString();
       });
 
       const eSnap = await getDocs(query(collection(db, 'electricityBills'),

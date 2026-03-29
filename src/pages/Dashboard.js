@@ -477,14 +477,18 @@ export default function Dashboard() {
           .filter(p => (p.tenantId === t.id || p.tenantName === t.name) && p.month === thisMonth && p.year === thisYear)
           .reduce((a, p) => a + (p.amount || 0), 0);
         if (paid < (t.monthlyRent || 0)) {
-          pending.push({
-            name: t.name,
-            room: t.roomNumber || t.room || '—',
-            due: (t.monthlyRent || 0) - paid,
-            initial: (t.name || 'T').charAt(0).toUpperCase(),
-          });
-        }
-      });
+            pending.push({
+              id: t.id,
+              name: t.name,
+              room: t.roomNumber || t.room || '—',
+              due: (t.monthlyRent || 0) - paid,
+              initial: (t.name || 'T').charAt(0).toUpperCase(),
+              reminderRequestedAt: t.reminderRequestedAt || null,
+              phone: t.phone,
+              isDueToday: dueDay === todayDay,
+            });
+          }
+        });
 
       // Recent activity — latest 5 tenants by check-in
       const sorted = [...tenants].sort((a, b) => {
@@ -845,16 +849,62 @@ export default function Dashboard() {
                           <div className="db-pending-title">⏳ Rent Due</div>
                           <div className="db-pending-count">{pendingList.length} tenants</div>
                         </div>
-                        {pendingList.map((p, i) => (
-                          <div key={i} className="db-pending-row">
-                            <div className="db-pending-avatar">{p.initial}</div>
-                            <div>
-                              <div className="db-pending-name">{p.name}</div>
-                              <div className="db-pending-room">Room {p.room}</div>
+                        {pendingList.map((p, i) => {
+                          const requestedToday = p.reminderRequestedAt && 
+                            (p.reminderRequestedAt.toDate ? p.reminderRequestedAt.toDate() : new Date(p.reminderRequestedAt)).toDateString() === new Date().toDateString();
+
+                          const handleRemindClick = async (e, tenant) => {
+                            e.stopPropagation();
+                            if (requestedToday) return;
+                            try {
+                              const { updateDoc, doc: fsDoc, serverTimestamp } = await import('firebase/firestore');
+                              await updateDoc(fsDoc(db, 'tenants', tenant.id), {
+                                reminderRequestedAt: serverTimestamp()
+                              });
+                              // Update local state to show as sent
+                              setPendingList(prev => prev.map(item => item.id === tenant.id ? { ...item, reminderRequestedAt: new Date() } : item));
+                            } catch (err) { console.error(err); }
+                          };
+
+                          return (
+                            <div key={i} className="db-pending-row">
+                              <div className="db-pending-avatar">{p.initial}</div>
+                              <div>
+                                <div className="db-pending-name">{p.name}</div>
+                                <div className="db-pending-room">Room {p.room}</div>
+                              </div>
+                             <div className="db-pending-amt" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ color: '#1e293b' }}>₹{p.due.toLocaleString('en-IN')}</div>
+                                  <div style={{ fontSize: '9px', color: p.isDueToday ? '#059669' : '#dc2626', fontWeight: '800' }}>
+                                    {p.isDueToday ? 'DUE TODAY' : 'OVERDUE'}
+                                  </div>
+                                </div>
+                                <button 
+                                  onClick={(e) => handleRemindClick(e, p)}
+                                  disabled={requestedToday}
+                                  style={{
+                                    padding: '8px 12px',
+                                    borderRadius: '10px',
+                                    border: 'none',
+                                    background: requestedToday ? '#f1f5f9' : 'linear-gradient(135deg, #25d366, #128c7e)',
+                                    color: requestedToday ? '#94a3b8' : 'white',
+                                    fontSize: '11px',
+                                    fontWeight: '800',
+                                    cursor: requestedToday ? 'default' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    minWidth: '70px',
+                                    boxShadow: requestedToday ? 'none' : '0 4px 12px rgba(37,211,102,0.2)'
+                                  }}
+                                >
+                                  {requestedToday ? '✅ OK' : '📲 Remind'}
+                                </button>
+                              </div>
                             </div>
-                            <div className="db-pending-amt">₹{p.due.toLocaleString('en-IN')}</div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </>
                   )}
