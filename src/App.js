@@ -37,8 +37,12 @@ function LoadingScreen() {
 function PublicRoute({ children }) {
   const [user, loading] = useAuthState(auth);
   if (loading) return <LoadingScreen />;
+  
   const isSigningUp = sessionStorage.getItem('signingUp') === 'true';
-  if (isSigningUp) return children;
+  const authInProgress = sessionStorage.getItem('authInProgress') === 'true';
+  
+  if (isSigningUp || authInProgress) return children;
+  
   if (user) {
     // If staff, redirect to staff dashboard
     const isStaff = sessionStorage.getItem('staffMode') === 'true';
@@ -58,6 +62,12 @@ function OwnerRoute({ children }) {
   const [user, loading] = useAuthState(auth);
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
+  
+  // Also check if we are in signup mode to avoid redirecting back to dashboard mid-signup
+  if (sessionStorage.getItem('signingUp') === 'true') {
+    return <Navigate to="/signup" replace />;
+  }
+
   const isStaff = sessionStorage.getItem('staffMode') === 'true';
   if (isStaff) return <Navigate to="/staff-dashboard" replace />;
   return children;

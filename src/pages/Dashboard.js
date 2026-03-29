@@ -518,21 +518,25 @@ export default function Dashboard() {
       if (!user) return;
       try {
         const snap = await getDoc(doc(db, 'pgOwners', user.uid));
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data.isActive === false) {
-            await signOut(auth); navigate('/login');
-            alert('Your account has been blocked.'); return;
-          }
-          setPgOwner(data);
+        if (!snap.exists()) {
+          // User exists in auth but not yet in firestore (is signing up)
+          sessionStorage.setItem('signingUp', 'true');
+          navigate('/signup'); 
+          return;
         }
+        const data = snap.data();
+        if (data.isActive === false) {
+          await signOut(auth); navigate('/login');
+          alert('Your account has been blocked.'); return;
+        }
+        setPgOwner(data);
         const list = await fetchPGs(user);
         if (list.length > 0) {
           setSelectedPgId(list[0].id);
           setSelectedPg(list[0]);
           fetchStats(list[0].pgId || list[0].id, user.uid);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error("Dashboard Load Error:", e); }
     });
     return () => unsub();
   }, []);

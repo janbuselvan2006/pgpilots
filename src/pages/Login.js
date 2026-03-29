@@ -7,7 +7,8 @@ import {
   browserLocalPersistence,
   setPersistence,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
 } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
@@ -423,25 +424,49 @@ export default function Login() {
   };
 
 
+  // Handle redirect result on mount
+  React.useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          setLoading(true);
+          // Check if account exists in DB
+          const snap = await getDocs(query(collection(db, 'pgOwners'), where('email', '==', result.user.email)));
+          if (snap.empty) {
+            await auth.signOut();
+            showErr('🚫 No account found for this Google email. Please sign up first.');
+          } else {
+            navigate('/dashboard', { replace: true });
+          }
+          setLoading(false);
+        }
+        // Always clear the flag if we reach here (either result found or nothing pending)
+        sessionStorage.removeItem('authInProgress');
+      } catch (err) {
+        sessionStorage.removeItem('authInProgress');
+        console.error("Redirect check error:", err);
+        // Don't show error if it's just a routine mount without a redirect pending
+      }
+    };
+    checkRedirect();
+  }, [navigate]);
+
   const handleGoogleLogin = async () => {
+    setError(''); setSuccess('');
     setLoading(true);
+    // Set flag so App.js PublicRoute doesn't redirect before our check
+    sessionStorage.setItem('authInProgress', 'true');
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const snap = await getDocs(query(collection(db, 'pgOwners'), where('email', '==', result.user.email)));
-      if (snap.empty) {
-        auth.signOut();
-        setLoading(false);
-        return showErr('🚫 No account found for this Google email. Please sign up first.');
-      }
-      navigate('/dashboard', { replace: true });
+      // Use signInWithRedirect to avoid Cross-Origin-Opener-Policy (COOP) errors in some browsers
+      await signInWithRedirect(auth, provider);
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user') {
-        console.error(err);
-        showErr('Google Sign-In failed.');
-      }
+      sessionStorage.removeItem('authInProgress');
+      console.error(err);
+      showErr('Google Sign-In failed to start.');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleForgot = async () => {
@@ -656,10 +681,12 @@ export default function Login() {
         <span style={{flex:1, height:'1px', background:'#e2e8f0'}} />
       </div>
 
+      {/* Commented out Google OAuth button as requested
       <button className="lg-google-btn" onClick={handleGoogleLogin} disabled={loading}>
         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="lg-google-icon" />
         Continue with Google
       </button>
+      */}
 
       <p className="lg-switch">
         Don't have an account?{' '}

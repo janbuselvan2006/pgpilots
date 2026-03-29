@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWithPopup, PhoneAuthProvider, linkWithCredential, EmailAuthProvider, updatePassword, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import {
   doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, increment,
 } from 'firebase/firestore';
@@ -403,31 +403,59 @@ export default function Signup() {
     setLoading(false);
   };
 
+  // Handle redirect result on mount
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          setLoading(true);
+          const userEmail = result.user.email;
+          const q = query(collection(db, 'pgOwners'), where('email', '==', userEmail));
+          const snap = await getDocs(q);
+
+          if (!snap.empty) {
+            await auth.signOut();
+            setError('An account with this email already exists. Please sign in instead.');
+          } else {
+            setEmail(userEmail || '');
+            setOwnerName(result.user.displayName || '');
+            setIsGoogleAuth(true);
+            sessionStorage.setItem('signingUp', 'true');
+            setStep(3); // Land on details page as requested
+            setSuccess('Google account linked! Please fill in your PG details below.');
+          }
+          setLoading(false);
+        }
+        sessionStorage.removeItem('authInProgress');
+      } catch (err) {
+        sessionStorage.removeItem('authInProgress');
+        console.error("Redirect check error:", err);
+      }
+    };
+    if (sessionStorage.getItem('authInProgress') === 'true') {
+      checkRedirect();
+    }
+  }, []);
+
   const handleGoogleSignup = async () => {
     setError(''); setSuccess(''); setFailWarn('');
+    if (!agreedToTerms) {
+      return setError('Please agree to the Terms & Conditions and Privacy Policy first.');
+    }
     setLoading(true);
+    // Set flag so App.js PublicRoute doesn't redirect before our check
+    sessionStorage.setItem('authInProgress', 'true');
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const snap = await getDoc(doc(db, 'pgOwners', result.user.uid));
-      if (snap.exists()) {
-        auth.signOut();
-        setError('Google account already registered. Please sign in.');
-        setLoading(false);
-        return;
-      }
-      setEmail(result.user.email || '');
-      setOwnerName(result.user.displayName || '');
-      setIsGoogleAuth(true);
-      sessionStorage.setItem('signingUp', 'true');
-      setStep(3); // Jump to details
+      // Use signInWithRedirect to avoid Cross-Origin-Opener-Policy (COOP) errors
+      await signInWithRedirect(auth, provider);
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user') {
-        console.error(err);
-        setError('Google Sign-Up failed.');
-      }
+      sessionStorage.removeItem('authInProgress');
+      console.error(err);
+      setError('Google Sign-Up failed to start.');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleOtpChange = (index, value) => {
@@ -458,10 +486,19 @@ export default function Signup() {
     try {
       // ✅ Set flag BEFORE confirming so PublicRoute doesn't redirect mid-signup
       sessionStorage.setItem('signingUp', 'true');
-      await confirmResult.confirm(code);
+      
+      if (isGoogleAuth) {
+        // We are already signed in with Google. Link the phone instead of signing in again with phone (which switches UID).
+        const credential = PhoneAuthProvider.credential(confirmResult.verificationId, code);
+        await linkWithCredential(auth.currentUser, credential);
+      } else {
+        await confirmResult.confirm(code);
+      }
+      
       setStep(3);
       setSuccess('✅ Phone verified!');
-    } catch {
+    } catch (err) {
+      console.error("OTP Verification Error:", err);
       // ✅ Clean up flag on OTP failure
       sessionStorage.removeItem('signingUp');
       const result = await recordOtpFail(phone);
@@ -478,62 +515,55 @@ export default function Signup() {
   // ── Step 3: Details
   const handleDetailsNext = async () => {
     setError('');
+    const cleanPhone = phone.replace(/\D/g, '');
     if (!ownerName.trim()) return setError('Please enter your full name.');
     if (!pgName.trim())    return setError('Please enter your PG name.');
     if (!city.trim())      return setError('Please enter your city.');
     if (!pgState.trim())   return setError('Please enter your state.');
     if (!email.trim())     return setError('Please enter your email.');
-    if (isGoogleAuth && (!phone || phone.length < 10)) return setError('Please enter a valid 10-digit mobile number.');
-    
-    if (isGoogleAuth) {
-      await handleCreateAccount(true);
-    } else {
-      setStep(4);
+    if (!cleanPhone || cleanPhone.length < 10) return setError('Please enter a valid 10-digit mobile number.');
+
+    setLoading(true);
+    // ✅ Check for duplicate mobile number
+    const q = query(collection(db, 'pgOwners'), where('phone', '==', cleanPhone));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      setLoading(false);
+      return setError('This mobile number is already registered.');
     }
+    setLoading(false);
+    
+    // Always go to step 4 next for password creation
+    setStep(4);
   };
 
   // ── Step 4: Create Account
-  const handleCreateAccount = async (skipPassword = false) => {
+  const handleCreateAccount = async () => {
     setError(''); setFailWarn('');
-
-    if (!skipPassword) {
-      if (!password)             return setError('Please enter a password.');
-    if (!isStrongPw(password)) return setError('Password does not meet all requirements. Please check the rules below.');
-    if (password !== confirmPass) {
-      const result = await recordPassFail(phone);
-      if (result.blocked) {
-        setError('🔒 Too many incorrect password attempts. Your account has been blocked. Contact admin.');
-        return;
-      }
-      setError(`❌ Passwords do not match! ${result.remaining} attempt${result.remaining !== 1 ? 's' : ''} remaining before block.`);
-      setFailWarn(`⚠️ ${result.remaining} attempt${result.remaining !== 1 ? 's' : ''} left before your account gets blocked.`);
-      return;
-    }
-    }
+    if (!password)             return setError('Please enter a password.');
+    if (!isStrongPw(password)) return setError('Password does not meet requirements.');
+    if (password !== confirmPass) return setError('Passwords do not match!');
 
     if (await isAdminBlocked(phone)) {
-      setError('🔒 This account has been blocked. Contact admin to unblock.');
+      setError('🔒 This account has been blocked.');
       return;
     }
 
     setLoading(true);
     try {
-      const user     = auth.currentUser;
-      const code     = await createUniquePGCode(pgName);
+      const user = auth.currentUser;
+      const code = await createUniquePGCode(pgName);
+      const resolvedEmail = email.trim();
+      const cleanPhone = phone.replace(/\D/g, '');
 
-      // ✅ Resolve email — use real email or fallback to phone-based email
-      const resolvedEmail = email.trim()
-        ? email.trim()
-        : `${phone.replace(/\D/g, '')}@pgpilots.in`;
-
-      // ✅ Save to Firestore with resolved email
+      // 1. Save to Firestore
       await setDoc(doc(db, 'pgOwners', user.uid), {
         ownerName,
         pgName,
         city,
         state: pgState,
         email: resolvedEmail,
-        phone: phone.replace(/\D/g, ''),
+        phone: cleanPhone,
         pgCode: code,
         isActive: true,
         createdAt: new Date(),
@@ -542,37 +572,28 @@ export default function Signup() {
         max_beds_this_month: 0,
       });
 
-      // ✅ Link email+password to phone auth user so all 3 login methods work
-      if (!skipPassword) {
-      const { updatePassword, linkWithCredential, EmailAuthProvider } = await import('firebase/auth');
+      // 2. Link email+password so all login methods work for the same UID
       const emailCredential = EmailAuthProvider.credential(resolvedEmail, password);
       try {
         await linkWithCredential(user, emailCredential);
       } catch (linkErr) {
-        // If already linked, just update the password
-        if (
-          linkErr.code === 'auth/provider-already-linked' ||
-          linkErr.code === 'auth/email-already-in-use'
-        ) {
+        if (linkErr.code === 'auth/provider-already-linked') {
+          await updatePassword(user, password);
+        } else if (linkErr.code === 'auth/email-already-in-use') {
+          // This happens if the user existed in Auth but not in pgOwners (was deleted or something)
+          // Since we already checked Snap.empty in GoogleSignup, this is a fallback.
           await updatePassword(user, password);
         } else {
-          throw linkErr;
+          console.warn("Credential link error (non-critical):", linkErr);
         }
       }
-      }
 
-      // ✅ Signup fully complete — remove flag so dashboard redirect works normally
       sessionStorage.removeItem('signingUp');
       setPgCode(code);
       setStep(5);
     } catch (err) {
       console.error(err);
-      const result = await recordPassFail(phone);
-      if (result.blocked) {
-        setError('🔒 Too many failed attempts. Your account has been blocked. Contact admin.');
-      } else {
-        setError('Something went wrong. Please try again.');
-      }
+      setError('Something went wrong. Please try again.');
     }
     setLoading(false);
   };
@@ -665,38 +686,45 @@ export default function Signup() {
                     />
                   </div>
                 </div>
-                <div
-                  className={`pg-terms-row${agreedToTerms ? ' checked' : ''}`}
-                  onClick={() => setAgreedToTerms(!agreedToTerms)}
-                >
-                  <div className={`pg-terms-checkbox${agreedToTerms ? ' checked' : ''}`}>
-                    {agreedToTerms && <span style={{ color: 'white', fontSize: '13px', fontWeight: '800', lineHeight: 1 }}>✓</span>}
+                {!isGoogleAuth && (
+                  <div
+                    className={`pg-terms-row${agreedToTerms ? ' checked' : ''}`}
+                    onClick={() => setAgreedToTerms(!agreedToTerms)}
+                  >
+                    <div className={`pg-terms-checkbox${agreedToTerms ? ' checked' : ''}`}>
+                      {agreedToTerms && <span style={{ color: 'white', fontSize: '13px', fontWeight: '800', lineHeight: 1 }}>✓</span>}
+                    </div>
+                    <div className="pg-terms-text">
+                      I agree to the{' '}
+                      <a href="/terms-and-conditions.html" target="_blank" rel="noopener noreferrer"
+                        className="pg-terms-link" onClick={e => e.stopPropagation()}>Terms &amp; Conditions</a>
+                      {' '}and{' '}
+                      <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer"
+                        className="pg-terms-link" onClick={e => e.stopPropagation()}>Privacy Policy</a>
+                      . I confirm I am 18+ and authorized to manage this PG property.
+                    </div>
                   </div>
-                  <div className="pg-terms-text">
-                    I agree to the{' '}
-                    <a href="/terms-and-conditions.html" target="_blank" rel="noopener noreferrer"
-                      className="pg-terms-link" onClick={e => e.stopPropagation()}>Terms &amp; Conditions</a>
-                    {' '}and{' '}
-                    <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer"
-                      className="pg-terms-link" onClick={e => e.stopPropagation()}>Privacy Policy</a>
-                    . I confirm I am 18+ and authorized to manage this PG property.
-                  </div>
-                </div>
+                )}
                 <button className="pg-btn" onClick={handleSendOTP} disabled={loading || phoneBlocked}>
                   {loading ? 'Checking...' : <>Send OTP &rarr;</>}
                 </button>
 
-                <div style={{display:'flex', alignItems:'center', margin:'20px 0', gap:'10px'}}>
-                  <span style={{flex:1, height:'1px', background:'#e2e8f0'}} />
-                  <span style={{fontSize:'12px', color:'#94a3b8', fontWeight:'600'}}>OR</span>
-                  <span style={{flex:1, height:'1px', background:'#e2e8f0'}} />
-                </div>
+                {/* Commented out Google OAuth button as requested
+                {!isGoogleAuth && (
+                  <>
+                    <div style={{display:'flex', alignItems:'center', margin:'20px 0', gap:'10px'}}>
+                      <span style={{flex:1, height:'1px', background:'#e2e8f0'}} />
+                      <span style={{fontSize:'12px', color:'#94a3b8', fontWeight:'600'}}>OR</span>
+                      <span style={{flex:1, height:'1px', background:'#e2e8f0'}} />
+                    </div>
 
-                <button className="pg-google-btn" onClick={handleGoogleSignup} disabled={loading}>
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="pg-google-icon" />
-                  Continue with Google
-                </button>
-
+                    <button className="pg-google-btn" onClick={handleGoogleSignup} disabled={loading}>
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="pg-google-icon" />
+                      Continue with Google
+                    </button>
+                  </>
+                )}
+                */}
 
                 <p className="pg-switch">Already have an account? <Link to="/login">Sign in</Link></p>
               </>
@@ -751,13 +779,29 @@ export default function Signup() {
                       value={val} onChange={e => set(e.target.value)} />
                   </div>
                 ))}
-                {isGoogleAuth && (
-                  <div className="pg-field">
-                    <label className="pg-label">Mobile Number *</label>
-                    <input className="pg-input" type="tel" maxLength={10} placeholder="9876543210"
-                      value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} />
-                  </div>
-                )}
+
+                <div className="pg-field">
+                  <label className="pg-label">Mobile Number *</label>
+                  <input 
+                    className="pg-input" 
+                    type="tel" 
+                    maxLength={10} 
+                    placeholder="9876543210"
+                    value={phone} 
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} 
+                    readOnly={!isGoogleAuth}
+                    style={{ 
+                      backgroundColor: !isGoogleAuth ? '#f1f5f9' : 'white',
+                      cursor: !isGoogleAuth ? 'not-allowed' : 'text'
+                    }}
+                  />
+                  {!isGoogleAuth ? (
+                    <span style={{ fontSize: '10px', color: '#059669', fontWeight: 'bold' }}>✓ Verified via OTP</span>
+                  ) : (
+                    <span style={{ fontSize: '10px', color: '#64748b' }}>Enter your primary contact number</span>
+                  )}
+                </div>
+                
                 <button className="pg-btn" onClick={handleDetailsNext} disabled={loading}>{loading ? 'Creating...' : <>Continue &rarr;</>}</button>
               </>
             )}

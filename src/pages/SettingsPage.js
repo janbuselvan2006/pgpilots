@@ -309,7 +309,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg]     = useState('');
-  const [billingSettings, setBillingSettings] = useState({ price_per_bed: 0, effective_date: '' });
+  const [billingSettings, setBillingSettings] = useState({ price_per_bed: 8, effective_date: '' });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingQR, setUploadingQR]       = useState(false);
 
