@@ -68,18 +68,24 @@ const css = `
   }
 `;
 
-const RELATIONS = ['Father','Mother','Brother','Sister','Grandfather','Grandmother','Guardian','Other'];
+const RELATIONS = ['Father', 'Mother', 'Brother', 'Sister', 'Grandfather', 'Grandmother', 'Guardian', 'Other'];
 const STATES = [
-  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh',
-  'Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland',
-  'Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
-  'Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh',
+  'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland',
+  'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
 ];
 const DISTRICTS = {
-  'Tamil Nadu': ['Chennai','Coimbatore','Madurai','Salem','Tiruchirappalli'],
-  'Karnataka': ['Bengaluru Urban','Mysuru','Mangaluru','Hubballi','Belagavi'],
-  'Maharashtra': ['Mumbai','Pune','Nagpur','Nashik','Thane'],
-  'Delhi': ['Central Delhi','East Delhi','North Delhi','South Delhi','West Delhi'],
+  'Tamil Nadu': [
+    'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore', 'Dharmapuri', 'Dindigul', 'Erode',
+    'Kallakurichi', 'Kanchipuram', 'Kanniyakumari', 'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai',
+    'Nagapattinam', 'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai', 'Ramanathapuram', 'Ranipet',
+    'Salem', 'Sivaganga', 'Tenkasi', 'Thanjavur', 'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli',
+    'Tirupathur', 'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 'Tiruvarur', 'Vellore', 'Viluppuram', 'Virudhunagar'
+  ],
+  'Karnataka': ['Bengaluru Urban', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi'],
+  'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Thane'],
+  'Delhi': ['Central Delhi', 'East Delhi', 'North Delhi', 'South Delhi', 'West Delhi'],
 };
 
 const CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
@@ -103,7 +109,6 @@ export default function TenantOnboard() {
   const [family, setFamily] = useState([{ relation: 'Father', name: '', age: '', phone: '' }]);
   const [form, setForm] = useState({
     admissionNumber: '',
-    dateOfJoining: '',
     name: '',
     dob: '',
     age: '',
@@ -126,6 +131,9 @@ export default function TenantOnboard() {
     organizationPhone: '',
     roomNumber: '',
     bedNumber: '',
+    monthlyRent: '',
+    deposit: '',
+    checkIn: '',
     guardianName: '',
     guardianPhone: '',
     declaration: false,
@@ -228,7 +236,7 @@ export default function TenantOnboard() {
     };
 
     line('Admission No', tenantDoc.admissionNumber);
-    line('Date of Joining', tenantDoc.dateOfJoining);
+    line('Date of Joining', tenantDoc.checkIn);
     line('Name', tenantDoc.name);
     line('DOB', tenantDoc.dob);
     line('Age', tenantDoc.age);
@@ -273,9 +281,37 @@ export default function TenantOnboard() {
     setError('');
     setSuccess('');
     if (!form.name || !form.phone || !form.roomNumber || !form.bedNumber) {
-      setError('Please fill required fields and select room/bed.');
+      setError('Please fill Name, Phone and select Room/Bed.');
       return;
     }
+    if (form.phone.length !== 10) {
+      setError('Phone number must be exactly 10 digits.');
+      return;
+    }
+    if (!form.monthlyRent || parseInt(form.monthlyRent) <= 0) {
+      setError('Monthly Rent is mandatory.');
+      return;
+    }
+    if (form.deposit === '' || parseInt(form.deposit) < 0) {
+      setError('Security Deposit is mandatory.');
+      return;
+    }
+    if (!form.checkIn) {
+      setError('Check-in Date is mandatory.');
+      return;
+    }
+    if (!form.idNumber) {
+      setError(`Please enter your ${form.idType || 'ID'} number.`);
+      return;
+    }
+
+    // Family info validation
+    const validFamily = family.filter(f => f.name.trim() && f.phone.trim());
+    if (validFamily.length === 0) {
+      setError('Please add at least one family member with name and phone number.');
+      return;
+    }
+
     if (!form.declaration) {
       setError('Please accept the declaration.');
       return;
@@ -284,7 +320,9 @@ export default function TenantOnboard() {
     try {
       const tenantDoc = {
         ...form,
-        family: family.filter(f => f.name || f.phone),
+        monthlyRent: parseInt(form.monthlyRent) || 0,
+        deposit: parseInt(form.deposit) || 0,
+        family: validFamily,
       };
 
       const docPdf = buildPdf(tenantDoc);
@@ -382,65 +420,63 @@ export default function TenantOnboard() {
             <div className="to-row">
               <div className="to-field">
                 <label className="to-label">Admission Number</label>
-                <input className="to-input" value={form.admissionNumber} onChange={e=>setForm(f=>({...f,admissionNumber:e.target.value}))} />
-              </div>
-              <div className="to-field">
-                <label className="to-label">Date of Joining</label>
-                <input className="to-input" type="date" value={form.dateOfJoining} onChange={e=>setForm(f=>({...f,dateOfJoining:e.target.value}))} />
+                <input className="to-input" value={form.admissionNumber} onChange={e => setForm(f => ({ ...f, admissionNumber: e.target.value }))} />
               </div>
             </div>
 
             <div className="to-row">
               <div className="to-field">
                 <label className="to-label">Full Name *</label>
-                <input className="to-input" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
+                <input className="to-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               <div className="to-field">
                 <label className="to-label">Phone *</label>
-                <input className="to-input" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} />
+                <input className="to-input" type="tel" maxLength="10" placeholder="10-digit mobile" value={form.phone}
+                  onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))} />
               </div>
             </div>
 
             <div className="to-row-3">
               <div className="to-field">
                 <label className="to-label">DOB</label>
-                <input className="to-input" type="date" value={form.dob} onChange={e=>setForm(f=>({...f,dob:e.target.value}))} />
+                <input className="to-input" type="date" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} />
               </div>
               <div className="to-field">
                 <label className="to-label">Age</label>
-                <input className="to-input" value={form.age} onChange={e=>setForm(f=>({...f,age:e.target.value}))} />
+                <input className="to-input" value={form.age} onChange={e => setForm(f => ({ ...f, age: e.target.value }))} />
               </div>
               <div className="to-field">
                 <label className="to-label">Blood Group</label>
-                <input className="to-input" value={form.bloodGroup} onChange={e=>setForm(f=>({...f,bloodGroup:e.target.value}))} />
+                <input className="to-input" value={form.bloodGroup} onChange={e => setForm(f => ({ ...f, bloodGroup: e.target.value }))} />
               </div>
             </div>
 
             <div className="to-row">
               <div className="to-field">
                 <label className="to-label">Marital Status</label>
-                <input className="to-input" value={form.maritalStatus} onChange={e=>setForm(f=>({...f,maritalStatus:e.target.value}))} />
+                <input className="to-input" value={form.maritalStatus} onChange={e => setForm(f => ({ ...f, maritalStatus: e.target.value }))} />
               </div>
               <div className="to-field">
                 <label className="to-label">Nationality</label>
-                <input className="to-input" value={form.nationality} onChange={e=>setForm(f=>({...f,nationality:e.target.value}))} />
+                <input className="to-input" value={form.nationality} onChange={e => setForm(f => ({ ...f, nationality: e.target.value }))} />
               </div>
             </div>
 
             <div className="to-row">
               <div className="to-field">
-                <label className="to-label">ID Type</label>
-                <select className="to-select" value={form.idType} onChange={e=>setForm(f=>({...f,idType:e.target.value}))}>
+                <label className="to-label">ID Type *</label>
+                <select className="to-select" value={form.idType} onChange={e => setForm(f => ({ ...f, idType: e.target.value }))}>
                   <option>Aadhaar</option>
                   <option>PAN</option>
                   <option>Passport</option>
                   <option>Driving License</option>
                   <option>Voter ID</option>
+                  <option>Others</option>
                 </select>
               </div>
               <div className="to-field">
-                <label className="to-label">ID Number</label>
-                <input className="to-input" value={form.idNumber} onChange={e=>setForm(f=>({...f,idNumber:e.target.value}))} />
+                <label className="to-label">ID Number *</label>
+                <input className="to-input" value={form.idNumber} onChange={e => setForm(f => ({ ...f, idNumber: e.target.value }))} />
               </div>
             </div>
           </div>
@@ -449,19 +485,19 @@ export default function TenantOnboard() {
             <div className="to-section-title">Address Details</div>
             <div className="to-field">
               <label className="to-label">Address Line</label>
-              <input className="to-input" value={form.addressLine} onChange={e=>setForm(f=>({...f,addressLine:e.target.value}))} />
+              <input className="to-input" value={form.addressLine} onChange={e => setForm(f => ({ ...f, addressLine: e.target.value }))} />
             </div>
             <div className="to-row">
               <div className="to-field">
                 <label className="to-label">State</label>
-                <select className="to-select" value={form.state} onChange={e=>setForm(f=>({...f,state:e.target.value, district:''}))}>
+                <select className="to-select" value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value, district: '' }))}>
                   <option value="">Select State</option>
                   {STATES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div className="to-field">
                 <label className="to-label">District</label>
-                <input className="to-input" list="districts" value={form.district} onChange={e=>setForm(f=>({...f,district:e.target.value}))} />
+                <input className="to-input" list="districts" value={form.district} onChange={e => setForm(f => ({ ...f, district: e.target.value }))} />
                 <datalist id="districts">
                   {(DISTRICTS[form.state] || []).map(d => <option key={d} value={d} />)}
                 </datalist>
@@ -471,22 +507,42 @@ export default function TenantOnboard() {
             <div className="to-row">
               <div className="to-field">
                 <label className="to-label">City</label>
-                <input className="to-input" value={form.city} onChange={e=>setForm(f=>({...f,city:e.target.value}))} />
+                <input className="to-input" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
               </div>
               <div className="to-field">
                 <label className="to-label">Pincode</label>
-                <input className="to-input" value={form.pincode} onChange={e=>setForm(f=>({...f,pincode:e.target.value}))} />
+                <input className="to-input" value={form.pincode} onChange={e => setForm(f => ({ ...f, pincode: e.target.value }))} />
               </div>
             </div>
           </div>
 
           <div className="to-section">
-            <div className="to-section-title">Family Information</div>
+            <div className="to-section-title">Rent & Booking Details</div>
+            <div className="to-row">
+              <div className="to-field">
+                <label className="to-label">Monthly Rent *</label>
+                <input className="to-input" type="number" placeholder="Enter Amount" value={form.monthlyRent} onChange={e => setForm(f => ({ ...f, monthlyRent: e.target.value }))} />
+              </div>
+              <div className="to-field">
+                <label className="to-label">Security Deposit *</label>
+                <input className="to-input" type="number" placeholder="Enter Amount" value={form.deposit} onChange={e => setForm(f => ({ ...f, deposit: e.target.value }))} />
+              </div>
+            </div>
+            <div className="to-row">
+              <div className="to-field">
+                <label className="to-label">Check-in Date *</label>
+                <input className="to-input" type="date" value={form.checkIn} onChange={e => setForm(f => ({ ...f, checkIn: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+
+          <div className="to-section">
+            <div className="to-section-title">Family Information (Mandatory)</div>
             {family.map((row, idx) => (
               <div key={idx} className="to-family-row" style={{ marginBottom: '10px' }}>
                 <div className="to-family-grid">
                   <select className="to-select" value={row.relation}
-                    onChange={e=>{
+                    onChange={e => {
                       const next = [...family];
                       next[idx] = { ...next[idx], relation: e.target.value };
                       setFamily(next);
@@ -494,27 +550,27 @@ export default function TenantOnboard() {
                     {RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                   <input className="to-input" placeholder="Name" value={row.name}
-                    onChange={e=>{
+                    onChange={e => {
                       const next = [...family];
                       next[idx] = { ...next[idx], name: e.target.value };
                       setFamily(next);
                     }} />
-                  <input className="to-input" placeholder="Age" value={row.age}
-                    onChange={e=>{
+                  <input className="to-input" type="number" placeholder="Age" value={row.age}
+                    onChange={e => {
                       const next = [...family];
                       next[idx] = { ...next[idx], age: e.target.value };
                       setFamily(next);
                     }} />
-                  <input className="to-input" placeholder="Mobile No" value={row.phone}
-                    onChange={e=>{
+                  <input className="to-input" type="tel" maxLength="10" placeholder="Mobile * (10 Digits)" value={row.phone}
+                    onChange={e => {
                       const next = [...family];
-                      next[idx] = { ...next[idx], phone: e.target.value };
+                      next[idx] = { ...next[idx], phone: e.target.value.replace(/\D/g, '').slice(0, 10) };
                       setFamily(next);
                     }} />
                 </div>
                 <div className="to-add-row">
                   {family.length > 1 && (
-                    <button type="button" className="to-remove-btn" onClick={()=>removeFamilyRow(idx)}>Remove</button>
+                    <button type="button" className="to-remove-btn" onClick={() => removeFamilyRow(idx)}>Remove</button>
                   )}
                 </div>
               </div>
@@ -527,21 +583,21 @@ export default function TenantOnboard() {
             <div className="to-row">
               <div className="to-field">
                 <label className="to-label">College / Company</label>
-                <input className="to-input" value={form.organizationName} onChange={e=>setForm(f=>({...f,organizationName:e.target.value}))} />
+                <input className="to-input" value={form.organizationName} onChange={e => setForm(f => ({ ...f, organizationName: e.target.value }))} />
               </div>
               <div className="to-field">
                 <label className="to-label">Designation</label>
-                <input className="to-input" value={form.designation} onChange={e=>setForm(f=>({...f,designation:e.target.value}))} />
+                <input className="to-input" value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))} />
               </div>
             </div>
             <div className="to-row">
               <div className="to-field">
                 <label className="to-label">Organization Address</label>
-                <input className="to-input" value={form.organizationAddress} onChange={e=>setForm(f=>({...f,organizationAddress:e.target.value}))} />
+                <input className="to-input" value={form.organizationAddress} onChange={e => setForm(f => ({ ...f, organizationAddress: e.target.value }))} />
               </div>
               <div className="to-field">
                 <label className="to-label">Organization Phone</label>
-                <input className="to-input" value={form.organizationPhone} onChange={e=>setForm(f=>({...f,organizationPhone:e.target.value}))} />
+                <input className="to-input" value={form.organizationPhone} onChange={e => setForm(f => ({ ...f, organizationPhone: e.target.value }))} />
               </div>
             </div>
           </div>
@@ -551,7 +607,7 @@ export default function TenantOnboard() {
             <div className="to-row">
               <div className="to-field">
                 <label className="to-label">Select Room *</label>
-                <select className="to-select" value={form.roomNumber} onChange={e=>handleRoomChange(e.target.value)}>
+                <select className="to-select" value={form.roomNumber} onChange={e => handleRoomChange(e.target.value)}>
                   <option value="">Select Room</option>
                   {roomsWithVacancy.map(r => (
                     <option key={r.id} value={r.roomNumber}>
@@ -569,7 +625,7 @@ export default function TenantOnboard() {
               <div className="to-hint">Please select a room with vacant beds.</div>
             )}
             {form.roomNumber && !form.bedNumber && (
-              <div className="to-hint" style={{ color:'#dc2626' }}>No vacant beds in this room.</div>
+              <div className="to-hint" style={{ color: '#dc2626' }}>No vacant beds in this room.</div>
             )}
           </div>
 
@@ -578,31 +634,31 @@ export default function TenantOnboard() {
             <div className="to-row">
               <div className="to-field">
                 <label className="to-label">Guardian Name</label>
-                <input className="to-input" value={form.guardianName} onChange={e=>setForm(f=>({...f,guardianName:e.target.value}))} />
+                <input className="to-input" value={form.guardianName} onChange={e => setForm(f => ({ ...f, guardianName: e.target.value }))} />
               </div>
               <div className="to-field">
                 <label className="to-label">Guardian Phone</label>
-                <input className="to-input" value={form.guardianPhone} onChange={e=>setForm(f=>({...f,guardianPhone:e.target.value}))} />
+                <input className="to-input" value={form.guardianPhone} onChange={e => setForm(f => ({ ...f, guardianPhone: e.target.value }))} />
               </div>
             </div>
           </div>
 
           <div className="to-decl">
-            <input type="checkbox" checked={form.declaration} onChange={e=>setForm(f=>({...f,declaration:e.target.checked}))} />
+            <input type="checkbox" checked={form.declaration} onChange={e => setForm(f => ({ ...f, declaration: e.target.checked }))} />
             <div className="to-note">
               I hereby that all information given by me is true and complete. I will abide by the Rule and regulations of the {pgData?.pgName || 'PG'}.
             </div>
           </div>
           <div className="to-note">This is a computer generated document. No signature required.</div>
 
-          <div style={{ marginTop:'14px' }}>
+          <div style={{ marginTop: '14px' }}>
             <button className="to-submit" onClick={handleSubmit} disabled={submitting}>
               {submitting ? 'Submitting…' : 'Submit'}
             </button>
           </div>
 
           {pdfUrl && (
-            <div style={{ marginTop:'12px' }}>
+            <div style={{ marginTop: '12px' }}>
               <a href={pdfUrl} target="_blank" rel="noreferrer" className="to-note">Download your PDF</a>
             </div>
           )}

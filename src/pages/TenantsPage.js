@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { db, auth } from '../firebase';
 import {
   collection, addDoc, getDocs,
@@ -23,7 +25,13 @@ const STATES = [
   'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
 ];
 const DISTRICTS = {
-  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Salem', 'Tiruchirappalli'],
+  'Tamil Nadu': [
+    'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore', 'Dharmapuri', 'Dindigul', 'Erode',
+    'Kallakurichi', 'Kanchipuram', 'Kanniyakumari', 'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai',
+    'Nagapattinam', 'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai', 'Ramanathapuram', 'Ranipet',
+    'Salem', 'Sivaganga', 'Tenkasi', 'Thanjavur', 'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli',
+    'Tirupathur', 'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 'Tiruvarur', 'Vellore', 'Viluppuram', 'Virudhunagar'
+  ],
   'Karnataka': ['Bengaluru Urban', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi'],
   'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Thane'],
   'Delhi': ['Central Delhi', 'East Delhi', 'North Delhi', 'South Delhi', 'West Delhi'],
@@ -445,13 +453,13 @@ function TenantDocsSheet({ tenant, onClose }) {
 // ══════════════════════════════════════════
 const EMPTY_FORM = {
   name: '', phone: '', email: '', company: '',
-  admissionNumber: '', dateOfJoining: '', dob: '', age: '', bloodGroup: '',
+  admissionNumber: '', checkIn: '', dob: '', age: '', bloodGroup: '',
   maritalStatus: '', nationality: '',
   addressLine: '', state: '', district: '', city: '', pincode: '',
   organizationType: 'College', organizationName: '', designation: '',
   organizationAddress: '', organizationPhone: '',
   roomNumber: '', bedNumber: '', monthlyRent: '', deposit: '',
-  checkIn: '', idType: 'Aadhaar', idNumber: '',
+  idType: 'Aadhaar', idNumber: '',
   emergencyContact: '', emergencyPhone: '',
   guardianName: '', guardianPhone: '',
 };
@@ -472,6 +480,8 @@ export default function Tenants({ pgId }) {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [family, setFamily] = useState([{ relation: 'Father', name: '', age: '', phone: '' }]);
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [pgData, setPgData] = useState(null);
+  const [ownerData, setOwnerData] = useState(null);
 
   // ── NEW: which tenant's docs are open ──
   const [docsTenant, setDocsTenant] = useState(null);
@@ -500,6 +510,20 @@ export default function Tenants({ pgId }) {
       setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted'));
       const rSnap = await getDocs(query(collection(db, 'rooms'), where('pgId', '==', pgId)));
       setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // Fetch PG and Owner data for PDF generation
+      const oSnap = await getDoc(doc(db, 'pgOwners', user.uid));
+      if (oSnap.exists()) {
+        const oData = oSnap.data();
+        setOwnerData(oData);
+        
+        if (pgId === user.uid) {
+          setPgData(oData);
+        } else {
+          const pgSnap = await getDoc(doc(db, 'pgOwners', user.uid, 'pgs', pgId));
+          if (pgSnap.exists()) setPgData(pgSnap.data());
+        }
+      }
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -525,6 +549,75 @@ export default function Tenants({ pgId }) {
     setFamily([{ relation: 'Father', name: '', age: '', phone: '' }]);
     setEditId(null);
     setShowForm(false);
+  };
+
+  const buildPdf = (tenantDoc) => {
+    const docPdf = new jsPDF();
+    const pgName = pgData?.pgName || ownerData?.pgName || 'PG';
+    const address = [pgData?.address || ownerData?.address, pgData?.city || ownerData?.city, pgData?.state || ownerData?.state].filter(Boolean).join(', ');
+    const ownerPhone = ownerData?.phone || '';
+    const ownerEmail = ownerData?.email || ownerData?.ownerEmail || '';
+
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.setFontSize(16);
+    docPdf.text(pgName, 14, 18);
+    docPdf.setFont('helvetica', 'normal');
+    docPdf.setFontSize(10);
+    if (address) docPdf.text(address, 14, 24);
+    docPdf.text(`Phone: ${ownerPhone || '—'}  Email: ${ownerEmail || '—'}`, 14, 30);
+
+    docPdf.setFontSize(12);
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.text('Tenant Admission Form', 14, 40);
+
+    docPdf.setFontSize(10);
+    docPdf.setFont('helvetica', 'normal');
+    let y = 48;
+    const line = (label, value) => {
+      docPdf.text(`${label}: ${value || '—'}`, 14, y);
+      y += 6;
+    };
+
+    line('Admission No', tenantDoc.admissionNumber);
+    line('Date of Joining', tenantDoc.dateOfJoining);
+    line('Name', tenantDoc.name);
+    line('DOB', tenantDoc.dob);
+    line('Age', tenantDoc.age);
+    line('Blood Group', tenantDoc.bloodGroup);
+    line('Marital Status', tenantDoc.maritalStatus);
+    line('Nationality', tenantDoc.nationality);
+    line('Phone', tenantDoc.phone);
+    line('ID', `${tenantDoc.idType || ''} ${tenantDoc.idNumber || ''}`.trim());
+    line('Address', [tenantDoc.addressLine, tenantDoc.district, tenantDoc.state, tenantDoc.city, tenantDoc.pincode].filter(Boolean).join(', '));
+    line('Organization', tenantDoc.organizationName || tenantDoc.company);
+    line('Designation', tenantDoc.designation);
+    line('Org Address', tenantDoc.organizationAddress);
+    line('Org Phone', tenantDoc.organizationPhone);
+    line('Room/Bed', `${tenantDoc.roomNumber || ''} / ${tenantDoc.bedNumber || ''}`.trim());
+    line('Guardian', `${tenantDoc.guardianName || ''} (${tenantDoc.guardianPhone || ''})`.trim());
+
+    const familyRows = (tenantDoc.family || []).map(f => [f.relation, f.name, f.age, f.phone]);
+    if (familyRows.length > 0 && docPdf.autoTable) {
+      docPdf.autoTable({
+        startY: y + 4,
+        head: [['Relation', 'Name', 'Age', 'Mobile']],
+        body: familyRows,
+        styles: { fontSize: 9 },
+      });
+      y = docPdf.lastAutoTable.finalY + 8;
+    } else {
+      y += 8;
+    }
+
+    const declarationText = `I hereby that all information given by me is true and complete. I will abide by the Rule and regulations of the ${pgName}.`;
+    docPdf.setFontSize(9);
+    docPdf.text(declarationText, 14, y);
+    y += 8;
+    docPdf.text('This is a computer generated document. No signature required.', 14, y);
+    y += 8;
+    docPdf.text('pgpilots.in', 14, y);
+
+    return docPdf;
   };
 
   const handleEdit = (tenant) => {
@@ -562,16 +655,50 @@ export default function Tenants({ pgId }) {
 
   const handleSave = async () => {
     if (!form.name || !form.phone || !form.roomNumber) return alert('Please fill Name, Phone and Room Number!');
+    if (form.phone.length !== 10) return alert('Phone number must be exactly 10 digits!');
+    if (!form.monthlyRent || parseInt(form.monthlyRent) <= 0) return alert('Monthly Rent is mandatory and must be greater than 0!');
+    if (form.deposit === '' || parseInt(form.deposit) < 0) return alert('Deposit amount is mandatory!');
+    if (!form.checkIn) return alert('Check-in Date is mandatory!');
+    if (!form.idNumber) return alert(`Please enter the ${form.idType || 'ID'} number!`);
+    
+    // Family info validation
+    const validFamily = family.filter(f => f.name.trim() && f.phone.trim());
+    if (validFamily.length === 0) return alert('Please add at least one family member with name and phone number!');
+
     if (!form.bedNumber) return alert('Please select a Bed Number!');
     if (!pgId) return alert('No PG selected!');
     setSaving(true);
     try {
-      const data = {
+      let data = {
         ...form,
         monthlyRent: parseInt(form.monthlyRent) || 0,
         deposit: parseInt(form.deposit) || 0,
-        family: family.filter(f => f.name || f.phone),
+        family: validFamily,
       };
+
+      // ✅ NEW: Always generate and upload the onboarding PDF
+      try {
+        const docPdf = buildPdf(data);
+        const pdfBlob = docPdf.output('blob');
+        const fileName = `${data.admissionNumber || data.name || 'tenant'}_${Date.now()}.pdf`.replace(/\s+/g, '_');
+        const formData = new FormData();
+        formData.append('file', pdfBlob, fileName);
+        formData.append('upload_preset', UPLOAD_PRESET);
+        formData.append('folder', `tenantForms/${user.uid}/${pgId}`);
+
+        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadRes.ok) {
+          data.onboardingPdfUrl = uploadData.secure_url;
+          data.onboardingPdfPublicId = uploadData.public_id;
+        }
+      } catch (pdfErr) {
+        console.warn('PDF generation/upload failed:', pdfErr);
+      }
+
       if (editId) {
         const old = tenants.find(t => t.id === editId);
         if (old && old.roomNumber !== form.roomNumber) {
@@ -879,18 +1006,17 @@ export default function Tenants({ pgId }) {
                 </div>
 
                 <div className="fs-section">
-                  <div className="fs-section-title">👨‍👩‍👧 Family Information</div>
+                  <div className="fs-section-title">👨‍👩‍👧‍👦 Family Info (Mandatory)</div>
                   {family.map((row, idx) => (
                     <div key={idx} className="fs-family-row">
-                      <select className="fs-input" value={row.relation} onChange={e => updateFamily(idx, 'relation', e.target.value)}>
+                      <select className="to-select" style={{padding:'10px', borderRadius:8, border:'1.5px solid #e2e8f0'}} value={row.relation}
+                        onChange={e=>updateFamily(idx,'relation',e.target.value)}>
                         {RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
-                      <input className="fs-input" placeholder="Name" value={row.name} onChange={e => updateFamily(idx, 'name', e.target.value)} />
-                      <input className="fs-input" placeholder="Age" value={row.age} onChange={e => updateFamily(idx, 'age', e.target.value)} />
-                      <input className="fs-input" placeholder="Mobile No" value={row.phone} onChange={e => updateFamily(idx, 'phone', e.target.value)} />
-                      {family.length > 1 && (
-                        <button type="button" className="fs-remove-btn" onClick={() => removeFamilyRow(idx)}>✕</button>
-                      )}
+                      <input className="fs-input" placeholder="Name *" value={row.name} onChange={e=>updateFamily(idx,'name',e.target.value)} />
+                      <input className="fs-input" type="number" placeholder="Age" value={row.age} onChange={e=>updateFamily(idx,'age',e.target.value)} />
+                      <input className="fs-input" type="tel" maxLength="10" placeholder="Mobile *" value={row.phone} onChange={e=>updateFamily(idx,'phone',e.target.value.replace(/\D/g,'').slice(0,10))} />
+                      {family.length > 1 && <button className="fs-remove-btn" onClick={()=>removeFamilyRow(idx)}>✕</button>}
                     </div>
                   ))}
                   <button type="button" className="fs-add-btn" onClick={addFamilyRow}>+ Add Family Member</button>
