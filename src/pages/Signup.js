@@ -726,7 +726,20 @@ export default function Signup() {
                 )}
                 */}
 
-                <p className="pg-switch">Already have an account? <Link to="/login">Sign in</Link></p>
+                <p className="pg-switch">
+                  Already have an account?{' '}
+                  <span 
+                    style={{ color: '#e94560', fontWeight: '700', cursor: 'pointer' }}
+                    onClick={async () => {
+                      await auth.signOut();
+                      sessionStorage.removeItem('signingUp');
+                      sessionStorage.removeItem('authInProgress');
+                      navigate('/login');
+                    }}
+                  >
+                    Sign in
+                  </span>
+                </p>
               </>
             )}
 

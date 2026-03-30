@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import {
-  doc, getDoc, collection, getDocs, query, where,
+  doc, getDoc, collection, getDocs, query, where, collectionGroup
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import Rooms from './RoomsPage';
@@ -523,7 +523,19 @@ export default function Dashboard() {
       try {
         const snap = await getDoc(doc(db, 'pgOwners', user.uid));
         if (!snap.exists()) {
-          // User exists in auth but not yet in firestore (is signing up)
+          // Check if this user is actually staff (in case they signed in via wrong page)
+          const staffSnap = await getDocs(query(collectionGroup(db, 'staff'), where('staffUid', '==', user.uid)));
+          if (!staffSnap.empty) {
+            const staffData = staffSnap.docs[0].data();
+            sessionStorage.setItem('staffMode', 'true');
+            sessionStorage.setItem('staffOwnerId', staffData.ownerId || '');
+            sessionStorage.setItem('staffPgId', staffData.pgId || '');
+            sessionStorage.setItem('staffPgName', staffData.pgName || '');
+            navigate('/staff-dashboard', { replace: true });
+            return;
+          }
+
+          // User truly exists in auth but not yet in firestore/staff (is signing up)
           sessionStorage.setItem('signingUp', 'true');
           navigate('/signup'); 
           return;

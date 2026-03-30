@@ -383,6 +383,7 @@ export default function Login() {
     setLoading(true);
     try {
       await setPersistence(auth, persist());
+      sessionStorage.removeItem('signingUp');
       await signInWithEmailAndPassword(auth, emailInput.trim(), password);
       navigate('/dashboard', { replace: true });
     } catch { showErr('❌ Invalid email or password.'); }
@@ -400,6 +401,7 @@ export default function Login() {
       if (snap.empty) { setLoading(false); return showErr('❌ PG Code not found.'); }
       const data = snap.docs[0].data();
       const userEmail = data.email || `${data.phone}@pgpilots.in`;
+      sessionStorage.removeItem('signingUp');
       await signInWithEmailAndPassword(auth, userEmail, password);
       navigate('/dashboard', { replace: true });
     } catch(e) { console.error(e); showErr('❌ Invalid PG Code or password.'); }
@@ -417,6 +419,7 @@ export default function Login() {
       if (snap.empty) { setLoading(false); return showErr('❌ No account found for this mobile number.'); }
       const data = snap.docs[0].data();
       const userEmail = data.email || `${data.phone}@pgpilots.in`;
+      sessionStorage.removeItem('signingUp');
       await signInWithEmailAndPassword(auth, userEmail, password);
       navigate('/dashboard', { replace: true });
     } catch(e) { console.error(e); showErr('❌ Invalid mobile number or password.'); }
@@ -437,14 +440,17 @@ export default function Login() {
             await auth.signOut();
             showErr('🚫 No account found for this Google email. Please sign up first.');
           } else {
+            sessionStorage.removeItem('signingUp');
             navigate('/dashboard', { replace: true });
           }
           setLoading(false);
         }
         // Always clear the flag if we reach here (either result found or nothing pending)
         sessionStorage.removeItem('authInProgress');
+        sessionStorage.removeItem('signingUp');
       } catch (err) {
         sessionStorage.removeItem('authInProgress');
+        sessionStorage.removeItem('signingUp');
         console.error("Redirect check error:", err);
         // Don't show error if it's just a routine mount without a redirect pending
       }
