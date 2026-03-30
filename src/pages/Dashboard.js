@@ -11,7 +11,6 @@ import RentPage from './RentPage';
 import ElectricityPage from './ElectricityPage';
 import ReportsPage from './ReportsPage';
 import SettingsPage from './SettingsPage';
-import TodayDues from './TodayDues';
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -384,29 +383,49 @@ export default function Dashboard() {
   const primaryPgId = pgs[0]?.pgId || pgs[0]?.id || null;
   const isAllSelected = selectedPgId === ALL_PGS_ID;
   const dashboardPgId = isAllSelected ? ALL_PGS_ID : (selectedPg?.pgId || selectedPgId);
-  const effectivePgId = isAllSelected && activeMenu !== 'Dashboard' ? primaryPgId : dashboardPgId;
+  const effectivePgId = dashboardPgId;
 
-  // ── Fetch all PGs for this owner
   const fetchPGs = async (user) => {
-    // ✅ Try new subcollection first (multi-PG structure)
-    const subSnap = await getDocs(collection(db, 'pgOwners', user.uid, 'pgs'));
-    if (!subSnap.empty) {
-      const list = subSnap.docs.map(d => {
+    try {
+      // 1. Get Main PG from root doc (always exists for valid owners)
+      const rootSnap = await getDoc(doc(db, 'pgOwners', user.uid));
+      let mainPg = null;
+      if (rootSnap.exists()) {
+        const data = rootSnap.data();
+        mainPg = { 
+          id: user.uid, 
+          ...data, 
+          pgId: data.pgId || user.uid, 
+          is_main: true,
+          // Use pgName from doc, fallback to ownerName if needed
+          pgName: data.pgName || `${data.ownerName}'s PG` || 'Main PG'
+        };
+      }
+
+      // 2. Get Branch PGs from subcollection
+      const subSnap = await getDocs(collection(db, 'pgOwners', user.uid, 'pgs'));
+      const branchPgs = subSnap.docs.map(d => {
         const data = d.data();
-        return { id: d.id, ...data, pgId: data.pgId || d.id };
+        return { id: d.id, ...data, pgId: data.pgId || d.id, is_main: false };
       });
-      setPgs(list);
-      return list;
+
+      // 3. Combine them, starting with Main
+      const combined = [];
+      if (mainPg) combined.push(mainPg);
+      
+      // Add branches that aren't somehow duplicates of the main doc ID
+      branchPgs.forEach(bp => {
+        if (!combined.some(c => c.id === bp.id)) {
+          combined.push(bp);
+        }
+      });
+
+      setPgs(combined);
+      return combined;
+    } catch (err) {
+      console.error("fetchPGs error:", err);
+      return [];
     }
-    // ✅ Fallback: old single-PG structure — treat root doc as single PG
-    const rootSnap = await getDoc(doc(db, 'pgOwners', user.uid));
-    if (rootSnap.exists()) {
-      const data = rootSnap.data();
-      const fallback = [{ id: user.uid, ...data, pgId: data.pgId || user.uid }];
-      setPgs(fallback);
-      return fallback;
-    }
-    return [];
   };
 
   // ── Fetch dashboard stats for selected PG
@@ -438,6 +457,8 @@ export default function Dashboard() {
     return { tenants, rooms, payments };
   };
 
+  const getPgName = (id) => pgs?.find(p => p.pgId === id || p.id === id)?.pgName || 'PG';
+
   const fetchStats = useCallback(async (pgId, ownerId) => {
     if (!pgId || !ownerId) return;
     setStatsLoading(true);
@@ -448,7 +469,7 @@ export default function Dashboard() {
 
       // When older data doesn't have `pgId` saved, querying by `ownerId` is the safe fallback.
       if (pgId === ALL_PGS_ID) {
-        ({ tenants: allTenants, rooms, payments } = await fetchStatsByOwnerId(ownerId));
+        ({ tenants: allTenants, rooms, payments } = await fetchStatsForPgIds(pgs.map(p => p.pgId || p.id)));
       } else if (pgId === ownerId) {
         // Legacy single-PG mode (documents may not have pgId).
         const res = await fetchStatsByOwnerId(ownerId);
@@ -486,6 +507,7 @@ export default function Dashboard() {
               reminderRequestedAt: t.reminderRequestedAt || null,
               phone: t.phone,
               isDueToday: dueDay === todayDay,
+              pgName: pgId === ALL_PGS_ID ? getPgName(t.pgId) : null,
             });
           }
         });
@@ -500,7 +522,7 @@ export default function Dashboard() {
       setRecentActivity(sorted.map(t => ({
         icon: '👤',
         bg: '#eff6ff',
-        text: `${t.name} joined — Room ${t.roomNumber || t.room || '?'}`,
+        text: `${t.name} joined — Room ${t.roomNumber || t.room || '?'}${pgId === ALL_PGS_ID ? ` · ${getPgName(t.pgId)}` : ''}`,
         time: timeAgo(t.createdAt),
       })));
 
@@ -625,6 +647,7 @@ export default function Dashboard() {
         is_main: isMain,
         parent_pg_id: parentPgId,
         isActive: true,
+        ownerId:  user.uid,
         createdAt: new Date(),
       };
       await fsSetDoc(pgRef, newPg);
@@ -644,7 +667,6 @@ export default function Dashboard() {
     { icon: '👥', label: 'Tenants' },
     { icon: '💰', label: 'Rent' },
     { icon: '⚡', label: 'Electricity' },
-    { icon: '📅', label: 'Payment Dues' },
     { icon: '🍽️', label: 'Food Menu' },
     { icon: '📄', label: 'ID Proofs' },
     { icon: '📈', label: 'Reports' },
@@ -666,7 +688,7 @@ export default function Dashboard() {
     { icon: '⚡', label: 'Electricity', menu: 'Electricity', accent: '#dc2626' },
   ];
 
-  const knownPages = ['Dashboard', 'Rooms', 'Tenants', 'Rent', 'Electricity', 'Payment Dues', 'Reports', 'Settings'];
+  const knownPages = ['Dashboard', 'Rooms', 'Tenants', 'Rent', 'Electricity', 'Reports', 'Settings'];
 
   const PgSwitcherSelect = ({ className }) => (
     <select
@@ -680,7 +702,7 @@ export default function Dashboard() {
     >
       <option value={ALL_PGS_ID}>All PGs (Overview)</option>
       {pgs.map(pg => (
-        <option key={pg.id} value={pg.id}>{pg.pgName} — {pg.city}</option>
+        <option key={pg.id} value={pg.id}>{pg.pgName} {pg.city ? `— ${pg.city}` : ''}</option>
       ))}
     </select>
   );
@@ -761,7 +783,7 @@ export default function Dashboard() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {/* Desktop PG switcher */}
-              {pgs.length > 1 && (
+              {pgs.length > 0 && (
                 <select
                   value={selectedPgId || ''}
                   onChange={e => {
@@ -778,7 +800,7 @@ export default function Dashboard() {
                 >
                   <option value={ALL_PGS_ID}>All PGs (Overview)</option>
                   {pgs.map(pg => (
-                    <option key={pg.id} value={pg.id}>{pg.pgName} — {pg.city}</option>
+                    <option key={pg.id} value={pg.id}>{pg.pgName} — {pg.city || 'PG'}</option>
                   ))}
                 </select>
               )}
@@ -801,13 +823,12 @@ export default function Dashboard() {
           <div className="db-page-content">
 
             {/* ── Routed pages ── */}
-            {activeMenu === 'Rooms' && <Rooms pgId={effectivePgId} />}
-            {activeMenu === 'Tenants' && <Tenants pgId={effectivePgId} />}
-            {activeMenu === 'Rent' && <RentPage pgId={effectivePgId} />}
-            {activeMenu === 'Electricity' && <ElectricityPage pgId={effectivePgId} />}
-            {activeMenu === 'Reports' && <ReportsPage pgId={effectivePgId} />}
-            {activeMenu === 'Settings' && <SettingsPage pgId={effectivePgId} />}
-            {activeMenu === 'Payment Dues' && <TodayDues pgId={effectivePgId} />}
+            {activeMenu === 'Rooms' && <Rooms pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
+            {activeMenu === 'Tenants' && <Tenants pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
+            {activeMenu === 'Rent' && <RentPage pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
+            {activeMenu === 'Electricity' && <ElectricityPage pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
+            {activeMenu === 'Reports' && <ReportsPage pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
+            {activeMenu === 'Settings' && <SettingsPage pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
 
             {/* ── Dashboard Home ── */}
             {activeMenu === 'Dashboard' && (
@@ -883,7 +904,7 @@ export default function Dashboard() {
                               <div className="db-pending-avatar">{p.initial}</div>
                               <div>
                                 <div className="db-pending-name">{p.name}</div>
-                                <div className="db-pending-room">Room {p.room}</div>
+                                <div className="db-pending-room">Room {p.room}{p.pgName && ` · ${p.pgName}`}</div>
                               </div>
                              <div className="db-pending-amt" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{ textAlign: 'right' }}>

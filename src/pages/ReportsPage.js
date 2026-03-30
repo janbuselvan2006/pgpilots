@@ -98,8 +98,8 @@ const css = `
   .rp-no-pg { text-align:center; padding:60px 20px; background:white; border-radius:20px; margin:20px 16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); }
 `;
 
-// ✅ Now accepts pgId prop from Dashboard
-export default function ReportsPage({ pgId }) {
+// ✅ Now accepts pgId, allPgIds, and pgs props
+export default function ReportsPage({ pgId, allPgIds, pgs }) {
   const [tenants, setTenants]     = useState([]);
   const [rooms, setRooms]         = useState([]);
   const [payments, setPayments]   = useState([]);
@@ -126,18 +126,22 @@ export default function ReportsPage({ pgId }) {
     if (!user || !pgId) { setLoading(false); return; }
     setLoading(true);
     try {
-      // ✅ All queries use pgId
-      const [tS, rS, pS, eS, oD] = await Promise.all([
-        getDocs(query(collection(db, 'tenants'),          where('pgId', '==', pgId))),
-        getDocs(query(collection(db, 'rooms'),            where('pgId', '==', pgId))),
-        getDocs(query(collection(db, 'payments'),         where('pgId', '==', pgId))),
-        getDocs(query(collection(db, 'electricityBills'), where('pgId', '==', pgId))),
+      const isAll = pgId === '__all__';
+      const targetIds = isAll ? allPgIds : [pgId];
+      if (!targetIds || targetIds.length === 0) { setLoading(false); return; }
+
+      const [tSnaps, rSnaps, pSnaps, eSnaps, oD] = await Promise.all([
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'rooms'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'payments'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'electricityBills'), where('pgId', '==', id))))),
         getDoc(doc(db, 'pgOwners', user.uid)),
       ]);
-      setTenants(tS.docs.map(d => ({ id: d.id, ...d.data() })));
-      setRooms(rS.docs.map(d => ({ id: d.id, ...d.data() })));
-      setPayments(pS.docs.map(d => ({ id: d.id, ...d.data() })));
-      setElecBills(eS.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      setTenants(tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setRooms(rSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setPayments(pSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setElecBills(eSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
       if (oD.exists()) {
         const d = oD.data();
         setPenaltyEnabled(d.penaltyEnabled || false);
@@ -150,6 +154,8 @@ export default function ReportsPage({ pgId }) {
 
   // ✅ Re-fetch whenever pgId changes
   useEffect(() => { fetchData(); }, [pgId]);
+
+  const getPgName = (id) => pgs?.find(p => p.pgId === id || p.id === id)?.pgName || 'PG';
 
   const getDaysStayed = (t) => {
     const ci = t.checkIn ? new Date(t.checkIn) : null;
@@ -475,6 +481,7 @@ export default function ReportsPage({ pgId }) {
                         <div>
                           <div className="rp-tr-name">{t.name}</div>
                           <div className="rp-tr-sub">Room {t.roomNumber} · {t.cnt} payment{t.cnt!==1?'s':''}{t.elec>0&&<span style={{color:'#0891b2'}}> · ⚡ ₹{t.elec.toLocaleString('en-IN')}</span>}{t.showPen&&<span style={{color:'#dc2626'}}> · 🔴 ₹{t.pen.toLocaleString('en-IN')}</span>}</div>
+                          {pgId === '__all__' && <div className="rp-tr-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(t.pgId)}</div>}
                         </div>
                       </div>
                       <div className="rp-tr-right">
@@ -491,7 +498,11 @@ export default function ReportsPage({ pgId }) {
                     <div className="rp-pb">
                       {rentPmts.map(p => (
                         <div key={p.id} className="rp-payment-row" style={{ background:p.isCompleted?'#f0fdf4':p.isPartial?'#fffbeb':'#f8fafc' }}>
-                          <div><div className="rp-pr-name">{p.tenantName}</div><div className="rp-pr-sub">Room {p.roomNumber} · {p.paymentDate}{p.paymentTime&&` · ${p.paymentTime}`}</div></div>
+                          <div>
+                            <div className="rp-pr-name">{p.tenantName}</div>
+                            <div className="rp-pr-sub">Room {p.roomNumber} · {p.paymentDate}{p.paymentTime&&` · ${p.paymentTime}`}</div>
+                            {pgId === '__all__' && <div className="rp-pr-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(p.pgId)}</div>}
+                          </div>
                           <div style={{ textAlign:'right' }}><div className="rp-pr-amount" style={{ color:p.isCompleted?'#059669':p.isPartial?'#d97706':'#4f46e5' }}>₹{p.amount?.toLocaleString('en-IN')}</div><div className="rp-pr-method">{p.paymentMethod}</div></div>
                         </div>
                       ))}
@@ -524,7 +535,12 @@ export default function ReportsPage({ pgId }) {
                     <div className="rp-pb">
                       {elecFiltered.map(b => (
                         <div key={b.id} className="rp-payment-row" style={{ background:b.isPaid?'#f0fdf4':'#fffbeb' }}>
-                          <div><div className="rp-pr-name">Room {b.roomNumber}</div><div className="rp-pr-sub">{b.month} {b.year} · {b.tenantCount} tenants · {b.readingDate}</div>{b.notes&&<div className="rp-pr-sub">📝 {b.notes}</div>}</div>
+                          <div>
+                            <div className="rp-pr-name">Room {b.roomNumber}</div>
+                            <div className="rp-pr-sub">{b.month} {b.year} · {b.tenantCount} tenants · {b.readingDate}</div>
+                            {b.notes&&<div className="rp-pr-sub">📝 {b.notes}</div>}
+                            {pgId === '__all__' && <div className="rp-pr-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(b.pgId)}</div>}
+                          </div>
                           <div style={{ textAlign:'right' }}><div className="rp-pr-amount" style={{ color:'#d97706' }}>₹{b.amount?.toLocaleString('en-IN')}</div><span className="rp-tr-tag" style={{ background:b.isPaid?'#dcfce7':'#fef2f2', color:b.isPaid?'#059669':'#dc2626' }}>{b.isPaid?'✅ Done':'⏳ Pending'}</span></div>
                         </div>
                       ))}
@@ -560,7 +576,11 @@ export default function ReportsPage({ pgId }) {
                       <div key={t.id} className="rp-tenant-row" style={{ background:'#f0fdf4', borderLeft:'3px solid #059669' }}>
                         <div className="rp-tr-left">
                           <div className="rp-tr-avatar" style={{ background:'linear-gradient(135deg,#4f46e5,#0891b2)' }}>{t.name?.charAt(0).toUpperCase()}</div>
-                          <div><div className="rp-tr-name">{t.name}</div><div className="rp-tr-sub">Room {t.roomNumber} · {t.checkIn||'—'}</div></div>
+                          <div>
+                            <div className="rp-tr-name">{t.name}</div>
+                            <div className="rp-tr-sub">Room {t.roomNumber} · {t.checkIn||'—'}</div>
+                            {pgId === '__all__' && <div className="rp-tr-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(t.pgId)}</div>}
+                          </div>
                         </div>
                         <div className="rp-tr-right"><div className="rp-tr-amount" style={{ color:'#4f46e5' }}>₹{(t.monthlyRent||0).toLocaleString('en-IN')}</div><div style={{ fontSize:'9px', color:'#94a3b8' }}>per month</div></div>
                       </div>
@@ -597,7 +617,11 @@ export default function ReportsPage({ pgId }) {
                           <div key={r.id} className="rp-tenant-row" style={{ background:'#fef2f2', borderLeft:'3px solid #dc2626' }}>
                             <div className="rp-tr-left">
                               <div className="rp-tr-avatar" style={{ background:'linear-gradient(135deg,#dc2626,#9f1239)' }}>{r.roomNumber}</div>
-                              <div><div className="rp-tr-name">Room {r.roomNumber}</div><div className="rp-tr-sub">{r.floor||'—'} · {r.roomType} · {r.bathType} · {r.acType}</div></div>
+                              <div>
+                                <div className="rp-tr-name">Room {r.roomNumber}</div>
+                                <div className="rp-tr-sub">{r.floor||'—'} · {r.roomType} · {r.bathType} · {r.acType}</div>
+                                {pgId === '__all__' && <div className="rp-tr-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(r.pgId)}</div>}
+                              </div>
                             </div>
                             <div className="rp-tr-right">
                               <div className="rp-tr-amount" style={{ color:'#dc2626' }}>🔴 {vacant} vacant</div>
@@ -648,6 +672,7 @@ export default function ReportsPage({ pgId }) {
                               <div>
                                 <div className="rp-tr-name">{t.name}</div>
                                 <div className="rp-tr-sub">Room {t.roomNumber} · In: {t.checkIn||'—'}{co&&<span style={{color:'#dc2626'}}> · Out: {co}</span>}</div>
+                                {pgId === '__all__' && <div className="rp-tr-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(t.pgId)}</div>}
                               </div>
                             </div>
                             <div className="rp-tr-right">

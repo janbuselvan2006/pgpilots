@@ -115,8 +115,8 @@ const css = `
   .ef-save-btn:disabled { opacity:0.6; cursor:not-allowed; }
 `;
 
-// ✅ Now accepts pgId prop from Dashboard
-export default function ElectricityPage({ pgId }) {
+// ✅ Now accepts pgId, allPgIds, and pgs props
+export default function ElectricityPage({ pgId, allPgIds, pgs }) {
   const [rooms, setRooms]       = useState([]);
   const [tenants, setTenants]   = useState([]);
   const [bills, setBills]       = useState([]);
@@ -142,23 +142,29 @@ export default function ElectricityPage({ pgId }) {
     if (!user || !pgId) { setLoading(false); return; }
     setLoading(true);
     try {
-      // ✅ All queries use pgId
-      const [rSnap, tSnap, bSnap, pSnap] = await Promise.all([
-        getDocs(query(collection(db, 'rooms'),            where('pgId', '==', pgId))),
-        getDocs(query(collection(db, 'tenants'),          where('pgId', '==', pgId))),
-        getDocs(query(collection(db, 'electricityBills'), where('pgId', '==', pgId))),
-        getDocs(query(collection(db, 'payments'),         where('pgId', '==', pgId))),
+      const isAll = pgId === '__all__';
+      const targetIds = isAll ? allPgIds : [pgId];
+      if (!targetIds || targetIds.length === 0) { setLoading(false); return; }
+
+      const [rSnaps, tSnaps, bSnaps, pSnaps] = await Promise.all([
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'rooms'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'electricityBills'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'payments'), where('pgId', '==', id))))),
       ]);
-      setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setBills(bSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setPayments(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      
+      setRooms(rSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setTenants(tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setBills(bSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setPayments(pSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
     } catch (e) { console.error(e); }
     setLoading(false);
   };
 
   // ✅ Re-fetch whenever pgId changes
   useEffect(() => { fetchData(); }, [pgId]);
+
+  const getPgName = (id) => pgs?.find(p => p.pgId === id || p.id === id)?.pgName || 'PG';
 
   const getTenantsInRoom = (rn) =>
     tenants.filter(t => t.roomNumber === rn && t.status !== 'deleted' && t.status !== 'inactive');
@@ -248,7 +254,10 @@ export default function ElectricityPage({ pgId }) {
               <h1 className="el-page-title">Electricity</h1>
               <p className="el-page-sub">{roomsBilled}/{rooms.length} rooms billed · {currentMonth}</p>
             </div>
-            <button className="el-add-fab" onClick={() => setShowForm(true)}>⚡</button>
+            <button className="el-add-fab" onClick={() => {
+              if (pgId === '__all__') return alert('Please select a specific PG to add electricity bills.');
+              setShowForm(true);
+            }}>⚡</button>
           </div>
         </div>
 
@@ -302,6 +311,7 @@ export default function ElectricityPage({ pgId }) {
                       <div>
                         <div className="el-bill-room">Room {bill.roomNumber}</div>
                         <div className="el-bill-sub">{bill.month} {bill.year} · {bill.readingDate}{bill.notes && ` · ${bill.notes}`}</div>
+                        {pgId === '__all__' && <div className="el-bill-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(bill.pgId)}</div>}
                       </div>
                       <div className="el-bill-badge">⚡ ₹{bill.amount?.toLocaleString('en-IN')}</div>
                     </div>
@@ -382,6 +392,7 @@ export default function ElectricityPage({ pgId }) {
                                 <div className="el-hc-room">Room {bill.roomNumber}</div>
                                 <div className="el-hc-sub">{bill.tenantCount} tenant{bill.tenantCount !== 1 ? 's' : ''} · {bill.readingDate}</div>
                                 {bill.notes && <div className="el-hc-notes">📝 {bill.notes}</div>}
+                                {pgId === '__all__' && <div className="el-hc-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '4px' }}>🏠 {getPgName(bill.pgId)}</div>}
                               </div>
                             </div>
                             <div className="el-hc-right">

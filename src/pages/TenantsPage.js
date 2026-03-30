@@ -467,7 +467,8 @@ const EMPTY_FORM = {
 // ══════════════════════════════════════════
 //  MAIN COMPONENT
 // ══════════════════════════════════════════
-export default function Tenants({ pgId }) {
+// ✅ Now accepts pgId, allPgIds, and pgs props
+export default function Tenants({ pgId, allPgIds, pgs }) {
   const [tenants, setTenants] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -506,19 +507,27 @@ export default function Tenants({ pgId }) {
     if (!user || !pgId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const tSnap = await getDocs(query(collection(db, 'tenants'), where('pgId', '==', pgId)));
-      setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted'));
-      const rSnap = await getDocs(query(collection(db, 'rooms'), where('pgId', '==', pgId)));
-      setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const isAll = pgId === '__all__';
+      const targetIds = isAll ? allPgIds : [pgId];
+      if (!targetIds || targetIds.length === 0) { setLoading(false); return; }
 
-      // Fetch PG and Owner data for PDF generation
-      const oSnap = await getDoc(doc(db, 'pgOwners', user.uid));
+      const [tSnaps, rSnaps, oSnap] = await Promise.all([
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'rooms'), where('pgId', '==', id))))),
+        getDoc(doc(db, 'pgOwners', user.uid)),
+      ]);
+
+      setTenants(tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))).filter(t => t.status !== 'deleted'));
+      setRooms(rSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
       if (oSnap.exists()) {
         const oData = oSnap.data();
         setOwnerData(oData);
         
         if (pgId === user.uid) {
           setPgData(oData);
+        } else if (pgId === '__all__') {
+          setPgData(oData); // default to main pg data for all view
         } else {
           const pgSnap = await getDoc(doc(db, 'pgOwners', user.uid, 'pgs', pgId));
           if (pgSnap.exists()) setPgData(pgSnap.data());
@@ -530,6 +539,7 @@ export default function Tenants({ pgId }) {
 
   useEffect(() => { fetchData(); }, [pgId]);
 
+  const getPgName = (id) => pgs?.find(p => p.pgId === id || p.id === id)?.pgName || 'PG';
   const tenantCount = tenants.length;
 
   const getVacantBeds = (roomNumber) => {
@@ -779,7 +789,10 @@ export default function Tenants({ pgId }) {
               <h1 className="tn-page-title">Tenants</h1>
               <p className="tn-page-sub">{tenantCount} active tenants</p>
             </div>
-            <button className="tn-add-fab" onClick={() => setShowQr(true)}>＋</button>
+            <button className="tn-add-fab" onClick={() => {
+              if (pgId === '__all__') return alert('Please select a specific PG to add tenants.');
+              setShowQr(true);
+            }}>＋</button>
           </div>
         </div>
 
@@ -850,6 +863,9 @@ export default function Tenants({ pgId }) {
 
                     {(tenant.company || tenant.organizationName) && (
                       <div className="tc-company">🏢 {tenant.organizationName || tenant.company}</div>
+                    )}
+                    {pgId === '__all__' && (
+                      <div className="tc-company" style={{ color: '#0f3460', fontWeight: '700' }}>🏠 {getPgName(tenant.pgId)}</div>
                     )}
 
                     <div className="tc-footer">

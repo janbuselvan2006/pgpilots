@@ -223,16 +223,10 @@ const css = `
   .del-cancel  { flex: 1; padding: 13px; background: #f1f5f9; color: #64748b; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .del-confirm { flex: 1; padding: 13px; background: #dc2626; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
 
-  /* No PG selected warning */
-  .rooms-no-pg {
-    text-align: center; padding: 60px 20px; background: white;
-    border-radius: 20px; margin: 20px 16px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-  }
+  .rooms-no-pg { text-align: center; padding: 60px 20px; background: white; border-radius: 20px; margin: 20px 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
 `;
 
-// ✅ Now accepts pgId prop from Dashboard
-export default function Rooms({ pgId }) {
+export default function Rooms({ pgId, allPgIds, pgs }) {
   const [rooms, setRooms]           = useState([]);
   const [tenants, setTenants]       = useState([]);
   const [showForm, setShowForm]     = useState(false);
@@ -247,20 +241,24 @@ export default function Rooms({ pgId }) {
   const user = auth.currentUser;
 
   const fetchData = async () => {
-    // ✅ Guard: need both user and pgId
     if (!user || !pgId) { setLoading(false); return; }
     setLoading(true);
     try {
-      // ✅ Query by pgId instead of ownerId
-      const rSnap = await getDocs(query(collection(db, 'rooms'),   where('pgId', '==', pgId)));
-      setRooms(rSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      const tSnap = await getDocs(query(collection(db, 'tenants'), where('pgId', '==', pgId)));
-      setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted'));
+      const isAll = pgId === '__all__';
+      const targetIds = isAll ? allPgIds : [pgId];
+      if (!targetIds || targetIds.length === 0) { setLoading(false); return; }
+
+      const [rSnaps, tSnaps] = await Promise.all([
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'rooms'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
+      ]);
+
+      setRooms(rSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setTenants(tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))).filter(t => t.status !== 'deleted'));
     } catch (err) { console.error(err); }
     setLoading(false);
   };
 
-  // ✅ Re-fetch whenever pgId changes (user switches PG)
   useEffect(() => { fetchData(); }, [pgId]);
 
   const resetForm = () => setForm({
@@ -270,7 +268,7 @@ export default function Rooms({ pgId }) {
 
   const handleAdd = async () => {
     if (!form.roomNumber.trim() || !form.rentPerBed) return alert('Please fill all required fields!');
-    if (!pgId) return alert('No PG selected. Please select a PG from the dashboard.');
+    if (!pgId || pgId === '__all__') return alert('No PG selected. Please select a specific PG.');
     setSaving(true);
     try {
       await addDoc(collection(db, 'rooms'), {
@@ -278,11 +276,10 @@ export default function Rooms({ pgId }) {
         totalBeds:    parseInt(form.totalBeds),
         rentPerBed:   parseInt(form.rentPerBed),
         occupiedBeds: 0,
-        ownerId:      user.uid,  // keep for backward compat
-        pgId:         pgId,      // ✅ new field for multi-PG
+        ownerId:      user.uid,
+        pgId:         pgId,
         createdAt:    new Date(),
       });
-
       resetForm();
       setShowForm(false);
       fetchData();
@@ -308,15 +305,12 @@ export default function Rooms({ pgId }) {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-
     const hasTenants = tenants.some(t => t.roomNumber === deleteTarget.roomNumber && t.status !== 'deleted');
     if (hasTenants) {
       alert('Please move tenants to another room before deleting this room.');
       return;
     }
-
     await deleteDoc(doc(db, 'rooms', deleteTarget.id));
-
     setDeleteTarget(null);
     fetchData();
     recalcBeds();
@@ -327,6 +321,8 @@ export default function Rooms({ pgId }) {
       .filter(t => t.roomNumber === roomNumber)
       .map(t => parseInt(t.bedNumber))
       .filter(n => !isNaN(n));
+
+  const getPgName = (id) => pgs?.find(p => p.pgId === id || p.id === id)?.pgName || 'PG';
 
   const totalBedsCount    = rooms.reduce((a, r) => a + r.totalBeds, 0);
   const occupiedBedsCount = rooms.reduce((a, r) => a + (r.occupiedBeds || 0), 0);
@@ -343,7 +339,6 @@ export default function Rooms({ pgId }) {
     </div>
   );
 
-  // ✅ Show warning if no PG selected
   if (!pgId) {
     return (
       <>
@@ -361,19 +356,19 @@ export default function Rooms({ pgId }) {
     <>
       <style>{css}</style>
       <div className="rooms-root">
-
-        {/* Top bar */}
         <div className="rooms-topbar">
           <div className="rooms-topbar-row">
             <div>
               <h1 className="rooms-page-title">Rooms</h1>
               <p className="rooms-page-sub">{rooms.length} rooms · {vacantBedsCount} beds available</p>
             </div>
-            <button className="rooms-add-fab" onClick={() => { resetForm(); setShowForm(true); }}>＋</button>
+            <button className="rooms-add-fab" onClick={() => { 
+              if (pgId === '__all__') return alert('Please select a specific PG to add rooms.');
+              resetForm(); setShowForm(true); 
+            }}>＋</button>
           </div>
         </div>
 
-        {/* Stats strip */}
         <div className="rooms-stats">
           {[
             { label: 'Rooms',    value: rooms.length,      color: '#4f46e5' },
@@ -388,101 +383,69 @@ export default function Rooms({ pgId }) {
           ))}
         </div>
 
-        {/* Content */}
         <div className="rooms-content">
           {loading ? (
-            <div className="rooms-loading">
-              <div className="rooms-spinner" />
-              Loading rooms…
-            </div>
+            <div className="rooms-loading"><div className="rooms-spinner" />Loading rooms…</div>
           ) : rooms.length === 0 ? (
             <div className="rooms-empty">
               <div className="rooms-empty-icon">🛏️</div>
               <p className="rooms-empty-title">No rooms yet</p>
               <p className="rooms-empty-sub">Add your first room to get started</p>
-              <button className="rooms-empty-btn" onClick={() => { resetForm(); setShowForm(true); }}>
-                ➕ Add First Room
-              </button>
+              <button className="rooms-empty-btn" onClick={() => { 
+                if (pgId === '__all__') return alert('Please select a specific PG to add rooms.');
+                resetForm(); setShowForm(true); 
+              }}>➕ Add First Room</button>
             </div>
           ) : (
             <div className="rooms-grid">
               {rooms.map(room => {
-                const vacant         = room.totalBeds - (room.occupiedBeds || 0);
-                const occupancyPct   = Math.round(((room.occupiedBeds || 0) / room.totalBeds) * 100);
+                const vacant = room.totalBeds - (room.occupiedBeds || 0);
+                const occupancyPct = Math.round(((room.occupiedBeds || 0) / room.totalBeds) * 100);
                 const occupiedBedNos = getOccupiedBeds(room.roomNumber);
-                const isFull         = vacant === 0;
-
+                const isFull = vacant === 0;
                 return (
                   <div key={room.id} className="room-card">
                     <div className="room-card-header">
                       <div className="room-num-badge">Room {room.roomNumber}</div>
-                      <div className="room-status-badge" style={{
-                        background: isFull ? '#fef2f2' : '#ecfdf5',
-                        color:      isFull ? '#dc2626' : '#059669',
-                      }}>
+                      <div className="room-status-badge" style={{ background: isFull ? '#fef2f2' : '#ecfdf5', color: isFull ? '#dc2626' : '#059669' }}>
                         {isFull ? '🔴 Full' : `🟢 ${vacant} Free`}
                       </div>
                     </div>
-
                     <div className="room-chips">
                       {room.floor && <span className="room-chip">📍 {room.floor} Floor</span>}
                       <span className="room-chip">{room.roomType}</span>
                       <span className="room-chip">{room.bathType}</span>
                       <span className="room-chip">{room.acType}</span>
                     </div>
-
+                    {pgId === '__all__' && (
+                      <div style={{ padding: '0 16px 14px', fontSize: '11px', fontWeight: '800', color: '#0f3460' }}>
+                        🏠 {getPgName(room.pgId)}
+                      </div>
+                    )}
                     <div className="bed-section">
                       <div className="bed-section-title">🛏️ Bed Status</div>
                       <div className="bed-grid">
                         {Array.from({ length: room.totalBeds }, (_, i) => {
-                          const bedNum     = i + 1;
-                          const isOccupied = occupiedBedNos.includes(bedNum);
-                          const tenant     = tenants.find(
-                            t => t.roomNumber === room.roomNumber && parseInt(t.bedNumber) === bedNum
-                          );
+                          const bNum = i + 1;
+                          const occ = occupiedBedNos.includes(bNum);
                           return (
-                            <div key={bedNum} className="bed-dot"
-                              title={isOccupied ? `Bed ${bedNum}: ${tenant?.name || 'Occupied'}` : `Bed ${bedNum}: Vacant`}
-                              style={{
-                                background: isOccupied ? '#dc2626' : '#059669',
-                                boxShadow:  isOccupied ? '0 2px 8px rgba(220,38,38,0.35)' : '0 2px 8px rgba(5,150,105,0.35)',
-                              }}>
-                              {bedNum}
-                            </div>
+                            <div key={bNum} className="bed-dot" style={{ background: occ ? '#dc2626' : '#059669' }}>{bNum}</div>
                           );
                         })}
                       </div>
-                      <div className="bed-legend">
-                        <div className="bed-legend-item">
-                          <div className="bed-legend-dot" style={{ background: '#059669' }} />Vacant
-                        </div>
-                        <div className="bed-legend-item">
-                          <div className="bed-legend-dot" style={{ background: '#dc2626' }} />Occupied
-                        </div>
-                      </div>
                     </div>
-
                     <div className="occ-bar-wrap">
                       <div className="occ-bar-row">
-                        <span className="occ-bar-text">{room.occupiedBeds || 0} of {room.totalBeds} beds</span>
+                        <span className="occ-bar-text">{room.occupiedBeds || 0}/{room.totalBeds} beds</span>
                         <span className="occ-bar-pct">{occupancyPct}%</span>
                       </div>
-                      <div className="occ-bar-bg">
-                        <div className="occ-bar-fill" style={{
-                          width:      `${occupancyPct}%`,
-                          background: occupancyPct === 100 ? '#dc2626' : 'linear-gradient(90deg,#e94560,#4f46e5)',
-                        }} />
-                      </div>
+                      <div className="occ-bar-bg"><div className="occ-bar-fill" style={{ width: `${occupancyPct}%`, background: occupancyPct === 100 ? '#dc2626' : '#4f46e5' }} /></div>
                     </div>
-
                     <div className="room-footer">
-                      <div>
-                        <span className="room-rent">₹{room.rentPerBed.toLocaleString('en-IN')}</span>
-                        <span className="room-rent-sub"> /bed/mo</span>
-                      </div>
-                      <button className="room-delete-btn" onClick={() => setDeleteTarget(room)}>
-                        🗑️ Delete
-                      </button>
+                      <div className="room-rent">₹{room.rentPerBed.toLocaleString('en-IN')}<span className="room-rent-sub">/mo</span></div>
+                      {pgId !== '__all__' && (
+                        <button className="room-delete-btn" onClick={() => setDeleteTarget(room)}>🗑️</button>
+                      )}
                     </div>
                   </div>
                 );
@@ -491,7 +454,6 @@ export default function Rooms({ pgId }) {
           )}
         </div>
 
-        {/* Add Room Sheet */}
         {showForm && (
           <>
             <div className="sheet-overlay" onClick={() => setShowForm(false)} />
@@ -503,95 +465,44 @@ export default function Rooms({ pgId }) {
               </div>
               <div className="sheet-body">
                 <div className="sf-row">
-                  <div className="sf-field">
-                    <label className="sf-label">Room Number *</label>
-                    <input className="sf-input" type="text" placeholder="101"
-                      value={form.roomNumber}
-                      onChange={e => setForm({ ...form, roomNumber: e.target.value })} />
-                  </div>
-                  <div className="sf-field">
-                    <label className="sf-label">Floor</label>
-                    <input className="sf-input" type="text" placeholder="Ground / 1st"
-                      value={form.floor}
-                      onChange={e => setForm({ ...form, floor: e.target.value })} />
-                  </div>
+                  <div className="sf-field"><label className="sf-label">Room Number *</label><input className="sf-input" type="text" value={form.roomNumber} onChange={e => setForm({ ...form, roomNumber: e.target.value })} /></div>
+                  <div className="sf-field"><label className="sf-label">Floor</label><input className="sf-input" type="text" value={form.floor} onChange={e => setForm({ ...form, floor: e.target.value })} /></div>
                 </div>
-
-                <div className="sf-field">
-                  <label className="sf-label">Rent per Bed (₹) *</label>
-                  <input className="sf-input" type="number" inputMode="numeric" placeholder="5000"
-                    value={form.rentPerBed}
-                    onChange={e => setForm({ ...form, rentPerBed: e.target.value })} />
-                </div>
-
-                <div className="sf-field">
-                  <label className="sf-label">Total Beds</label>
+                <div className="sf-field"><label className="sf-label">Rent per Bed *</label><input className="sf-input" type="number" value={form.rentPerBed} onChange={e => setForm({ ...form, rentPerBed: e.target.value })} /></div>
+                <div className="sf-field"><label className="sf-label">Total Beds</label>
                   <div className="sf-stepper">
-                    <button className="sf-step-btn"
-                      onClick={() => setForm({ ...form, totalBeds: Math.max(1, form.totalBeds - 1) })}>−</button>
+                    <button className="sf-step-btn" onClick={() => setForm({ ...form, totalBeds: Math.max(1, form.totalBeds - 1) })}>−</button>
                     <span className="sf-step-val">{form.totalBeds}</span>
-                    <button className="sf-step-btn"
-                      onClick={() => setForm({ ...form, totalBeds: Math.min(20, form.totalBeds + 1) })}>+</button>
+                    <button className="sf-step-btn" onClick={() => setForm({ ...form, totalBeds: Math.min(20, form.totalBeds + 1) })}>+</button>
                   </div>
                 </div>
-
-                <div className="sf-field">
-                  <label className="sf-label">Room Type</label>
-                  <SegControl field="roomType" options={['Single', 'Double', 'Triple', 'Dorm']} />
-                </div>
-
+                <div className="sf-field"><label className="sf-label">Room Type</label><SegControl field="roomType" options={['Single', 'Double', 'Triple', 'Dorm']} /></div>
                 <div className="sf-row">
-                  <div className="sf-field">
-                    <label className="sf-label">Bathroom</label>
-                    <SegControl field="bathType" options={['Shared', 'Attached']} />
-                  </div>
-                  <div className="sf-field">
-                    <label className="sf-label">AC Type</label>
-                    <SegControl field="acType" options={['AC', 'Non-AC']} />
-                  </div>
+                  <div className="sf-field"><label className="sf-label">Bathroom</label><SegControl field="bathType" options={['Shared', 'Attached']} /></div>
+                  <div className="sf-field"><label className="sf-label">AC Type</label><SegControl field="acType" options={['AC', 'Non-AC']} /></div>
                 </div>
-
-                <button className="sf-save-btn" onClick={handleAdd} disabled={saving}>
-                  {saving ? 'Saving…' : '💾 Save Room'}
-                </button>
+                <button className="sf-save-btn" onClick={handleAdd} disabled={saving}>{saving ? 'Saving…' : '💾 Save Room'}</button>
               </div>
             </div>
           </>
         )}
 
-        {/* Delete Confirm Sheet */}
         {deleteTarget && (
           <>
             <div className="sheet-overlay" onClick={() => setDeleteTarget(null)} />
             <div className="sheet">
-              <div className="sheet-handle" />
               <div className="del-sheet">
                 <div className="del-icon">🗑️</div>
                 <p className="del-title">Delete this room?</p>
-                {tenants.some(t => t.roomNumber === deleteTarget.roomNumber && t.status !== 'deleted') ? (
-  <p className="del-sub" style={{ color:'#dc2626', fontWeight:'700' }}>
-    Please move tenants to another room before deleting this room.
-  </p>
-) : (
-  <p className="del-sub">This action cannot be undone.</p>
-)}
                 <div className="del-btn-row">
-                  <button className="del-cancel"  onClick={() => setDeleteTarget(null)}>Cancel</button>
-                  <button
-  className="del-confirm"
-  onClick={handleDelete}
-  disabled={tenants.some(t => t.roomNumber === deleteTarget.roomNumber && t.status !== 'deleted')}
->
-  Yes, Delete
-</button>
+                  <button className="del-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>
+                  <button className="del-confirm" onClick={handleDelete}>Yes, Delete</button>
                 </div>
               </div>
             </div>
           </>
         )}
-
       </div>
     </>
   );
 }
-

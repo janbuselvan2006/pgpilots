@@ -145,78 +145,77 @@ const css = `
   .pen-save-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #e94560, #0f3460); color: white; border: none; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
 `;
 
-// ✅ Now accepts pgId prop from Dashboard
-export default function RentPage({ pgId }) {
-  const [tenants, setTenants]     = useState([]);
-  const [payments, setPayments]   = useState([]);
+// ✅ Now accepts pgId, allPgIds, and pgs props
+export default function RentPage({ pgId, allPgIds, pgs }) {
+  const [tenants, setTenants] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [elecBills, setElecBills] = useState([]);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const [showPenaltySheet, setShowPenaltySheet] = useState(false);
-  const [selectedTenant, setSelectedTenant]     = useState(null);
-  const [saving, setSaving]   = useState(false);
-  const [search, setSearch]   = useState('');
-  const [filterMonth, setFilterMonth]   = useState('');
+  const [selectedTenant, setSelectedTenant] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
   const [filterMethod, setFilterMethod] = useState('');
 
   const [penaltyEnabled, setPenaltyEnabled] = useState(false);
-  const [penaltyAmount, setPenaltyAmount]   = useState('');
-  const [gracePeriod, setGracePeriod]       = useState('');
+  const [penaltyAmount, setPenaltyAmount] = useState('');
+  const [gracePeriod, setGracePeriod] = useState('');
 
   const [form, setForm] = useState({
     amount: '', paymentMethod: 'Cash',
     paymentDate: new Date().toISOString().split('T')[0], notes: '',
   });
 
-  const user      = auth.currentUser;
-  const today     = new Date(); today.setHours(0, 0, 0, 0);
+  const user = auth.currentUser;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const thisMonth = new Date().toLocaleString('en-US', { month: 'long' });
-  const thisYear  = new Date().getFullYear().toString();
+  const thisYear = new Date().getFullYear().toString();
 
   const fetchData = async () => {
-    // ✅ Guard: need both user and pgId
     if (!user || !pgId) { setLoading(false); return; }
     setLoading(true);
     try {
-      // ✅ Query all by pgId
-      const tSnap = await getDocs(query(collection(db, 'tenants'),  where('pgId', '==', pgId)));
-      setTenants(tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted'));
+      const isAll = pgId === '__all__';
+      const targetIds = isAll ? allPgIds : [pgId];
+      if (!targetIds || targetIds.length === 0) { setLoading(false); return; }
 
-      const pSnap = await getDocs(query(collection(db, 'payments'), where('pgId', '==', pgId)));
-      setPayments(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const [tSnaps, pSnaps, eSnaps] = await Promise.all([
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'payments'), where('pgId', '==', id))))),
+        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'electricityBills'), where('pgId', '==', id), where('month', '==', thisMonth), where('year', '==', thisYear))))),
+      ]);
 
-      const eSnap = await getDocs(query(collection(db, 'electricityBills'),
-        where('pgId', '==', pgId),
-        where('month', '==', thisMonth),
-        where('year',  '==', thisYear)
-      ));
-      setElecBills(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTenants(tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))).filter(t => t.status !== 'deleted'));
+      setPayments(pSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setElecBills(eSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-      // ✅ Penalty settings live on the pgOwners root doc (owner level, not PG level)
       const ownerDoc = await getDoc(doc(db, 'pgOwners', user.uid));
       if (ownerDoc.exists()) {
         const d = ownerDoc.data();
         setPenaltyEnabled(d.penaltyEnabled === true);
         if (d.penaltyAmount !== undefined) setPenaltyAmount(d.penaltyAmount.toString());
-        if (d.gracePeriod  !== undefined) setGracePeriod(d.gracePeriod.toString());
+        if (d.gracePeriod !== undefined) setGracePeriod(d.gracePeriod.toString());
       }
     } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  // ✅ Re-fetch whenever pgId changes (user switches PG)
   useEffect(() => { fetchData(); }, [pgId]);
 
-  const getElecShare  = (t) => { const b = elecBills.find(b => b.roomNumber === t.roomNumber); return b ? Math.round((b.amount || 0) / (b.tenantCount || 1)) : 0; };
-  const hasElecBill   = (t) => elecBills.some(b => b.roomNumber === t.roomNumber);
-  const getDueDate    = (t) => { if (!t.checkIn) return null; const d = new Date(t.checkIn); return new Date(today.getFullYear(), today.getMonth(), d.getDate()); };
-  const getDaysDiff   = (t) => { const due = getDueDate(t); if (!due) return 999; return Math.floor((due - today) / (1000 * 60 * 60 * 24)); };
+  const getPgName = (id) => pgs?.find(p => p.pgId === id || p.id === id)?.pgName || 'PG';
+
+  const getElecShare = (t) => { const b = elecBills.find(b => b.roomNumber === t.roomNumber); return b ? Math.round((b.amount || 0) / (b.tenantCount || 1)) : 0; };
+  const hasElecBill = (t) => elecBills.some(b => b.roomNumber === t.roomNumber);
+  const getDueDate = (t) => { if (!t.checkIn) return null; const d = new Date(t.checkIn); return new Date(today.getFullYear(), today.getMonth(), d.getDate()); };
+  const getDaysDiff = (t) => { const due = getDueDate(t); if (!due) return 999; return Math.floor((due - today) / (1000 * 60 * 60 * 24)); };
 
   const getPenaltyForDate = (t, payDate) => {
     if (!penaltyEnabled || !t.checkIn) return 0;
     const dueDay = new Date(t.checkIn).getDate();
-    const pd  = new Date(payDate);
+    const pd = new Date(payDate);
     const due = new Date(pd.getFullYear(), pd.getMonth(), dueDay);
     const diff = Math.floor((pd - due) / (1000 * 60 * 60 * 24));
     if (diff <= 0) return 0;
@@ -255,28 +254,29 @@ export default function RentPage({ pgId }) {
   }).reduce((a, p) => a + (p.amount || 0), 0);
 
   const getTotalDue = (t) => (t.monthlyRent || 0) + getElecShare(t) + getPenaltyDisplay(t);
-  const getBalance  = (t) => Math.max(0, getTotalDue(t) - getThisMonthPaid(t.id));
-  const isPaid      = (t) => getBalance(t) === 0;
-  const isPartial   = (t) => { const p = getThisMonthPaid(t.id); return p > 0 && p < getTotalDue(t); };
+  const getBalance = (t) => Math.max(0, getTotalDue(t) - getThisMonthPaid(t.id));
+  const isPaid = (t) => getBalance(t) === 0;
+  const isPartial = (t) => { const p = getThisMonthPaid(t.id); return p > 0 && p < getTotalDue(t); };
 
-  const unpaid          = tenants.filter(t => !isPaid(t));
-  const lateTenants     = unpaid.filter(t => getDaysDiff(t) < 0).sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
-  const todayTenants    = unpaid.filter(t => getDaysDiff(t) === 0);
+  const unpaid = tenants.filter(t => !isPaid(t));
+  const lateTenants = unpaid.filter(t => getDaysDiff(t) < 0).sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
+  const todayTenants = unpaid.filter(t => getDaysDiff(t) === 0);
   const upcomingTenants = unpaid.filter(t => getDaysDiff(t) > 0).sort((a, b) => getDaysDiff(a) - getDaysDiff(b));
-  const paidTenants     = tenants.filter(t => isPaid(t));
+  const paidTenants = tenants.filter(t => isPaid(t));
 
-  const totalExpected  = tenants.reduce((a, t) => a + getTotalDue(t), 0);
+  const totalExpected = tenants.reduce((a, t) => a + getTotalDue(t), 0);
   const totalCollected = tenants.reduce((a, t) => a + getThisMonthPaid(t.id), 0);
-  const totalPending   = Math.max(0, totalExpected - totalCollected);
+  const totalPending = Math.max(0, totalExpected - totalCollected);
 
   const handleRecordPayment = (t) => {
+    if (pgId === '__all__') return alert('Please select a specific PG to collect rent.');
     setSelectedTenant(t);
     setForm({ amount: getBalance(t).toString(), paymentMethod: 'Cash', paymentDate: new Date().toISOString().split('T')[0], notes: '' });
     setShowPaymentSheet(true);
   };
 
-  const livePenalty  = selectedTenant ? getPenaltyForDate(selectedTenant, form.paymentDate) : 0;
-  const liveElec     = selectedTenant ? getElecShare(selectedTenant) : 0;
+  const livePenalty = selectedTenant ? getPenaltyForDate(selectedTenant, form.paymentDate) : 0;
+  const liveElec = selectedTenant ? getElecShare(selectedTenant) : 0;
   const liveTotalDue = selectedTenant ? Math.max(0, (selectedTenant.monthlyRent || 0) + liveElec + livePenalty - getThisMonthPaid(selectedTenant.id)) : 0;
 
   const handleSavePayment = async () => {
@@ -285,10 +285,9 @@ export default function RentPage({ pgId }) {
     if (amt > liveTotalDue) return alert(`Amount cannot exceed ₹${liveTotalDue.toLocaleString('en-IN')}`);
     const prevPaid = getThisMonthPaid(selectedTenant.id);
     const newTotal = prevPaid + amt;
-    const fullAmt  = (selectedTenant.monthlyRent || 0) + liveElec + livePenalty;
+    const fullAmt = (selectedTenant.monthlyRent || 0) + liveElec + livePenalty;
     setSaving(true);
     try {
-      // ✅ Save payment with both ownerId and pgId
       await addDoc(collection(db, 'payments'), {
         tenantId: selectedTenant.id,
         tenantName: selectedTenant.name,
@@ -305,13 +304,13 @@ export default function RentPage({ pgId }) {
         paymentTime: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
         recordedAt: new Date().toISOString(),
         month: new Date(form.paymentDate).toLocaleString('en-US', { month: 'long' }),
-        year:  new Date(form.paymentDate).getFullYear().toString(),
+        year: new Date(form.paymentDate).getFullYear().toString(),
         notes: form.notes,
-        isPartial:   amt < liveTotalDue,
+        isPartial: amt < liveTotalDue,
         isCompleted: newTotal >= fullAmt,
         type: 'Rent',
-        ownerId:   user.uid,  // backward compat
-        pgId:      pgId,      // ✅ multi-PG
+        ownerId: user.uid,
+        pgId: selectedTenant.pgId,
         createdAt: new Date(),
       });
       setShowPaymentSheet(false);
@@ -326,18 +325,18 @@ export default function RentPage({ pgId }) {
       await updateDoc(doc(db, 'pgOwners', user.uid), {
         penaltyEnabled,
         penaltyAmount: parseInt(penaltyAmount) || 0,
-        gracePeriod:   parseInt(gracePeriod)   || 0,
+        gracePeriod: parseInt(gracePeriod) || 0,
       });
       setShowPenaltySheet(false);
       fetchData();
     } catch (e) { console.error(e); }
   };
 
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   const filteredPayments = payments.filter(p => {
-    const ms  = !search       || p.tenantName?.toLowerCase().includes(search.toLowerCase()) || p.roomNumber?.includes(search);
-    const mm  = !filterMonth  || p.month === filterMonth;
+    const ms = !search || p.tenantName?.toLowerCase().includes(search.toLowerCase()) || p.roomNumber?.includes(search);
+    const mm = !filterMonth || p.month === filterMonth;
     const mmt = !filterMethod || p.paymentMethod === filterMethod;
     return ms && mm && mmt;
   }).sort((a, b) => {
@@ -347,15 +346,15 @@ export default function RentPage({ pgId }) {
   });
 
   const TenantCard = ({ tenant, status }) => {
-    const daysDiff    = getDaysDiff(tenant);
-    const balance     = getBalance(tenant);
-    const paid        = getThisMonthPaid(tenant.id);
-    const partial     = isPartial(tenant);
-    const penalty     = getPenaltyDisplay(tenant);
-    const elec        = getElecShare(tenant);
+    const daysDiff = getDaysDiff(tenant);
+    const balance = getBalance(tenant);
+    const paid = getThisMonthPaid(tenant.id);
+    const partial = isPartial(tenant);
+    const penalty = getPenaltyDisplay(tenant);
+    const elec = getElecShare(tenant);
     const showPenalty = shouldShowPenaltyOnCard(tenant);
-    const accentColor = status==='late'?'#dc2626':status==='today'?'#d97706':status==='paid'?'#059669':'#4f46e5';
-    const avatarBg    = status==='late'?'linear-gradient(135deg,#dc2626,#9f1239)':status==='today'?'linear-gradient(135deg,#d97706,#b45309)':status==='paid'?'linear-gradient(135deg,#059669,#0891b2)':'linear-gradient(135deg,#4f46e5,#0891b2)';
+    const accentColor = status === 'late' ? '#dc2626' : status === 'today' ? '#d97706' : status === 'paid' ? '#059669' : '#4f46e5';
+    const avatarBg = status === 'late' ? 'linear-gradient(135deg,#dc2626,#9f1239)' : status === 'today' ? 'linear-gradient(135deg,#d97706,#b45309)' : status === 'paid' ? 'linear-gradient(135deg,#059669,#0891b2)' : 'linear-gradient(135deg,#4f46e5,#0891b2)';
 
     return (
       <div className="trc">
@@ -367,13 +366,14 @@ export default function RentPage({ pgId }) {
               <div>
                 <div className="trc-name">{tenant.name}</div>
                 <div className="trc-sub">Room {tenant.roomNumber} · Bed {tenant.bedNumber || '—'}</div>
+                {pgId === '__all__' && <div className="trc-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(tenant.pgId)}</div>}
               </div>
             </div>
             <div className="trc-right">
-              {status==='late'     && <div className="trc-status-badge" style={{background:'#fef2f2',color:'#dc2626'}}>🔴 {Math.abs(daysDiff)}d overdue</div>}
-              {status==='today'    && <div className="trc-status-badge" style={{background:'#fffbeb',color:'#d97706'}}>🟡 Due Today</div>}
-              {status==='upcoming' && <div className="trc-status-badge" style={{background:'#ecfdf5',color:'#059669'}}>🟢 {daysDiff}d left</div>}
-              {status==='paid'     && <div className="trc-status-badge" style={{background:'#ecfdf5',color:'#059669'}}>✅ Paid</div>}
+              {status === 'late' && <div className="trc-status-badge" style={{ background: '#fef2f2', color: '#dc2626' }}>🔴 {Math.abs(daysDiff)}d overdue</div>}
+              {status === 'today' && <div className="trc-status-badge" style={{ background: '#fffbeb', color: '#d97706' }}>🟡 Due Today</div>}
+              {status === 'upcoming' && <div className="trc-status-badge" style={{ background: '#ecfdf5', color: '#059669' }}>🟢 {daysDiff}d left</div>}
+              {status === 'paid' && <div className="trc-status-badge" style={{ background: '#ecfdf5', color: '#059669' }}>✅ Paid</div>}
               <div className="trc-amount" style={{ color: accentColor }}>
                 ₹{(status === 'paid' ? getTotalDue(tenant) : balance).toLocaleString('en-IN')}
               </div>
@@ -392,13 +392,13 @@ export default function RentPage({ pgId }) {
           <div className="trc-breakdown">
             <div className="trc-bd-item">Rent <span>₹{(tenant.monthlyRent || 0).toLocaleString('en-IN')}</span></div>
             {elec > 0 && <div className="trc-bd-item">Elec <span>₹{elec.toLocaleString('en-IN')}</span></div>}
-            {showPenalty && penalty > 0 && <div className="trc-bd-item">Late Penalty <span style={{color:'#dc2626'}}>₹{penalty.toLocaleString('en-IN')}</span></div>}
+            {showPenalty && penalty > 0 && <div className="trc-bd-item">Late Penalty <span style={{ color: '#dc2626' }}>₹{penalty.toLocaleString('en-IN')}</span></div>}
             <div className="trc-bd-item">Total <span>₹{getTotalDue(tenant).toLocaleString('en-IN')}</span></div>
           </div>
 
           {status !== 'paid' && (
             <button className="trc-collect-btn"
-              style={{ background: status==='late'?'linear-gradient(135deg,#dc2626,#9f1239)':status==='today'?'linear-gradient(135deg,#d97706,#b45309)':'linear-gradient(135deg,#e94560,#0f3460)' }}
+              style={{ background: status === 'late' ? 'linear-gradient(135deg,#dc2626,#9f1239)' : status === 'today' ? 'linear-gradient(135deg,#d97706,#b45309)' : 'linear-gradient(135deg,#e94560,#0f3460)' }}
               onClick={() => handleRecordPayment(tenant)}>
               💰 {partial ? 'Collect Balance' : 'Collect Rent'}
             </button>
@@ -420,20 +420,6 @@ export default function RentPage({ pgId }) {
     </div>
   );
 
-  // ✅ Show warning if no PG selected
-  if (!pgId) {
-    return (
-      <>
-        <style>{css}</style>
-        <div className="rent-no-pg">
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏠</div>
-          <div style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>No PG Selected</div>
-          <div style={{ fontSize: '13px', color: '#94a3b8' }}>Please select a PG from the dashboard.</div>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <style>{css}</style>
@@ -443,7 +429,7 @@ export default function RentPage({ pgId }) {
           <div className="rent-topbar-row">
             <div>
               <h1 className="rent-page-title">Rent</h1>
-              <p className="rent-page-sub">{new Date().toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' })}</p>
+              <p className="rent-page-sub">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
             <div className="rent-penalty-pill" onClick={() => setShowPenaltySheet(true)}>
               <span className="rent-penalty-pill-label">⚡ Penalty</span>
@@ -456,10 +442,10 @@ export default function RentPage({ pgId }) {
 
         <div className="rent-stats">
           {[
-            { label:'Expected',  value:`₹${totalExpected.toLocaleString('en-IN')}`,  color:'#4f46e5', icon:'💰' },
-            { label:'Collected', value:`₹${totalCollected.toLocaleString('en-IN')}`, color:'#059669', icon:'✅' },
-            { label:'Pending',   value:`₹${totalPending.toLocaleString('en-IN')}`,   color:'#dc2626', icon:'⏳' },
-            { label:'Paid',      value:`${paidTenants.length}/${tenants.length}`, color:'#d97706', icon:'👥' },
+            { label: 'Expected', value: `₹${totalExpected.toLocaleString('en-IN')}`, color: '#4f46e5', icon: '💰' },
+            { label: 'Collected', value: `₹${totalCollected.toLocaleString('en-IN')}`, color: '#059669', icon: '✅' },
+            { label: 'Pending', value: `₹${totalPending.toLocaleString('en-IN')}`, color: '#dc2626', icon: '⏳' },
+            { label: 'Paid', value: `${paidTenants.length}/${tenants.length}`, color: '#d97706', icon: '👥' },
           ].map(({ label, value, color, icon }) => (
             <div key={label} className="rent-stat">
               <div className="rent-stat-icon">{icon}</div>
@@ -471,7 +457,7 @@ export default function RentPage({ pgId }) {
 
         <div className="rent-content">
           <div className="rent-tabs">
-            {[{ id:'overview', label:'📊 Overview' }, { id:'history', label:'📋 History' }].map(({ id, label }) => (
+            {[{ id: 'overview', label: '📊 Overview' }, { id: 'history', label: '📋 History' }].map(({ id, label }) => (
               <button key={id} className={`rent-tab${activeTab === id ? ' active' : ''}`}
                 onClick={() => setActiveTab(id)}>{label}</button>
             ))}
@@ -488,10 +474,10 @@ export default function RentPage({ pgId }) {
               </div>
             ) : (
               <>
-                <Section title="🟡 Due Today"        color="#d97706" items={todayTenants}    status="today"    />
-                <Section title="🔴 Overdue"           color="#dc2626" items={lateTenants}     status="late"     />
-                <Section title="🟢 Upcoming"          color="#4f46e5" items={upcomingTenants} status="upcoming" />
-                <Section title="✅ Paid This Month"   color="#059669" items={paidTenants}     status="paid"     />
+                <Section title="🟡 Due Today" color="#d97706" items={todayTenants} status="today" />
+                <Section title="🔴 Overdue" color="#dc2626" items={lateTenants} status="late" />
+                <Section title="🟢 Upcoming" color="#4f46e5" items={upcomingTenants} status="upcoming" />
+                <Section title="✅ Paid This Month" color="#059669" items={paidTenants} status="paid" />
               </>
             )
           )}
@@ -523,7 +509,7 @@ export default function RentPage({ pgId }) {
               <div className="rent-result-count" style={{ marginTop: '10px' }}>
                 {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''}
                 {filteredPayments.filter(p => p.isPartial && !p.isCompleted).length > 0 &&
-                  <span style={{ color:'#d97706', fontWeight:'600' }}> · {filteredPayments.filter(p => p.isPartial && !p.isCompleted).length} partial</span>}
+                  <span style={{ color: '#d97706', fontWeight: '600' }}> · {filteredPayments.filter(p => p.isPartial && !p.isCompleted).length} partial</span>}
               </div>
 
               {filteredPayments.length === 0 ? (
@@ -535,12 +521,12 @@ export default function RentPage({ pgId }) {
               ) : (
                 filteredPayments.map(p => (
                   <div key={p.id} className="hc" style={{
-                    background:  p.isCompleted ? '#f0fdf4' : p.isPartial ? '#fffbeb' : 'white',
+                    background: p.isCompleted ? '#f0fdf4' : p.isPartial ? '#fffbeb' : 'white',
                     borderLeft: `4px solid ${p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#4f46e5'}`,
                   }}>
                     <div className="hc-top">
                       <div className="hc-left">
-                        <div className="hc-avatar" style={{ background: p.isCompleted?'linear-gradient(135deg,#059669,#0891b2)':p.isPartial?'linear-gradient(135deg,#d97706,#b45309)':'linear-gradient(135deg,#4f46e5,#0891b2)' }}>
+                        <div className="hc-avatar" style={{ background: p.isCompleted ? 'linear-gradient(135deg,#059669,#0891b2)' : p.isPartial ? 'linear-gradient(135deg,#d97706,#b45309)' : 'linear-gradient(135deg,#4f46e5,#0891b2)' }}>
                           {p.tenantName?.charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -549,21 +535,21 @@ export default function RentPage({ pgId }) {
                         </div>
                       </div>
                       <div className="hc-right">
-                        <div className="hc-amount" style={{ color: p.isCompleted?'#059669':p.isPartial?'#d97706':'#4f46e5' }}>₹{p.amount?.toLocaleString('en-IN')}</div>
+                        <div className="hc-amount" style={{ color: p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#4f46e5' }}>₹{p.amount?.toLocaleString('en-IN')}</div>
                         <div className="hc-method">{p.paymentMethod}</div>
                       </div>
                     </div>
                     <div className="hc-tags">
-                      {p.isCompleted && <span className="hc-tag" style={{background:'#dcfce7',color:'#059669'}}>✅ Complete</span>}
-                      {p.isPartial && !p.isCompleted && <span className="hc-tag" style={{background:'#fffbeb',color:'#d97706'}}>⚠️ Partial</span>}
-                      {p.penaltyAmount > 0 && <span className="hc-tag" style={{background:'#fef2f2',color:'#dc2626'}}>🔴 Penalty</span>}
-                      {p.electricityShare > 0 && <span className="hc-tag" style={{background:'#ecfeff',color:'#0891b2'}}>⚡ Elec</span>}
+                      {p.isCompleted && <span className="hc-tag" style={{ background: '#dcfce7', color: '#059669' }}>✅ Complete</span>}
+                      {p.isPartial && !p.isCompleted && <span className="hc-tag" style={{ background: '#fffbeb', color: '#d97706' }}>⚠️ Partial</span>}
+                      {p.penaltyAmount > 0 && <span className="hc-tag" style={{ background: '#fef2f2', color: '#dc2626' }}>🔴 Penalty</span>}
+                      {p.electricityShare > 0 && <span className="hc-tag" style={{ background: '#ecfeff', color: '#0891b2' }}>⚡ Elec</span>}
                     </div>
                     <div className="hc-breakdown">
                       🏠 Rent ₹{(p.rentAmount || 0).toLocaleString('en-IN')}
-                      {p.electricityShare > 0 && <span style={{color:'#0891b2'}}> · ⚡ ₹{p.electricityShare.toLocaleString('en-IN')}</span>}
-                      {p.penaltyAmount    > 0 && <span style={{color:'#dc2626'}}> · 🔴 ₹{p.penaltyAmount.toLocaleString('en-IN')}</span>}
-                      {p.isPartial && <span style={{color:'#d97706',display:'block',marginTop:'3px'}}>Paid ₹{p.newTotal?.toLocaleString('en-IN')} of ₹{p.fullAmount?.toLocaleString('en-IN')}</span>}
+                      {p.electricityShare > 0 && <span style={{ color: '#0891b2' }}> · ⚡ ₹{p.electricityShare.toLocaleString('en-IN')}</span>}
+                      {p.penaltyAmount > 0 && <span style={{ color: '#dc2626' }}> · 🔴 ₹{p.penaltyAmount.toLocaleString('en-IN')}</span>}
+                      {p.isPartial && <span style={{ color: '#d97706', display: 'block', marginTop: '3px' }}>Paid ₹{p.newTotal?.toLocaleString('en-IN')} of ₹{p.fullAmount?.toLocaleString('en-IN')}</span>}
                     </div>
                     <div className="hc-date">📅 {p.paymentDate}{p.paymentTime && <span> · 🕐 {p.paymentTime}</span>}</div>
                     {p.notes && <div className="hc-notes">📝 {p.notes}</div>}
@@ -598,10 +584,10 @@ export default function RentPage({ pgId }) {
 
                 <div className="pay-breakdown">
                   <div className="pay-bd-row"><span>🏠 Monthly Rent</span><span>₹{(selectedTenant.monthlyRent || 0).toLocaleString('en-IN')}</span></div>
-                  <div className="pay-bd-row"><span>⚡ Electricity</span><span style={{color:liveElec>0?'#d97706':'#94a3b8'}}>{liveElec>0?`₹${liveElec.toLocaleString('en-IN')}`:'⚠️ Not added'}</span></div>
-                  <div className="pay-bd-row"><span>🔴 Penalty</span><span style={{color:livePenalty>0?'#dc2626':'#94a3b8'}}>{livePenalty>0?`₹${livePenalty.toLocaleString('en-IN')}`:penaltyEnabled?'✅ None':'—'}</span></div>
+                  <div className="pay-bd-row"><span>⚡ Electricity</span><span style={{ color: liveElec > 0 ? '#d97706' : '#94a3b8' }}>{liveElec > 0 ? `₹${liveElec.toLocaleString('en-IN')}` : '⚠️ Not added'}</span></div>
+                  <div className="pay-bd-row"><span>🔴 Penalty</span><span style={{ color: livePenalty > 0 ? '#dc2626' : '#94a3b8' }}>{livePenalty > 0 ? `₹${livePenalty.toLocaleString('en-IN')}` : penaltyEnabled ? '✅ None' : '—'}</span></div>
                   {getThisMonthPaid(selectedTenant.id) > 0 && (
-                    <div className="pay-bd-row"><span>Already Paid</span><span style={{color:'#059669'}}>−₹{getThisMonthPaid(selectedTenant.id).toLocaleString('en-IN')}</span></div>
+                    <div className="pay-bd-row"><span>Already Paid</span><span style={{ color: '#059669' }}>−₹{getThisMonthPaid(selectedTenant.id).toLocaleString('en-IN')}</span></div>
                   )}
                   <div className="pay-bd-row pay-bd-total"><span>Balance Due</span><span>₹{liveTotalDue.toLocaleString('en-IN')}</span></div>
                 </div>
@@ -667,7 +653,7 @@ export default function RentPage({ pgId }) {
                 <div className="pen-toggle-row">
                   <div>
                     <div className="pen-toggle-label">Late Payment Penalty</div>
-                    <div className="pen-toggle-sub">{penaltyEnabled ? `₹${penaltyAmount||0}/day after ${gracePeriod||0} day grace` : 'Tap to enable'}</div>
+                    <div className="pen-toggle-sub">{penaltyEnabled ? `₹${penaltyAmount || 0}/day after ${gracePeriod || 0} day grace` : 'Tap to enable'}</div>
                   </div>
                   <div className="pen-toggle" style={{ background: penaltyEnabled ? '#e94560' : '#e2e8f0' }}
                     onClick={() => setPenaltyEnabled(!penaltyEnabled)}>
@@ -691,15 +677,18 @@ export default function RentPage({ pgId }) {
                     </div>
                     <div className="pen-preview">
                       <div className="pen-preview-title">📊 Example</div>
-                      Due: 1st · Paid: 8th · Grace: {gracePeriod||0} days<br/>
-                      Overdue days: {Math.max(0, 7 - (parseInt(gracePeriod)||0))}<br/>
-                      Penalty: {Math.max(0, 7-(parseInt(gracePeriod)||0))} × ₹{penaltyAmount||0} = <strong>₹{Math.max(0, 7-(parseInt(gracePeriod)||0)) * (parseInt(penaltyAmount)||0)}</strong><br/>
+                      Due: 1st · Paid: 8th · Grace: {gracePeriod || 0} days<br />
+                      Overdue days: {Math.max(0, 7 - (parseInt(gracePeriod) || 0))}<br />
+                      Penalty: {Math.max(0, 7 - (parseInt(gracePeriod) || 0))} × ₹{penaltyAmount || 0} = <strong>₹{Math.max(0, 7 - (parseInt(gracePeriod) || 0)) * (parseInt(penaltyAmount) || 0)}</strong><br />
                       <strong>✅ No penalty if paid on or before due date</strong>
                     </div>
                   </>
                 )}
 
-                <button className="pen-save-btn" onClick={savePenaltySettings}>✅ Save Settings</button>
+                <button className="pen-save-btn" onClick={() => {
+                  if (pgId === '__all__') return alert('Please select a specific PG to change settings.');
+                  savePenaltySettings();
+                }}>✅ Save Settings</button>
               </div>
             </div>
           </>
