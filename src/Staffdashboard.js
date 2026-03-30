@@ -309,11 +309,11 @@ export default function StaffDashboard() {
         <div className="sd-main">
 
           {/* ── Sub pages ── */}
-          {activeMenu === 'Rooms'       && <RoomsPage       pgId={staffInfo?.pgId} />}
-          {activeMenu === 'Tenants'     && <TenantsPage     pgId={staffInfo?.pgId} />}
-          {activeMenu === 'Rent'        && <RentPage        pgId={staffInfo?.pgId} />}
-          {activeMenu === 'Electricity' && <ElectricityPage pgId={staffInfo?.pgId} />}
-          {activeMenu === 'Reports'     && <ReportsPage     pgId={staffInfo?.pgId} />}
+          {activeMenu === 'Rooms'       && <RoomsPage       pgId={staffInfo?.pgId} ownerId={staffInfo?.ownerId} />}
+          {activeMenu === 'Tenants'     && <TenantsPage     pgId={staffInfo?.pgId} ownerId={staffInfo?.ownerId} />}
+          {activeMenu === 'Rent'        && <RentPage        pgId={staffInfo?.pgId} ownerId={staffInfo?.ownerId} />}
+          {activeMenu === 'Electricity' && <ElectricityPage pgId={staffInfo?.pgId} ownerId={staffInfo?.ownerId} />}
+          {activeMenu === 'Reports'     && <ReportsPage     pgId={staffInfo?.pgId} ownerId={staffInfo?.ownerId} />}
 
           {/* ── Dashboard Home ── */}
           {activeMenu === 'Dashboard' && (

@@ -145,8 +145,8 @@ const css = `
   .pen-save-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #e94560, #0f3460); color: white; border: none; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
 `;
 
-// ✅ Now accepts pgId, allPgIds, and pgs props
-export default function RentPage({ pgId, allPgIds, pgs }) {
+// ✅ Now accepts pgId, allPgIds, pgs, and ownerId props
+export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
   const [tenants, setTenants] = useState([]);
   const [payments, setPayments] = useState([]);
   const [elecBills, setElecBills] = useState([]);
@@ -170,6 +170,8 @@ export default function RentPage({ pgId, allPgIds, pgs }) {
   });
 
   const user = auth.currentUser;
+  const effectiveOwnerId = ownerId || user?.uid;
+
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const thisMonth = new Date().toLocaleString('en-US', { month: 'long' });
   const thisYear = new Date().getFullYear().toString();
@@ -192,7 +194,7 @@ export default function RentPage({ pgId, allPgIds, pgs }) {
       setPayments(pSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
       setElecBills(eSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-      const ownerDoc = await getDoc(doc(db, 'pgOwners', user.uid));
+      const ownerDoc = await getDoc(doc(db, 'pgOwners', effectiveOwnerId));
       if (ownerDoc.exists()) {
         const d = ownerDoc.data();
         setPenaltyEnabled(d.penaltyEnabled === true);
@@ -309,7 +311,7 @@ export default function RentPage({ pgId, allPgIds, pgs }) {
         isPartial: amt < liveTotalDue,
         isCompleted: newTotal >= fullAmt,
         type: 'Rent',
-        ownerId: user.uid,
+        ownerId: effectiveOwnerId,
         pgId: selectedTenant.pgId,
         createdAt: new Date(),
       });
@@ -322,7 +324,7 @@ export default function RentPage({ pgId, allPgIds, pgs }) {
 
   const savePenaltySettings = async () => {
     try {
-      await updateDoc(doc(db, 'pgOwners', user.uid), {
+      await updateDoc(doc(db, 'pgOwners', effectiveOwnerId), {
         penaltyEnabled,
         penaltyAmount: parseInt(penaltyAmount) || 0,
         gracePeriod: parseInt(gracePeriod) || 0,

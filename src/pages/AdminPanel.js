@@ -69,6 +69,18 @@ function AdminPanel() {
           bedCount += (r.data().totalBeds || 0);
           usedBeds += (r.data().occupiedBeds || 0);
         });
+
+        // Fallback: rooms missing ownerId, sum by pgId list
+        if (bedCount === 0 && pSnap.size > 0) {
+          const pgIds = pSnap.docs.map(d => d.id);
+          for (const pgId of pgIds) {
+            const byPg = await getDocs(query(collection(db, 'rooms'), where('pgId', '==', pgId)));
+            byPg.forEach(r => {
+              bedCount += (r.data().totalBeds || 0);
+              usedBeds += (r.data().occupiedBeds || 0);
+            });
+          }
+        }
         owner.actualBedCount = bedCount;
         owner.usedBedCount = usedBeds;
 

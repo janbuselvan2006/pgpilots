@@ -226,7 +226,7 @@ const css = `
   .rooms-no-pg { text-align: center; padding: 60px 20px; background: white; border-radius: 20px; margin: 20px 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
 `;
 
-export default function Rooms({ pgId, allPgIds, pgs }) {
+export default function Rooms({ pgId, allPgIds, pgs, ownerId }) {
   const [rooms, setRooms]           = useState([]);
   const [tenants, setTenants]       = useState([]);
   const [showForm, setShowForm]     = useState(false);
@@ -239,6 +239,7 @@ export default function Rooms({ pgId, allPgIds, pgs }) {
   });
 
   const user = auth.currentUser;
+  const effectiveOwnerId = ownerId || user?.uid;
 
   const fetchData = async () => {
     if (!user || !pgId) { setLoading(false); return; }
@@ -276,7 +277,7 @@ export default function Rooms({ pgId, allPgIds, pgs }) {
         totalBeds:    parseInt(form.totalBeds),
         rentPerBed:   parseInt(form.rentPerBed),
         occupiedBeds: 0,
-        ownerId:      user.uid,
+        ownerId:      effectiveOwnerId,
         pgId:         pgId,
         createdAt:    new Date(),
       });
@@ -290,10 +291,10 @@ export default function Rooms({ pgId, allPgIds, pgs }) {
 
   const recalcBeds = async () => {
     try {
-      const rSnap = await getDocs(query(collection(db, 'rooms'), where('ownerId', '==', user.uid)));
+      const rSnap = await getDocs(query(collection(db, 'rooms'), where('ownerId', '==', effectiveOwnerId)));
       let totalBeds = 0;
       rSnap.forEach(r => { totalBeds += (r.data().totalBeds || 0); });
-      const ownerRef = doc(db, 'pgOwners', user.uid);
+      const ownerRef = doc(db, 'pgOwners', effectiveOwnerId);
       const ownerSnap = await getDoc(ownerRef);
       const ownerData = ownerSnap.exists() ? ownerSnap.data() : {};
       const currentMax = ownerData.max_beds_this_month ?? 0;

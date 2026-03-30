@@ -384,15 +384,35 @@ export default function SettingsPage() {
 
   useEffect(()=>{
     if(activeTab==='staff') fetchStaff();
-  },[activeTab]);
+  },[activeTab, pgList]);
 
   useEffect(()=>{
     const refreshBeds = async () => {
       if (activeTab !== 'billing') return;
       try {
-        const rSnap = await getDocs(query(collection(db, 'rooms'), where('ownerId', '==', user.uid)));
         let totalBeds = 0;
-        rSnap.forEach(r => { totalBeds += (r.data().totalBeds || 0); });
+        const seen = new Set();
+
+        // Sum rooms by ownerId (newer data)
+        const rSnap = await getDocs(query(collection(db, 'rooms'), where('ownerId', '==', user.uid)));
+        rSnap.forEach(r => {
+          if (seen.has(r.id)) return;
+          seen.add(r.id);
+          totalBeds += (r.data().totalBeds || 0);
+        });
+
+        // Sum rooms by pgId (legacy data or missing ownerId)
+        if (pgList.length > 0) {
+          const pgIds = pgList.map(p => p.pgId || p.id);
+          for (const pgId of pgIds) {
+            const byPg = await getDocs(query(collection(db, 'rooms'), where('pgId', '==', pgId)));
+            byPg.forEach(r => {
+              if (seen.has(r.id)) return;
+              seen.add(r.id);
+              totalBeds += (r.data().totalBeds || 0);
+            });
+          }
+        }
         const ownerRef = doc(db, 'pgOwners', user.uid);
         const ownerSnap = await getDoc(ownerRef);
         const ownerData = ownerSnap.exists() ? ownerSnap.data() : {};
@@ -1080,6 +1100,7 @@ export default function SettingsPage() {
                       <div className="st-cp-feature">Price per bed: ₹{pgOwner?.price_per_bed || billingSettings.price_per_bed || 0}</div>
                       <div className="st-cp-feature">
                         Estimated bill: ₹{((pgOwner?.max_beds_this_month ?? pgOwner?.max_bed_count_this_month ?? (pgOwner?.current_beds ?? pgOwner?.current_bed_count ?? 0)) * (pgOwner?.price_per_bed || billingSettings.price_per_bed || 0)).toLocaleString('en-IN')}
+                        <span style={{ marginLeft:'6px', fontSize:'11px', color:'#94a3b8', fontWeight:'600' }}>(All PGs combined)</span>
                       </div>
                       {billingSettings.effective_date && (
                         <div className="st-cp-feature">Next price effective: {billingSettings.effective_date}</div>

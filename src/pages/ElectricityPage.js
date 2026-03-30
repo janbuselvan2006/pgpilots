@@ -115,8 +115,8 @@ const css = `
   .ef-save-btn:disabled { opacity:0.6; cursor:not-allowed; }
 `;
 
-// ✅ Now accepts pgId, allPgIds, and pgs props
-export default function ElectricityPage({ pgId, allPgIds, pgs }) {
+// ✅ Now accepts pgId, allPgIds, pgs, and ownerId props
+export default function ElectricityPage({ pgId, allPgIds, pgs, ownerId }) {
   const [rooms, setRooms]       = useState([]);
   const [tenants, setTenants]   = useState([]);
   const [bills, setBills]       = useState([]);
@@ -132,7 +132,9 @@ export default function ElectricityPage({ pgId, allPgIds, pgs }) {
     notes:  '', readingDate: new Date().toISOString().split('T')[0],
   });
 
-  const user         = auth.currentUser;
+  const user = auth.currentUser;
+  const effectiveOwnerId = ownerId || user?.uid;
+
   const months       = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const currentMonth = new Date().toLocaleString('default', { month: 'long' });
   const currentYear  = new Date().getFullYear().toString();
@@ -203,7 +205,7 @@ export default function ElectricityPage({ pgId, allPgIds, pgs }) {
         tenantNames:  rt.map(t => t.name),
         isPaid:       false,
         paidTenantIds: [],
-        ownerId:      user.uid,   // backward compat
+        ownerId:      effectiveOwnerId,   // backward compat
         pgId:         pgId,       // ✅ multi-PG
         createdAt:    new Date().toISOString(),
       });

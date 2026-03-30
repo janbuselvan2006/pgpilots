@@ -468,7 +468,7 @@ const EMPTY_FORM = {
 //  MAIN COMPONENT
 // ══════════════════════════════════════════
 // ✅ Now accepts pgId, allPgIds, and pgs props
-export default function Tenants({ pgId, allPgIds, pgs }) {
+export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
   const [tenants, setTenants] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -488,7 +488,8 @@ export default function Tenants({ pgId, allPgIds, pgs }) {
   const [docsTenant, setDocsTenant] = useState(null);
 
   const user = auth.currentUser;
-  const qrLink = user && pgId ? `${window.location.origin}/tenant-onboard?ownerId=${user.uid}&pgId=${pgId}` : '';
+  const effectiveOwnerId = ownerId || user?.uid;
+  const qrLink = user && pgId ? `${window.location.origin}/tenant-onboard?ownerId=${effectiveOwnerId}&pgId=${pgId}` : '';
 
   useEffect(() => {
     if (!showQr || !pgId || !user) return;
@@ -514,7 +515,7 @@ export default function Tenants({ pgId, allPgIds, pgs }) {
       const [tSnaps, rSnaps, oSnap] = await Promise.all([
         Promise.all(targetIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
         Promise.all(targetIds.map(id => getDocs(query(collection(db, 'rooms'), where('pgId', '==', id))))),
-        getDoc(doc(db, 'pgOwners', user.uid)),
+        getDoc(doc(db, 'pgOwners', effectiveOwnerId)),
       ]);
 
       setTenants(tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))).filter(t => t.status !== 'deleted'));
@@ -524,12 +525,12 @@ export default function Tenants({ pgId, allPgIds, pgs }) {
         const oData = oSnap.data();
         setOwnerData(oData);
         
-        if (pgId === user.uid) {
+        if (pgId === effectiveOwnerId) {
           setPgData(oData);
         } else if (pgId === '__all__') {
           setPgData(oData); // default to main pg data for all view
         } else {
-          const pgSnap = await getDoc(doc(db, 'pgOwners', user.uid, 'pgs', pgId));
+          const pgSnap = await getDoc(doc(db, 'pgOwners', effectiveOwnerId, 'pgs', pgId));
           if (pgSnap.exists()) setPgData(pgSnap.data());
         }
       }
@@ -720,7 +721,7 @@ export default function Tenants({ pgId, allPgIds, pgs }) {
         await updateDoc(doc(db, 'tenants', editId), data);
       } else {
         await addDoc(collection(db, 'tenants'), {
-          ...data, ownerId: user.uid, pgId, status: 'Active', createdAt: new Date(),
+          ...data, ownerId: effectiveOwnerId, pgId, status: 'Active', createdAt: new Date(),
         });
         const room = rooms.find(r => r.roomNumber === form.roomNumber);
         if (room) await updateDoc(doc(db, 'rooms', room.id), { occupiedBeds: (room.occupiedBeds || 0) + 1 });
