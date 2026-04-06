@@ -2,7 +2,6 @@
 
 A comprehensive, full-stack management solution designed for PG owners and hostel managers to streamline tenant onboarding, billing, and operational workflows.
 
-![PG Pilot Banner](https://images.unsplash.com/photo-1555854817-5b2247a8175f?q=80&w=2070&auto=format&fit=crop) *(Replace this with a screenshot of your actual dashboard)*
 
 ## 🌟 Key Features
 
