@@ -98,8 +98,8 @@ const css = `
   .rp-no-pg { text-align:center; padding:60px 20px; background:white; border-radius:20px; margin:20px 16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); }
 `;
 
-// ✅ Now accepts pgId, allPgIds, and pgs props
-export default function ReportsPage({ pgId, allPgIds, pgs }) {
+// ✅ Now accepts pgId, allPgIds, pgs, and ownerId props
+export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
   const [tenants, setTenants]     = useState([]);
   const [rooms, setRooms]         = useState([]);
   const [payments, setPayments]   = useState([]);
@@ -117,6 +117,8 @@ export default function ReportsPage({ pgId, allPgIds, pgs }) {
   const [gracePeriod, setGracePeriod]       = useState(0);
 
   const user   = auth.currentUser;
+  const effectiveOwnerId = ownerId || user?.uid;
+  
   const today  = new Date(); today.setHours(0, 0, 0, 0);
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const years  = ['2024','2025','2026','2027'];
@@ -127,21 +129,32 @@ export default function ReportsPage({ pgId, allPgIds, pgs }) {
     setLoading(true);
     try {
       const isAll = pgId === '__all__';
-      const targetIds = isAll ? allPgIds : [pgId];
-      if (!targetIds || targetIds.length === 0) { setLoading(false); return; }
 
-      const [tSnaps, rSnaps, pSnaps, eSnaps, oD] = await Promise.all([
-        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
-        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'rooms'), where('pgId', '==', id))))),
-        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'payments'), where('pgId', '==', id))))),
-        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'electricityBills'), where('pgId', '==', id))))),
-        getDoc(doc(db, 'pgOwners', user.uid)),
+      const [tSnap, rSnap, pSnap, eSnap, oD] = await Promise.all([
+        getDocs(query(collection(db, 'tenants'), where('ownerId', '==', effectiveOwnerId))),
+        getDocs(query(collection(db, 'rooms'), where('ownerId', '==', effectiveOwnerId))),
+        getDocs(query(collection(db, 'payments'), where('ownerId', '==', effectiveOwnerId))),
+        getDocs(query(collection(db, 'electricityBills'), where('ownerId', '==', effectiveOwnerId))),
+        getDoc(doc(db, 'pgOwners', effectiveOwnerId)),
       ]);
 
-      setTenants(tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
-      setRooms(rSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
-      setPayments(pSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
-      setElecBills(eSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      const allT = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allR = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allP = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allE = eSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (isAll) {
+        setTenants(allT);
+        setRooms(allR);
+        setPayments(allP);
+        setElecBills(allE);
+      } else {
+        const filterByPg = (item) => (item.pgId || effectiveOwnerId) === pgId;
+        setTenants(allT.filter(filterByPg));
+        setRooms(allR.filter(filterByPg));
+        setPayments(allP.filter(filterByPg));
+        setElecBills(allE.filter(filterByPg));
+      }
       if (oD.exists()) {
         const d = oD.data();
         setPenaltyEnabled(d.penaltyEnabled || false);

@@ -184,15 +184,26 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
       const targetIds = isAll ? allPgIds : [pgId];
       if (!targetIds || targetIds.length === 0) { setLoading(false); return; }
 
-      const [tSnaps, pSnaps, eSnaps] = await Promise.all([
-        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
-        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'payments'), where('pgId', '==', id))))),
-        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'electricityBills'), where('pgId', '==', id), where('month', '==', thisMonth), where('year', '==', thisYear))))),
+      const [tSnap, pSnap, eSnap] = await Promise.all([
+        getDocs(query(collection(db, 'tenants'), where('ownerId', '==', effectiveOwnerId))),
+        getDocs(query(collection(db, 'payments'), where('ownerId', '==', effectiveOwnerId))),
+        getDocs(query(collection(db, 'electricityBills'), where('ownerId', '==', effectiveOwnerId), where('month', '==', thisMonth), where('year', '==', thisYear))),
       ]);
 
-      setTenants(tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))).filter(t => t.status !== 'deleted'));
-      setPayments(pSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
-      setElecBills(eSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      const allT = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allP = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allE = eSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (isAll) {
+        setTenants(allT.filter(t => t.status !== 'deleted'));
+        setPayments(allP);
+        setElecBills(allE);
+      } else {
+        const filterByPg = (item) => (item.pgId || effectiveOwnerId) === pgId;
+        setTenants(allT.filter(filterByPg).filter(t => t.status !== 'deleted'));
+        setPayments(allP.filter(filterByPg));
+        setElecBills(allE.filter(filterByPg));
+      }
 
       const ownerDoc = await getDoc(doc(db, 'pgOwners', effectiveOwnerId));
       if (ownerDoc.exists()) {

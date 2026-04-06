@@ -380,6 +380,7 @@ export default function Dashboard() {
   const [addingPg, setAddingPg] = useState(false);
 
   const navigate = useNavigate();
+  const effectiveOwnerId = auth.currentUser?.uid;
   const primaryPgId = pgs[0]?.pgId || pgs[0]?.id || null;
   const isAllSelected = selectedPgId === ALL_PGS_ID;
   const dashboardPgId = isAllSelected ? ALL_PGS_ID : (selectedPg?.pgId || selectedPgId);
@@ -428,59 +429,38 @@ export default function Dashboard() {
     }
   };
 
-  // ── Fetch dashboard stats for selected PG
-  const fetchStatsForPgIds = async (pgIds) => {
-    if (!pgIds || pgIds.length === 0) return { tenants: [], rooms: [], payments: [] };
-    const [tSnaps, rSnaps, pSnaps] = await Promise.all([
-      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
-      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'rooms'), where('pgId', '==', id))))),
-      Promise.all(pgIds.map(id => getDocs(query(collection(db, 'payments'), where('pgId', '==', id))))),
-    ]);
-
-    const tenants = tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() })));
-    const rooms = rSnaps.flatMap(s => s.docs.map(d => d.data()));
-    const payments = pSnaps.flatMap(s => s.docs.map(d => d.data()));
-    return { tenants, rooms, payments };
-  };
-
-  const fetchStatsByOwnerId = async (ownerId) => {
-    if (!ownerId) return { tenants: [], rooms: [], payments: [] };
-    const [tSnap, rSnap, pSnap] = await Promise.all([
-      getDocs(query(collection(db, 'tenants'), where('ownerId', '==', ownerId))),
-      getDocs(query(collection(db, 'rooms'), where('ownerId', '==', ownerId))),
-      getDocs(query(collection(db, 'payments'), where('ownerId', '==', ownerId))),
-    ]);
-
-    const tenants = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const rooms = rSnap.docs.map(d => d.data());
-    const payments = pSnap.docs.map(d => d.data());
-    return { tenants, rooms, payments };
-  };
-
   const getPgName = (id) => pgs?.find(p => p.pgId === id || p.id === id)?.pgName || 'PG';
 
   const fetchStats = useCallback(async (pgId, ownerId) => {
     if (!pgId || !ownerId) return;
     setStatsLoading(true);
     try {
-      let allTenants = [];
+      const [tSnap, rSnap, pSnap] = await Promise.all([
+        getDocs(query(collection(db, 'tenants'), where('ownerId', '==', ownerId))),
+        getDocs(query(collection(db, 'rooms'), where('ownerId', '==', ownerId))),
+        getDocs(query(collection(db, 'payments'), where('ownerId', '==', ownerId))),
+      ]);
+
+      const allT = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allR = rSnap.docs.map(d => d.data());
+      const allP = pSnap.docs.map(d => d.data());
+
+      let rawTenants = [];
       let rooms = [];
       let payments = [];
 
-      // When older data doesn't have `pgId` saved, querying by `ownerId` is the safe fallback.
       if (pgId === ALL_PGS_ID) {
-        ({ tenants: allTenants, rooms, payments } = await fetchStatsForPgIds(pgs.map(p => p.pgId || p.id)));
-      } else if (pgId === ownerId) {
-        // Legacy single-PG mode (documents may not have pgId).
-        const res = await fetchStatsByOwnerId(ownerId);
-        allTenants = res.tenants.filter(t => !t.pgId || t.pgId === ownerId);
-        rooms = res.rooms.filter(r => !r.pgId || r.pgId === ownerId);
-        payments = res.payments.filter(p => !p.pgId || p.pgId === ownerId);
+        rawTenants = allT;
+        rooms = allR;
+        payments = allP;
       } else {
-        ({ tenants: allTenants, rooms, payments } = await fetchStatsForPgIds([pgId]));
+        const filterByPg = (item) => (item.pgId || ownerId) === pgId;
+        rawTenants = allT.filter(filterByPg);
+        rooms = allR.filter(filterByPg);
+        payments = allP.filter(filterByPg);
       }
 
-      const tenants = allTenants.filter(t => t.status !== 'deleted');
+      const tenants = rawTenants.filter(t => t.status !== 'deleted');
 
       const totalBeds = rooms.reduce((a, r) => a + (r.totalBeds || 0), 0);
       const occupiedBeds = rooms.reduce((a, r) => a + (r.occupiedBeds || 0), 0);
@@ -590,7 +570,7 @@ export default function Dashboard() {
     const pg = pgs.find(p => p.id === selectedPgId);
     setSelectedPg(pg || null);
     fetchStats((pg?.pgId || selectedPgId), auth.currentUser.uid);
-  }, [selectedPgId]);
+  }, [selectedPgId, pgs, fetchStats]);
 
   // ── Back button handler
   useEffect(() => {
@@ -827,7 +807,7 @@ export default function Dashboard() {
             {activeMenu === 'Tenants' && <Tenants pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
             {activeMenu === 'Rent' && <RentPage pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
             {activeMenu === 'Electricity' && <ElectricityPage pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
-            {activeMenu === 'Reports' && <ReportsPage pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
+            {activeMenu === 'Reports' && <ReportsPage pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} ownerId={effectiveOwnerId} />}
             {activeMenu === 'Settings' && <SettingsPage pgId={effectivePgId} allPgIds={pgs.map(p => p.pgId || p.id)} pgs={pgs} />}
 
             {/* ── Dashboard Home ── */}

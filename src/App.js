@@ -15,19 +15,19 @@ import TenantOnboard from './pages/TenantOnboard';
 function LoadingScreen() {
   return (
     <div style={{
-      display:'flex', alignItems:'center', justifyContent:'center',
-      height:'100vh', flexDirection:'column', gap:'14px',
-      background:'#f0f2f8', fontFamily:'DM Sans, Segoe UI, sans-serif',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100vh', flexDirection: 'column', gap: '14px',
+      background: '#f0f2f8', fontFamily: 'DM Sans, Segoe UI, sans-serif',
     }}>
       <div style={{
-        width:'36px', height:'36px',
-        border:'3px solid #e2e8f0',
-        borderTopColor:'#e94560',
-        borderRadius:'50%',
-        animation:'appspin 0.7s linear infinite',
-      }}/>
+        width: '36px', height: '36px',
+        border: '3px solid #e2e8f0',
+        borderTopColor: '#e94560',
+        borderRadius: '50%',
+        animation: 'appspin 0.7s linear infinite',
+      }} />
       <style>{`@keyframes appspin { to { transform: rotate(360deg); } }`}</style>
-      <div style={{fontSize:'14px', color:'#94a3b8', fontWeight:'600'}}>
+      <div style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '600' }}>
         🏠 PGpilots
       </div>
     </div>
@@ -37,12 +37,12 @@ function LoadingScreen() {
 function PublicRoute({ children }) {
   const [user, loading] = useAuthState(auth);
   if (loading) return <LoadingScreen />;
-  
+
   const isSigningUp = sessionStorage.getItem('signingUp') === 'true';
   const authInProgress = sessionStorage.getItem('authInProgress') === 'true';
-  
+
   if (isSigningUp || authInProgress) return children;
-  
+
   if (user) {
     // If staff, redirect to staff dashboard
     const isStaff = sessionStorage.getItem('staffMode') === 'true';
@@ -62,7 +62,7 @@ function OwnerRoute({ children }) {
   const [user, loading] = useAuthState(auth);
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
-  
+
   // Also check if we are in signup mode to avoid redirecting back to dashboard mid-signup
   if (sessionStorage.getItem('signingUp') === 'true') {
     return <Navigate to="/signup" replace />;

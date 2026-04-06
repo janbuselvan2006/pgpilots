@@ -246,16 +246,23 @@ export default function Rooms({ pgId, allPgIds, pgs, ownerId }) {
     setLoading(true);
     try {
       const isAll = pgId === '__all__';
-      const targetIds = isAll ? allPgIds : [pgId];
-      if (!targetIds || targetIds.length === 0) { setLoading(false); return; }
 
-      const [rSnaps, tSnaps] = await Promise.all([
-        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'rooms'), where('pgId', '==', id))))),
-        Promise.all(targetIds.map(id => getDocs(query(collection(db, 'tenants'), where('pgId', '==', id))))),
+      const [rSnap, tSnap] = await Promise.all([
+        getDocs(query(collection(db, 'rooms'), where('ownerId', '==', effectiveOwnerId))),
+        getDocs(query(collection(db, 'tenants'), where('ownerId', '==', effectiveOwnerId))),
       ]);
 
-      setRooms(rSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
-      setTenants(tSnaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))).filter(t => t.status !== 'deleted'));
+      const allR = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allT = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (isAll) {
+        setRooms(allR);
+        setTenants(allT.filter(t => t.status !== 'deleted'));
+      } else {
+        const filterByPg = (item) => (item.pgId || effectiveOwnerId) === pgId;
+        setRooms(allR.filter(filterByPg));
+        setTenants(allT.filter(filterByPg).filter(t => t.status !== 'deleted'));
+      }
     } catch (err) { console.error(err); }
     setLoading(false);
   };

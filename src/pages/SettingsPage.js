@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { auth, db, storage } from '../firebase';
-import { doc, getDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { auth, db, storage, firebaseConfig as sharedFirebaseConfig } from '../firebase';
+import { doc, getDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, serverTimestamp, query, where, setDoc } from 'firebase/firestore';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { initializeApp, getApps } from 'firebase/app';
@@ -8,14 +8,7 @@ import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
 // Secondary Firebase app — used ONLY to create staff accounts
 // without signing out the current owner
-const firebaseConfig = {
-  apiKey: "AIzaSyDIvLqFM0jMWJtPAMyOkU4HdrYJKsoknTo",
-  authDomain: "new2-42396.firebaseapp.com",
-  projectId: "new2-42396",
-  storageBucket: "new2-42396.firebasestorage.app",
-  messagingSenderId: "186741862906",
-  appId: "1:186741862906:web:8cde0b14daba62f1823443",
-};
+const firebaseConfig = sharedFirebaseConfig;
 const secondaryApp  = getApps().find(a => a.name === 'secondary') || initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
@@ -594,6 +587,9 @@ export default function SettingsPage() {
       // Delete staffAccounts lookup
       await Promise.all(staffAccSnap.docs.map(d => deleteDoc(d.ref)));
 
+      // Delete staff index docs
+      await Promise.all(Array.from(staffUids).map(uid => deleteDoc(doc(db, 'staffIndex', uid))));
+
       // Delete PG doc
       await deleteDoc(doc(db, 'pgOwners', user.uid, 'pgs', pgId));
 
@@ -659,6 +655,16 @@ export default function SettingsPage() {
         createdAt: serverTimestamp(),
       });
 
+      // ✅ Staff index for secure rules lookup (doc id = staffUid)
+      await setDoc(doc(db, 'staffIndex', staffUid), {
+        staffUid,
+        ownerId: user.uid,
+        pgId: staffForm.pgId,
+        pgName,
+        isActive: true,
+        createdAt: serverTimestamp(),
+      }, { merge: true });
+
       setNewCredentials({ name: staffForm.name, email, password, pgName, pgCode });
       setStaffForm({ name:'', pgId:'' });
       fetchStaff();
@@ -674,7 +680,13 @@ export default function SettingsPage() {
   const handleDeleteStaff = async (staffId, staffName) => {
     if (!window.confirm(`Remove ${staffName} from staff?`)) return;
     try {
-      await deleteDoc(doc(db,'pgOwners',user.uid,'staff',staffId));
+      const staffRef = doc(db,'pgOwners',user.uid,'staff',staffId);
+      const staffSnap = await getDoc(staffRef);
+      const staffUid = staffSnap.exists() ? staffSnap.data().staffUid : null;
+      await deleteDoc(staffRef);
+      if (staffUid) {
+        await deleteDoc(doc(db, 'staffIndex', staffUid));
+      }
       setStaffList(prev=>prev.filter(s=>s.id!==staffId));
       showOk(`✅ ${staffName} removed from staff.`);
     } catch { showErr('Failed to remove staff!'); }

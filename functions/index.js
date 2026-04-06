@@ -195,76 +195,76 @@ exports.onRoomWritten = onDocumentWritten(
 exports.monthlyBilling = onSchedule(
   { schedule: "0 0 1 * *", timeZone: "Asia/Kolkata" },
   async () => {
-  console.log("Starting monthly billing cycle...");
+    console.log("Starting monthly billing cycle...");
 
-  // 1. Get current price per bed from settings
-  const settingsSnap = await db.collection("settings").doc("billing").get();
-  const settings = settingsSnap.exists ? settingsSnap.data() : { price_per_bed: 8 };
-  const defaultPricePerBed = settings.price_per_bed;
+    // 1. Get current price per bed from settings
+    const settingsSnap = await db.collection("settings").doc("billing").get();
+    const settings = settingsSnap.exists ? settingsSnap.data() : { price_per_bed: 8 };
+    const defaultPricePerBed = settings.price_per_bed;
 
-  // 2. Process all owners
-  const ownersSnap = await db.collection("pgOwners")
-    .where("isAdmin", "==", false)
-    .where("isDeleted", "==", false)
-    .get();
+    // 2. Process all owners
+    const ownersSnap = await db.collection("pgOwners")
+      .where("isAdmin", "==", false)
+      .where("isDeleted", "==", false)
+      .get();
 
-  const now = new Date();
-  // We are billing for the previous month
-  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const monthName = lastMonthDate.toLocaleString('default', { month: 'long' });
-  const year = lastMonthDate.getFullYear();
-  const monthKey = `${monthName}_${year}`;
+    const now = new Date();
+    // We are billing for the previous month
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const monthName = lastMonthDate.toLocaleString('default', { month: 'long' });
+    const year = lastMonthDate.getFullYear();
+    const monthKey = `${monthName}_${year}`;
 
-  const batch = db.batch();
+    const batch = db.batch();
 
-  for (const ownerDoc of ownersSnap.docs) {
-    const ownerData = ownerDoc.data();
-    const ownerId = ownerDoc.id;
-    const maxBeds = ownerData.max_beds_this_month || ownerData.current_beds || 0;
-    const currentBeds = ownerData.current_beds || 0;
-    const pricePerBed = ownerData.price_per_bed || defaultPricePerBed;
+    for (const ownerDoc of ownersSnap.docs) {
+      const ownerData = ownerDoc.data();
+      const ownerId = ownerDoc.id;
+      const maxBeds = ownerData.max_beds_this_month || ownerData.current_beds || 0;
+      const currentBeds = ownerData.current_beds || 0;
+      const pricePerBed = ownerData.price_per_bed || defaultPricePerBed;
 
-    // Skip if no beds used
-    if (maxBeds === 0) {
-      // Still reset the max count for the new month
-      batch.update(ownerDoc.ref, { max_bed_count_this_month: currentBeds });
-      continue;
+      // Skip if no beds used
+      if (maxBeds === 0) {
+        // Still reset the max count for the new month
+        batch.update(ownerDoc.ref, { max_bed_count_this_month: currentBeds });
+        continue;
+      }
+
+      // Create billing record
+      const billRef = db.collection("billing").doc(`${ownerId}_${monthKey}`);
+
+      // Check if bill already exists to prevent duplicates
+      const existingBill = await billRef.get();
+      if (existingBill.exists) {
+        console.log(`Bill already exists for owner ${ownerId} for ${monthKey}. Skipping.`);
+        continue;
+      }
+
+      const totalAmount = maxBeds * pricePerBed;
+
+      batch.set(billRef, {
+        owner_id: ownerId,
+        owner_name: ownerData.name || "Unknown",
+        pg_name: ownerData.pgName || "Unknown",
+        month: monthName,
+        year: year,
+        max_beds_used: maxBeds,
+        price_per_bed: pricePerBed,
+        total_amount: totalAmount,
+        status: "unpaid",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Reset peak usage for the new month
+      batch.update(ownerDoc.ref, {
+        max_beds_this_month: currentBeds,
+      });
     }
 
-    // Create billing record
-    const billRef = db.collection("billing").doc(`${ownerId}_${monthKey}`);
-
-    // Check if bill already exists to prevent duplicates
-    const existingBill = await billRef.get();
-    if (existingBill.exists) {
-      console.log(`Bill already exists for owner ${ownerId} for ${monthKey}. Skipping.`);
-      continue;
-    }
-
-    const totalAmount = maxBeds * pricePerBed;
-
-    batch.set(billRef, {
-      owner_id: ownerId,
-      owner_name: ownerData.name || "Unknown",
-      pg_name: ownerData.pgName || "Unknown",
-      month: monthName,
-      year: year,
-      max_beds_used: maxBeds,
-      price_per_bed: pricePerBed,
-      total_amount: totalAmount,
-      status: "unpaid",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    // Reset peak usage for the new month
-    batch.update(ownerDoc.ref, {
-      max_beds_this_month: currentBeds,
-    });
-  }
-
-  await batch.commit();
-  console.log("Monthly billing cycle complete ✅");
-});
+    await batch.commit();
+    console.log("Monthly billing cycle complete ✅");
+  });
 
 exports.recalculateOwnerBeds = onCall(async (request) => {
   if (!request.auth) {
