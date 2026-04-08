@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWithPopup, PhoneAuthProvider, linkWithCredential, EmailAuthProvider, updatePassword, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import {
-  doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, increment,
+  doc, setDoc, getDoc, updateDoc, increment, serverTimestamp,
 } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -57,10 +57,22 @@ const maybeResetWindow = async (ref, data) => {
   return data;
 };
 
+const phoneIndexRef = (phone) => doc(db, 'phoneIndex', `+91${phone.replace(/\D/g, '')}`);
+const emailIndexRef = (email) => doc(db, 'emailIndex', (email || '').trim().toLowerCase());
+const pgCodeIndexRef = (code) => doc(db, 'pgCodeIndex', (code || '').trim().toUpperCase());
+
 const isPhoneRegistered = async (phone) => {
-  const q    = query(collection(db, 'pgOwners'), where('phone', '==', phone.replace(/\D/g, '')));
-  const snap = await getDocs(q);
-  return !snap.empty;
+  const snap = await getDoc(phoneIndexRef(phone));
+  return snap.exists();
+};
+
+const isEmailRegistered = async (email) => {
+  const snap = await getDoc(emailIndexRef(email));
+  return snap.exists();
+};
+const isPGCodeUnique = async (code) => {
+  const snap = await getDoc(pgCodeIndexRef(code));
+  return !snap.exists();
 };
 
 const checkOtpSendAllowed = async (phone) => {
@@ -109,12 +121,6 @@ const generatePGCode = (pgName) => {
   const letters = pgName.replace(/\s+/g, '').toUpperCase().slice(0, 3).padEnd(3, 'X');
   const digits  = Math.floor(100 + Math.random() * 900);
   return `${letters}${digits}`;
-};
-
-const isPGCodeUnique = async (code) => {
-  const q    = query(collection(db, 'pgOwners'), where('pgCode', '==', code));
-  const snap = await getDocs(q);
-  return snap.empty;
 };
 
 const createUniquePGCode = async (pgName) => {
@@ -411,10 +417,8 @@ export default function Signup() {
         if (result) {
           setLoading(true);
           const userEmail = result.user.email;
-          const q = query(collection(db, 'pgOwners'), where('email', '==', userEmail));
-          const snap = await getDocs(q);
-
-          if (!snap.empty) {
+          const exists = await isEmailRegistered(userEmail);
+          if (exists) {
             await auth.signOut();
             setError('An account with this email already exists. Please sign in instead.');
           } else {
@@ -524,12 +528,14 @@ export default function Signup() {
     if (!cleanPhone || cleanPhone.length < 10) return setError('Please enter a valid 10-digit mobile number.');
 
     setLoading(true);
-    // ✅ Check for duplicate mobile number
-    const q = query(collection(db, 'pgOwners'), where('phone', '==', cleanPhone));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
+    // ✅ Check for duplicate mobile number / email using public-safe indexes
+    if (await isPhoneRegistered(cleanPhone)) {
       setLoading(false);
       return setError('This mobile number is already registered.');
+    }
+    if (await isEmailRegistered(email.trim())) {
+      setLoading(false);
+      return setError('This email is already registered.');
     }
     setLoading(false);
     
@@ -570,6 +576,23 @@ export default function Signup() {
         billing_mode: 'usage',
         current_beds: 0,
         max_beds_this_month: 0,
+      });
+
+      // Create public-safe indexes for signup checks + login resolution
+      await setDoc(phoneIndexRef(cleanPhone), {
+        ownerId: user.uid,
+        loginEmail: resolvedEmail,
+        createdAt: serverTimestamp(),
+      });
+      await setDoc(emailIndexRef(resolvedEmail), {
+        ownerId: user.uid,
+        loginEmail: resolvedEmail,
+        createdAt: serverTimestamp(),
+      });
+      await setDoc(pgCodeIndexRef(code), {
+        ownerId: user.uid,
+        loginEmail: resolvedEmail,
+        createdAt: serverTimestamp(),
       });
 
       // 2. Link email+password so all login methods work for the same UID

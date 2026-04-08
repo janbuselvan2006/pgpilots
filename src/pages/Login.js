@@ -10,7 +10,7 @@ import {
   signInWithRedirect,
   getRedirectResult,
 } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 
 const css = `
@@ -349,6 +349,10 @@ const css = `
   }
 `;
 
+const phoneIndexRef = (phone) => doc(db, 'phoneIndex', `+91${(phone || '').replace(/\D/g, '')}`);
+const emailIndexRef = (email) => doc(db, 'emailIndex', (email || '').trim().toLowerCase());
+const pgCodeIndexRef = (code) => doc(db, 'pgCodeIndex', (code || '').trim().toUpperCase());
+
 export default function Login() {
   const [loginType, setLoginType]   = useState('pgcode');
   const [emailInput, setEmailInput] = useState('');
@@ -397,10 +401,12 @@ export default function Login() {
     setLoading(true);
     try {
       await setPersistence(auth, persist());
-      const snap = await getDocs(query(collection(db,'pgOwners'), where('pgCode','==',pgCode.toUpperCase().trim())));
-      if (snap.empty) { setLoading(false); return showErr('❌ PG Code not found.'); }
-      const data = snap.docs[0].data();
-      const userEmail = data.email || `${data.phone}@pgpilots.in`;
+      const code = pgCode.toUpperCase().trim();
+      const snap = await getDoc(pgCodeIndexRef(code));
+      if (!snap.exists()) { setLoading(false); return showErr('❌ PG Code not found.'); }
+      const data = snap.data() || {};
+      const userEmail = data.loginEmail;
+      if (!userEmail) { setLoading(false); return showErr('❌ PG Code not found.'); }
       sessionStorage.removeItem('signingUp');
       await signInWithEmailAndPassword(auth, userEmail, password);
       navigate('/dashboard', { replace: true });
@@ -415,10 +421,12 @@ export default function Login() {
     setLoading(true);
     try {
       await setPersistence(auth, persist());
-      const snap = await getDocs(query(collection(db,'pgOwners'), where('phone','==',mobile.trim())));
-      if (snap.empty) { setLoading(false); return showErr('❌ No account found for this mobile number.'); }
-      const data = snap.docs[0].data();
-      const userEmail = data.email || `${data.phone}@pgpilots.in`;
+      const cleaned = mobile.trim();
+      const snap = await getDoc(phoneIndexRef(cleaned));
+      if (!snap.exists()) { setLoading(false); return showErr('❌ No account found for this mobile number.'); }
+      const data = snap.data() || {};
+      const userEmail = data.loginEmail;
+      if (!userEmail) { setLoading(false); return showErr('❌ No account found for this mobile number.'); }
       sessionStorage.removeItem('signingUp');
       await signInWithEmailAndPassword(auth, userEmail, password);
       navigate('/dashboard', { replace: true });
@@ -435,8 +443,8 @@ export default function Login() {
         if (result) {
           setLoading(true);
           // Check if account exists in DB
-          const snap = await getDocs(query(collection(db, 'pgOwners'), where('email', '==', result.user.email)));
-          if (snap.empty) {
+          const snap = await getDoc(emailIndexRef(result.user.email));
+          if (!snap.exists()) {
             await auth.signOut();
             showErr('🚫 No account found for this Google email. Please sign up first.');
           } else {
@@ -479,19 +487,25 @@ export default function Login() {
     if (!forgotInput.trim()) return showErr('Enter your email, PG Code, or mobile number.');
     setLoading(true);
     try {
-      let email = forgotInput.trim();
-      const cleaned = forgotInput.replace(/\D/g,'');
-      if (cleaned.length >= 10) {
-        // Mobile number
-        const snap = await getDocs(query(collection(db,'pgOwners'), where('phone','==',cleaned)));
-        if (snap.empty) { setLoading(false); return showErr('No account found for this number.'); }
-        email = snap.docs[0].data().email || `${cleaned}@pgpilots.in`;
-      } else if (!forgotInput.includes('@')) {
-        // PG Code
-        const snap = await getDocs(query(collection(db,'pgOwners'), where('pgCode','==',forgotInput.toUpperCase().trim())));
-        if (snap.empty) { setLoading(false); return showErr('PG Code not found.'); }
-        email = snap.docs[0].data().email || `${snap.docs[0].data().phone}@pgpilots.in`;
+      const input = forgotInput.trim();
+      const cleaned = input.replace(/\D/g,'');
+      let email = '';
+
+      if (input.includes('@')) {
+        const snap = await getDoc(emailIndexRef(input));
+        if (!snap.exists()) { setLoading(false); return showErr('No account found for this email.'); }
+        email = snap.data()?.loginEmail || input;
+      } else if (cleaned.length >= 10) {
+        const snap = await getDoc(phoneIndexRef(cleaned));
+        if (!snap.exists()) { setLoading(false); return showErr('No account found for this number.'); }
+        email = snap.data()?.loginEmail || '';
+      } else {
+        const snap = await getDoc(pgCodeIndexRef(input));
+        if (!snap.exists()) { setLoading(false); return showErr('PG Code not found.'); }
+        email = snap.data()?.loginEmail || '';
       }
+
+      if (!email) { setLoading(false); return showErr('No account found.'); }
       await sendPasswordResetEmail(auth, email);
       setForgotSent(true);
       showOk(`✅ Reset link sent to ${email}`);
