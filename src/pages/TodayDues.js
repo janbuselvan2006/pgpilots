@@ -131,11 +131,36 @@ const css = `
   }
   @keyframes tdspin { to { transform: rotate(360deg); } }
 
+  .td-list-actions {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .td-action-btn {
+    padding: 6px 12px; border-radius: 10px; border: none; font-size: 11px;
+    font-weight: 700; cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; gap: 4px; transition: all 0.15s;
+    background: #fff; color: #475569; border: 1.5px solid #e2e8f0;
+  }
+  .td-action-btn:hover { border-color: #4f46e5; color: #4f46e5; }
+  .td-action-btn.active { background: #ecfdf5; color: #059669; border-color: #059669; }
+
+  .due-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .due-copy-btn.phone { background: #ecfdf5; color: #059669; }
+  .due-copy-btn.phone:hover { background: #059669; color: white; }
+
+  .mini-copy-btn {
+    border: none; background: rgba(79,70,229,0.08); color: #4f46e5;
+    padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
+    cursor: pointer; font-family: inherit; margin-left: 6px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .mini-copy-btn:hover { background: #4f46e5; color: white; }
+
   @media (max-width: 640px) {
     .due-amounts { display: none; }
     .due-copy-btn span { display: none; }
     .due-copy-btn { padding: 10px; }
     .td-page-title { font-size: 20px; }
+    .td-list-actions { flex-direction: column; align-items: flex-end; }
   }
 `;
 
@@ -225,6 +250,40 @@ export default function TodayDues({ pgId }) {
     });
   };
 
+  const handleCopyPhone = (t) => {
+    navigator.clipboard.writeText(t.phone);
+    setCopiedId('phone-' + t.id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  const handleCopyAllMsgs = () => {
+    if (tenants.length === 0) return;
+    const allMsgs = tenants.map(t => {
+      const rent = t.monthlyRent || 0;
+      const elec = getElec(t);
+      const total = rent + elec;
+      return template
+        .replace(/{{name}}/g, t.name || 'Tenant')
+        .replace(/{{amount}}/g, total.toLocaleString('en-IN'))
+        .replace(/{{rent}}/g, rent.toLocaleString('en-IN'))
+        .replace(/{{electricity}}/g, elec.toLocaleString('en-IN'));
+    }).join('\n\n---------------------------\n\n');
+    
+    navigator.clipboard.writeText(allMsgs).then(() => {
+      setCopiedId('all-msgs');
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  const handleCopyPhoneList = () => {
+    if (tenants.length === 0) return;
+    const phones = tenants.map(t => t.phone).join(', ');
+    navigator.clipboard.writeText(phones).then(() => {
+      setCopiedId('phones');
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
   if (!pgId) return <div className="td-root" style={{ padding: 40, textAlign: 'center' }}>Please select a PG.</div>;
 
   return (
@@ -259,8 +318,16 @@ export default function TodayDues({ pgId }) {
             <div className="td-list-title">
               Due Today <span className="td-list-count">{tenants.length}</span>
             </div>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>
-              {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
+            <div className="td-list-actions">
+              <button className={`td-action-btn${copiedId === 'all-msgs' ? ' active' : ''}`} onClick={handleCopyAllMsgs}>
+                {copiedId === 'all-msgs' ? '✅ Copied' : '📋 Copy All Msgs'}
+              </button>
+              <button className={`td-action-btn${copiedId === 'phones' ? ' active' : ''}`} onClick={handleCopyPhoneList}>
+                {copiedId === 'phones' ? '✅ Copied' : '📞 Copy All Phones'}
+              </button>
+              <div style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>
+                {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
+              </div>
             </div>
           </div>
 
@@ -294,7 +361,20 @@ export default function TodayDues({ pgId }) {
 
                     <div className="due-info">
                       <div className="due-name">{t.name}</div>
-                      <div className="due-phone">{t.phone} • Room {t.roomNumber}</div>
+                      <div className="due-phone" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                        <span 
+                          onClick={() => handleCopyPhone(t)} 
+                          style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          title="Click to copy"
+                        >
+                          📞 {t.phone}
+                        </span>
+                        <button className="mini-copy-btn" onClick={() => handleCopyPhone(t)}>
+                          {copiedId === 'phone-' + t.id ? '✅ Copied' : '📋 Copy'}
+                        </button>
+                        <span>• Room {t.roomNumber}</span>
+                        {t.pgName && <span>• {t.pgName}</span>}
+                      </div>
                     </div>
 
                     <div className="due-amounts">
@@ -302,10 +382,16 @@ export default function TodayDues({ pgId }) {
                       <div className="due-sub">Rent + Elec</div>
                     </div>
 
-                    <button className={`due-copy-btn${isCopied ? ' copied' : ''}`} onClick={() => handleCopy(t)}>
-                      {isCopied ? '✅' : '📋'}
-                      <span>{isCopied ? 'Copied' : 'Copy Text'}</span>
-                    </button>
+                    <div className="due-actions">
+                      <button className={`due-copy-btn phone ${copiedId === 'phone-' + t.id ? ' copied' : ''}`} onClick={() => handleCopyPhone(t)}>
+                        {copiedId === 'phone-' + t.id ? '✅' : '📞'}
+                        <span>{copiedId === 'phone-' + t.id ? 'Copied' : 'Copy Phone'}</span>
+                      </button>
+                      <button className={`due-copy-btn${isCopied ? ' copied' : ''}`} onClick={() => handleCopy(t)}>
+                        {isCopied ? '✅' : '📋'}
+                        <span>{isCopied ? 'Copied' : 'Copy Text'}</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}

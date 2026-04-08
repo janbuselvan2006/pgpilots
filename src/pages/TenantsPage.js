@@ -109,7 +109,9 @@ const css = `
     background: linear-gradient(135deg, #4f46e5, #0891b2);
   }
   .tc-name         { font-size: 15px; font-weight: 800; color: #1e293b; }
-  .tc-phone        { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .tc-phone        { font-size: 12px; color: #94a3b8; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+  .tc-copy-phone   { background: rgba(79,70,229,0.06); color: #4f46e5; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 800; cursor: pointer; transition: background 0.2s; }
+  .tc-copy-phone:hover { background: #4f46e5; color: white; }
   .tc-status-badge { margin-left: auto; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; background: #ecfdf5; color: #059669; }
   .tc-details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   .tc-detail-item { display: flex; flex-direction: column; }
@@ -848,7 +850,14 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
                       <div className="tc-avatar">{tenant.name?.charAt(0).toUpperCase()}</div>
                       <div style={{ flex: 1 }}>
                         <div className="tc-name">{tenant.name}</div>
-                        <div className="tc-phone">📞 {tenant.phone}</div>
+                        <div className="tc-phone">
+                          📞 {tenant.phone}
+                          <button className="tc-copy-phone" onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(tenant.phone);
+                            alert('Phone number copied!');
+                          }}>📋 Copy</button>
+                        </div>
                       </div>
                       <div className="tc-status-badge">{tenant.status}</div>
                     </div>

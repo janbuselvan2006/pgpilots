@@ -237,6 +237,7 @@ const css = `
   }
   .db-pending-name  { font-size: 13px; font-weight: 700; color: #1e293b; }
   .db-pending-room  { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .db-pending-phone { font-size: 11px; color: #4f46e5; margin-top: 2px; display: flex; align-items: center; gap: 4px; cursor: pointer; }
   .db-pending-amt   { margin-left: auto; font-size: 13px; font-weight: 800; color: #dc2626; }
 
   /* Recent activity */
@@ -885,6 +886,15 @@ export default function Dashboard() {
                               <div>
                                 <div className="db-pending-name">{p.name}</div>
                                 <div className="db-pending-room">Room {p.room}{p.pgName && ` · ${p.pgName}`}</div>
+                                {p.phone && (
+                                  <div className="db-pending-phone" onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(p.phone);
+                                    alert('Phone number copied!');
+                                  }}>
+                                    📞 {p.phone} 📋
+                                  </div>
+                                )}
                               </div>
                              <div className="db-pending-amt" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{ textAlign: 'right' }}>
