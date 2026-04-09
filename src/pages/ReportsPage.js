@@ -107,10 +107,51 @@ const css = `
   .rp-invoice-btn:hover { background: #e94560; }
   .rp-invoice-btn:active { transform: scale(0.96); }
 
-  /* Table Styles */
+  /* --- PRO TABLE / LEDGER STYLES --- */
+  .rpt-table-wrap { background: white; border-radius: 18px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+  .rpt-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .rpt-table thead th { background: #f8fafc; padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; }
+  .rpt-table td { padding: 16px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #1e293b; vertical-align: middle; }
+  .rpt-table tr:last-child td { border-bottom: none; }
   
+  .rt-name { font-weight: 800; color: #1a1a2e; font-size: 14px; }
+  .rt-sub  { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+  .rt-amt  { font-weight: 800; font-size: 14px; }
   .rp-t-status { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
-  .rp-t-amt    { font-weight: 800; }
+
+  /* --- MOBILE ZERO-SCROLL CARDS --- */
+  @media (max-width: 640px) {
+    .rpt-stats { grid-template-columns: repeat(2,1fr); gap: 10px; margin: 0 16px 16px; }
+    
+    .rpt-table-wrap { border: none; background: transparent; box-shadow: none; border-radius: 0; overflow: visible; }
+    .rpt-table { display: block !important; width: 100% !important; table-layout: auto !important; }
+    .rpt-table thead { display: none !important; } /* FORCE HIDE HEADERS */
+    .rpt-table tbody { display: block !important; width: 100% !important; }
+    
+    .rpt-table tr { 
+      display: block !important; width: 100% !important;
+      margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 18px; 
+      padding: 16px; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      box-sizing: border-box;
+    }
+    
+    .rpt-table td { 
+      display: flex !important; justify-content: space-between !important; align-items: center !important;
+      padding: 8px 0 !important; border: none !important; width: 100% !important; 
+      text-align: right !important; background: transparent !important;
+    }
+    
+    .rpt-table td::before {
+      content: attr(data-label);
+      font-weight: 800; font-size: 10px; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      margin-right: 12px; flex-shrink: 0; text-align: left;
+    }
+    
+    .rt-name { font-size: 15px; }
+    .rt-amt  { font-size: 15px; }
+    .rp-invoice-btn { margin-left: auto; margin-top: 0; }
+  }
 `;
 
 // ✅ Now accepts pgId, allPgIds, pgs, and ownerId props
@@ -646,18 +687,18 @@ export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
                         <tbody>
                           {rentPmts.map(p => (
                             <tr key={p.id}>
-                              <td>
+                              <td data-label="Date">
                                 <div style={{ fontWeight: '700' }}>{p.paymentDate}</div>
                                 {p.paymentTime && <div style={{ fontSize: '10px', color: '#94a3b8' }}>{p.paymentTime}</div>}
                               </td>
-                              <td><div style={{ fontWeight: '700' }}>{p.tenantName}</div></td>
-                              <td>Room {p.roomNumber}</td>
-                              <td className="rp-t-amt" style={{ color: p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#1e293b' }}>
+                              <td data-label="Tenant"><div style={{ fontWeight: '700' }}>{p.tenantName}</div></td>
+                              <td data-label="Room">Room {p.roomNumber}</td>
+                              <td data-label="Amount" className="rt-amt" style={{ color: p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#1e293b' }}>
                                 ₹{p.amount?.toLocaleString('en-IN')}
                               </td>
-                              <td><span className="rp-pr-method" style={{ marginTop: 0 }}>{p.paymentMethod}</span></td>
-                              <td>
-                                <button className="rp-invoice-btn" style={{ marginTop: 0 }} onClick={() => generateInvoicePDF(p)}>📄 Receipt</button>
+                              <td data-label="Method"><span className="rp-pr-method" style={{ marginTop: 0 }}>{p.paymentMethod}</span></td>
+                              <td data-label="Action">
+                                <button className="rp-invoice-btn" style={{ marginTop: 0, marginLeft: 'auto' }} onClick={() => generateInvoicePDF(p)}>📄 Receipt</button>
                               </td>
                             </tr>
                           ))}
