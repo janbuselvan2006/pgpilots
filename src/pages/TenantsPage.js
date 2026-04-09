@@ -9,8 +9,13 @@ import {
 } from 'firebase/firestore';
 
 // ── Cloudinary config ──
-const CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
-const UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
+const CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'dc6pf89va';
+const UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || 'pgpilots_docs';
+
+console.log('Cloudinary Config Check:', { 
+  cloudName: CLOUD_NAME ? 'Loaded' : 'MISSING', 
+  preset: UPLOAD_PRESET ? 'Loaded' : 'MISSING' 
+});
 
 const DOC_LABELS = [
   'Aadhaar Card', 'PAN Card', 'Rent Agreement',
@@ -331,24 +336,43 @@ function TenantDocsSheet({ tenant, onClose }) {
     formData.append('upload_preset', UPLOAD_PRESET);
     formData.append('folder', `pgpilots/tenants/${tenant.id}`);
     try {
+      if (!CLOUD_NAME || !UPLOAD_PRESET) {
+        throw new Error('Cloudinary config missing in .env (CLOUD_NAME or UPLOAD_PRESET)');
+      }
       setProgress(50);
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, { method: 'POST', body: formData });
       const data = await res.json();
       setProgress(80);
       if (data.secure_url) {
+        // ... success logic ...
         const newDoc = {
           url: data.secure_url, name: selectedFile.name,
           label: selectedLabel, type: selectedFile.type,
           uploadedAt: new Date().toISOString(), publicId: data.public_id,
         };
-        await updateDoc(tenantRef, { documents: arrayUnion(newDoc) });
-        setDocuments(prev => [...prev, newDoc]);
+        try {
+          await updateDoc(tenantRef, { documents: arrayUnion(newDoc) });
+          setDocuments(prev => [...prev, newDoc]);
+        } catch (firestoreErr) {
+          console.error('Firestore document update failed:', firestoreErr);
+          alert('Saved to Cloudinary but failed to update Firestore. Check rules.');
+          setProgress(0);
+          return;
+        }
         setProgress(100);
         setSelectedFile(null);
         fileInputRef.current.value = null;
         setTimeout(() => setProgress(0), 800);
-      } else { alert('Upload failed'); setProgress(0); }
-    } catch (e) { console.error(e); alert('Upload error'); setProgress(0); }
+      } else {
+        console.error('Upload Failed Details:', data);
+        alert(`Cloudinary Error: ${data?.error?.message || 'Unknown Error'}`);
+        setProgress(0);
+      }
+    } catch (e) {
+      console.error('Upload error:', e);
+      alert(`Upload system error: ${e.message}`);
+      setProgress(0);
+    }
     setUploading(false);
   };
 

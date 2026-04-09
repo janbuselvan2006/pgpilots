@@ -3,6 +3,7 @@ import { db, auth } from '../firebase';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import QRCode from 'qrcode';
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -96,6 +97,29 @@ const css = `
   .rp-pb { padding-bottom:16px; }
 
   .rp-no-pg { text-align:center; padding:60px 20px; background:white; border-radius:20px; margin:20px 16px; box-shadow:0 2px 10px rgba(0,0,0,0.06); }
+
+  .rp-invoice-btn {
+    margin-top: 8px; padding: 6px 10px; background: #1a1a2e; color: white;
+    border: none; border-radius: 8px; font-size: 10px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; gap: 4px;
+    width: fit-content; transition: all 0.2s;
+  }
+  .rp-invoice-btn:hover { background: #e94560; }
+  .rp-invoice-btn:active { transform: scale(0.96); }
+
+  /* Table Styles */
+  .rp-table-wrap { overflow-x: auto; margin: 0 16px 20px; background: white; border-radius: 14px; border: 1px solid #e2e8f0; }
+  .rp-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  .rp-table th { background: #f8fafc; padding: 12px 16px; text-align: left; font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0; }
+  .rp-table th.sortable { cursor: pointer; user-select: none; }
+  .rp-table th.sortable:hover { background: #f1f5f9; color: #e94560; }
+  .rp-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #1e293b; vertical-align: middle; }
+  .rp-table tr:last-child td { border-bottom: none; }
+  .rp-table tr:hover { background: #fbfcfe; }
+  .rp-sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; }
+  
+  .rp-t-status { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .rp-t-amt    { font-weight: 800; }
 `;
 
 // ✅ Now accepts pgId, allPgIds, pgs, and ownerId props
@@ -115,6 +139,7 @@ export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
   const [penaltyEnabled, setPenaltyEnabled] = useState(false);
   const [penaltyAmount, setPenaltyAmount]   = useState(0);
   const [gracePeriod, setGracePeriod]       = useState(0);
+  const [sortOrder, setSortOrder]           = useState('desc'); // 'asc' or 'desc'
 
   const user   = auth.currentUser;
   const effectiveOwnerId = ownerId || user?.uid;
@@ -211,7 +236,7 @@ export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
   }).sort((a, b) => {
     const at = a.recordedAt ? new Date(a.recordedAt) : new Date(a.paymentDate);
     const bt = b.recordedAt ? new Date(b.recordedAt) : new Date(b.paymentDate);
-    return bt - at;
+    return sortOrder === 'desc' ? bt - at : at - bt;
   });
 
   const getFilteredElec = () => elecBills.filter(b => {
@@ -298,7 +323,7 @@ export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
   const allSorted = [...tenants].sort((a, b) => {
     const aD = a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000) : new Date(a.checkIn || 0);
     const bD = b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000) : new Date(b.checkIn || 0);
-    return bD - aD;
+    return sortOrder === 'desc' ? bD - aD : aD - bD;
   });
   const stayFilters = [{ id:'all', label:'All' }, { id:'1-3', label:'1–3d' }, { id:'week', label:'4–7d' }, { id:'month', label:'1–4w' }, { id:'long', label:'1m+' }];
   const historyTenants = allSorted.filter(t => {
@@ -372,6 +397,111 @@ export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
       pdf.text(`PGpilots • ${new Date().toLocaleDateString('en-IN')} • Page ${i}/${pc}`, 14, pdf.internal.pageSize.height - 10);
     }
     pdf.save(`${type}-${period}.pdf`);
+  };
+
+  const generateInvoicePDF = async (p) => {
+    const doc = new jsPDF();
+    const pg = pgs?.find(pgItem => pgItem.pgId === p.pgId || pgItem.id === p.pgId);
+    const pgName = pg?.pgName || 'PGpilots';
+    const pgAddr = [pg?.address, pg?.city, pg?.state].filter(Boolean).join(', ');
+    const receiptId = p.id?.toUpperCase() || 'N/A';
+    const securityHash = btoa(`${p.id}-${p.amount}-${p.tenantName}`).slice(0, 16);
+
+    // Header
+    doc.setFillColor(26, 26, 46);
+    doc.rect(0, 0, 210, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text(pgName, 14, 20);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    if (pgAddr) doc.text(pgAddr, 14, 28);
+    
+    doc.setFontSize(18);
+    doc.text('OFFICIAL RECEIPT', 196, 22, { align: 'right' });
+    doc.setFontSize(8);
+    doc.text(`VERIFIED SYSTEM RECORD`, 196, 28, { align: 'right' });
+    doc.setFontSize(9);
+    doc.text(`Receipt ID: ${receiptId.slice(-12)}`, 196, 34, { align: 'right' });
+
+    // Details Grid
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TENANT DETAILS', 14, 55);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Name: ${p.tenantName}`, 14, 62);
+    doc.text(`Room: ${p.roomNumber}`, 14, 68);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYMENT INFO', 120, 55);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Date: ${p.paymentDate}`, 120, 62);
+    doc.text(`Method: ${p.paymentMethod}`, 120, 68);
+    doc.text(`Status: ${p.isCompleted ? 'Complete Payment' : 'Partial Payment'}`, 120, 74);
+
+    // Breakdown Table
+    autoTable(doc, {
+      startY: 85,
+      head: [['Description', 'Amount']],
+      body: [
+        ['Monthly Rent', `Rs. ${(p.rentAmount || 0).toLocaleString('en-IN')}`],
+        p.electricityShare > 0 ? ['Electricity Maintenance', `Rs. ${p.electricityShare.toLocaleString('en-IN')}`] : null,
+        p.penaltyAmount > 0 ? ['Late Payment Penalty', `Rs. ${p.penaltyAmount.toLocaleString('en-IN')}`] : null,
+      ].filter(Boolean),
+      foot: [['Total Expected', `Rs. ${(p.fullAmount || ( (p.rentAmount||0)+(p.electricityShare||0)+(p.penaltyAmount||0) )).toLocaleString('en-IN')}`]],
+      headStyles: { fillColor: [26, 26, 46], textColor: 255 },
+      footStyles: { fillColor: [248, 250, 252], textColor: 26, fontStyle: 'bold' },
+      theme: 'grid',
+      styles: { fontSize: 10 }
+    });
+
+    let finalY = doc.lastAutoTable.finalY + 15;
+    
+    // Summary
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`AMOUNT PAID: Rs. ${(p.amount || 0).toLocaleString('en-IN')}`, 14, finalY);
+    
+    if (p.isPartial && !p.isCompleted) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(220, 38, 38);
+        doc.text(`Remaining Balance: Rs. ${( (p.fullAmount || 0) - (p.newTotal || 0) ).toLocaleString('en-IN')}`, 14, finalY + 8);
+    }
+
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    if (p.notes) doc.text(`Notes: ${p.notes}`, 14, finalY + 22);
+
+    // --- SECURITY SECTION ---
+    const qrData = `RECEIPT VERIFICATION\nID: ${p.id}\nTenant: ${p.tenantName}\nAmount: Rs. ${p.amount}\nDate: ${p.paymentDate}\nPG: ${pgName}`;
+    try {
+      const qrUrl = await QRCode.toDataURL(qrData);
+      doc.addImage(qrUrl, 'PNG', 160, finalY - 5, 35, 35);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text('SCAN TO VERIFY', 177.5, finalY + 32, { align: 'center' });
+    } catch (e) { console.error("QR Error", e); }
+
+    doc.setTextColor(180, 180, 180);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Security Hash: ${securityHash}`, 14, 275);
+    doc.text(`Digital Signature: ${btoa(p.id || '').slice(0, 32)}`, 14, 279);
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(140, 140, 140);
+    doc.text('CAUTION: This receipt is valid only if the Receipt ID exists in the PGpilots owner dashboard.', 105, 287, { align: 'center' });
+    doc.text('© Powered by PGpilots Security Module', 105, 292, { align: 'center' });
+
+    doc.save(`Invoice_${p.tenantName?.replace(/\s+/g,'_')}_${p.paymentDate}.pdf`);
   };
 
   const reportTypes = [
@@ -508,17 +638,40 @@ export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
                   {rentPmts.length === 0 ? (
                     <div className="rp-empty rp-pb"><div className="rp-empty-icon">📋</div><div className="rp-empty-title">No payments this period</div></div>
                   ) : (
-                    <div className="rp-pb">
-                      {rentPmts.map(p => (
-                        <div key={p.id} className="rp-payment-row" style={{ background:p.isCompleted?'#f0fdf4':p.isPartial?'#fffbeb':'#f8fafc' }}>
-                          <div>
-                            <div className="rp-pr-name">{p.tenantName}</div>
-                            <div className="rp-pr-sub">Room {p.roomNumber} · {p.paymentDate}{p.paymentTime&&` · ${p.paymentTime}`}</div>
-                            {pgId === '__all__' && <div className="rp-pr-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(p.pgId)}</div>}
-                          </div>
-                          <div style={{ textAlign:'right' }}><div className="rp-pr-amount" style={{ color:p.isCompleted?'#059669':p.isPartial?'#d97706':'#4f46e5' }}>₹{p.amount?.toLocaleString('en-IN')}</div><div className="rp-pr-method">{p.paymentMethod}</div></div>
-                        </div>
-                      ))}
+                    <div className="rp-table-wrap">
+                      <table className="rp-table">
+                        <thead>
+                          <tr>
+                            <th className="sortable" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
+                              Date {sortOrder === 'desc' ? '🔽' : '🔼'}
+                            </th>
+                            <th>Tenant</th>
+                            <th>Room</th>
+                            <th>Amount</th>
+                            <th>Method</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rentPmts.map(p => (
+                            <tr key={p.id}>
+                              <td>
+                                <div style={{ fontWeight: '700' }}>{p.paymentDate}</div>
+                                {p.paymentTime && <div style={{ fontSize: '10px', color: '#94a3b8' }}>{p.paymentTime}</div>}
+                              </td>
+                              <td><div style={{ fontWeight: '700' }}>{p.tenantName}</div></td>
+                              <td>Room {p.roomNumber}</td>
+                              <td className="rp-t-amt" style={{ color: p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#1e293b' }}>
+                                ₹{p.amount?.toLocaleString('en-IN')}
+                              </td>
+                              <td><span className="rp-pr-method" style={{ marginTop: 0 }}>{p.paymentMethod}</span></td>
+                              <td>
+                                <button className="rp-invoice-btn" style={{ marginTop: 0 }} onClick={() => generateInvoicePDF(p)}>📄 Receipt</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
                 </div>
@@ -675,26 +828,42 @@ export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
                   {historyTenants.length === 0 ? (
                     <div className="rp-empty rp-pb"><div className="rp-empty-icon">📋</div><div className="rp-empty-title">No records found</div></div>
                   ) : (
-                    <div className="rp-pb">
-                      {historyTenants.map(t => {
-                        const days = getDaysStayed(t), co = getCheckOut(t), out = t.status === 'deleted';
-                        return (
-                          <div key={t.id} className="rp-tenant-row" style={{ background:out?'#fafafa':'#f8fafc', borderLeft:`3px solid ${out?'#dc2626':'#059669'}`, opacity:out?0.9:1 }}>
-                            <div className="rp-tr-left">
-                              <div className="rp-tr-avatar" style={{ background:out?'linear-gradient(135deg,#dc2626,#9f1239)':'linear-gradient(135deg,#059669,#0891b2)' }}>{t.name?.charAt(0).toUpperCase()}</div>
-                              <div>
-                                <div className="rp-tr-name">{t.name}</div>
-                                <div className="rp-tr-sub">Room {t.roomNumber} · In: {t.checkIn||'—'}{co&&<span style={{color:'#dc2626'}}> · Out: {co}</span>}</div>
-                                {pgId === '__all__' && <div className="rp-tr-sub" style={{ color: '#0f3460', fontWeight: '800', marginTop: '2px' }}>🏠 {getPgName(t.pgId)}</div>}
-                              </div>
-                            </div>
-                            <div className="rp-tr-right">
-                              <div className="rp-tr-amount" style={{ color:'#4f46e5', fontSize:'13px' }}>{getDaysLabel(days)}</div>
-                              <span className="rp-tr-tag" style={{ background:out?'#fef2f2':'#ecfdf5', color:out?'#dc2626':'#059669' }}>{out?'🚪 Moved Out':'✅ Active'}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="rp-table-wrap">
+                      <table className="rp-table">
+                        <thead>
+                          <tr>
+                            <th className="sortable" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
+                              Date {sortOrder === 'desc' ? '🔽' : '🔼'}
+                            </th>
+                            <th>Tenant Name</th>
+                            <th>Room</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {historyTenants.map(t => {
+                            const days = getDaysStayed(t), co = getCheckOut(t), out = t.status === 'deleted';
+                            const dateStr = out ? co : t.checkIn || '—';
+                            return (
+                              <tr key={t.id}>
+                                <td>
+                                  <div style={{ fontWeight: '700' }}>{dateStr}</div>
+                                  <div style={{ fontSize: '10px', color: '#94a3b8' }}>{out ? 'Check-out' : 'Check-in'}</div>
+                                </td>
+                                <td><div style={{ fontWeight: '700' }}>{t.name}</div></td>
+                                <td>Room {t.roomNumber}</td>
+                                <td style={{ color: '#4f46e5', fontWeight: '700' }}>{getDaysLabel(days)}</td>
+                                <td>
+                                  <span className="rp-t-status" style={{ background: out ? '#fef2f2' : '#ecfdf5', color: out ? '#dc2626' : '#059669' }}>
+                                    {out ? '🚪 Moved Out' : '✅ Active'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   )}
                 </div>

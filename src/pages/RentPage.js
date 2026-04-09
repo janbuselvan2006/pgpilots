@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc } from 'firebase/firestore';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import QRCode from 'qrcode';
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -143,6 +146,40 @@ const css = `
   .pen-preview { background: #fff5f5; border: 1px solid #fecaca; border-radius: 14px; padding: 14px; font-size: 13px; color: #475569; line-height: 1.8; margin-bottom: 16px; }
   .pen-preview-title { font-size: 12px; font-weight: 800; color: #dc2626; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
   .pen-save-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #e94560, #0f3460); color: white; border: none; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+
+  .hc-invoice-btn {
+    margin-top: 10px; padding: 10px 14px; background: #1a1a2e; color: white;
+    border: none; border-radius: 10px; font-size: 11px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    width: fit-content; transition: background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hc-invoice-btn:hover { background: #e94560; }
+  .hc-invoice-btn:active { transform: scale(0.96); }
+
+  /* Table Style for History */
+  .rent-table-wrap { overflow-x: auto; background: white; border-radius: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+  .rent-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+  .rent-table th { background: #f8fafc; padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; }
+  .rent-table td { padding: 16px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #1e293b; vertical-align: middle; }
+  .rent-table tr:last-child td { border-bottom: none; }
+  .rent-table tr:hover { background: #fbfcfe; }
+  .rt-name { font-weight: 800; color: #1a1a2e; }
+  .rt-sub  { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .rt-amt  { font-weight: 800; font-size: 14px; }
+  .rt-badge { font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
+  .rt-method { font-size: 11px; font-weight: 700; color: #4f46e5; background: #eef2ff; padding: 3px 8px; border-radius: 6px; }
+  .rt-action-btn { width: 32px; height: 32px; border-radius: 8px; border: none; background: #1a1a2e; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
+  .rt-action-btn:hover { background: #e94560; transform: translateY(-1px); }
+  .rt-action-btn:active { transform: scale(0.9); }
+
+  .rt-sortable { cursor: pointer; user-select: none; }
+  .rt-sortable:hover { background: #f1f5f9 !important; color: #e94560; }
+
+  .rt-collect-btn { padding: 8px 12px; background: #059669; color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .rt-collect-btn:hover { background: #047857; transform: translateY(-1px); }
+  .rt-pay-btn { padding: 8px 12px; background: #d97706; color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .rt-pay-btn:hover { background: #b45309; transform: translateY(-1px); }
 `;
 
 // ✅ Now accepts pgId, allPgIds, pgs, and ownerId props
@@ -155,11 +192,12 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const [showPenaltySheet, setShowPenaltySheet] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
-  const [filterMonth, setFilterMonth] = useState('');
+  const [saving, setSaving]             = useState(false);
+  const [search, setSearch]             = useState('');
+  const [filterMonth, setFilterMonth]   = useState('');
   const [filterMethod, setFilterMethod] = useState('');
-
+  const [sortOrder, setSortOrder]       = useState('desc');
+  const [ovSortOrder, setOvSortOrder]   = useState('asc'); // for Overview tab
   const [penaltyEnabled, setPenaltyEnabled] = useState(false);
   const [penaltyAmount, setPenaltyAmount] = useState('');
   const [gracePeriod, setGracePeriod] = useState('');
@@ -272,14 +310,33 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
   const isPartial = (t) => { const p = getThisMonthPaid(t.id); return p > 0 && p < getTotalDue(t); };
 
   const unpaid = tenants.filter(t => !isPaid(t));
-  const lateTenants = unpaid.filter(t => getDaysDiff(t) < 0).sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
-  const todayTenants = unpaid.filter(t => getDaysDiff(t) === 0);
-  const upcomingTenants = unpaid.filter(t => getDaysDiff(t) > 0).sort((a, b) => getDaysDiff(a) - getDaysDiff(b));
-  const paidTenants = tenants.filter(t => isPaid(t));
+  const lateTenants     = unpaid.filter(t => getDaysDiff(t) < 0).sort((a,b)=>getDaysDiff(a)-getDaysDiff(b));
+  const todayTenants    = unpaid.filter(t => getDaysDiff(t) === 0);
+  const upcomingTenants = unpaid.filter(t => getDaysDiff(t) > 0).sort((a,b)=>getDaysDiff(a)-getDaysDiff(b));
+  const paidTenants     = tenants.filter(t => isPaid(t));
 
   const totalExpected = tenants.reduce((a, t) => a + getTotalDue(t), 0);
   const totalCollected = tenants.reduce((a, t) => a + getThisMonthPaid(t.id), 0);
   const totalPending = Math.max(0, totalExpected - totalCollected);
+
+  // Ledger Calculations
+  const currMonth = new Date().toLocaleString('default', { month: 'long' });
+  const currYear  = new Date().getFullYear().toString();
+  
+  const rentDues = [...lateTenants, ...todayTenants, ...upcomingTenants].sort((a,b) => {
+    const da = getDaysDiff(a); 
+    const db = getDaysDiff(b);
+    return ovSortOrder === 'desc' ? db - da : da - db;
+  });
+
+  const pendingElecTenants = tenants.filter(t => {
+      if (t.status === 'deleted' || isPaid(t)) return false;
+      return elecBills.some(b => b.roomNumber === t.roomNumber);
+  }).map(t => {
+      const bill = elecBills.find(b => b.roomNumber === t.roomNumber);
+      const share = bill ? Math.round(bill.amount / (bill.tenantCount || 1)) : 0;
+      return { ...t, elecAmount: share, billMonth: bill?.month };
+  }).sort((a,b) => (ovSortOrder === 'desc' ? b.elecAmount - a.elecAmount : a.elecAmount - b.elecAmount));
 
   const handleRecordPayment = (t) => {
     if (pgId === '__all__') return alert('Please select a specific PG to collect rent.');
@@ -333,6 +390,111 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
     setSaving(false);
   };
 
+  const generateInvoicePDF = async (p) => {
+    const doc = new jsPDF();
+    const pg = pgs?.find(pgItem => pgItem.pgId === p.pgId || pgItem.id === p.pgId);
+    const pgName = pg?.pgName || 'PGpilots';
+    const pgAddr = [pg?.address, pg?.city, pg?.state].filter(Boolean).join(', ');
+    const receiptId = p.id?.toUpperCase() || 'N/A';
+    const securityHash = btoa(`${p.id}-${p.amount}-${p.tenantName}`).slice(0, 16);
+
+    // Header
+    doc.setFillColor(26, 26, 46);
+    doc.rect(0, 0, 210, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text(pgName, 14, 20);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    if (pgAddr) doc.text(pgAddr, 14, 28);
+    
+    doc.setFontSize(18);
+    doc.text('OFFICIAL RECEIPT', 196, 22, { align: 'right' });
+    doc.setFontSize(8);
+    doc.text(`VERIFIED SYSTEM RECORD`, 196, 28, { align: 'right' });
+    doc.setFontSize(9);
+    doc.text(`Receipt ID: ${receiptId.slice(-12)}`, 196, 34, { align: 'right' });
+
+    // Details Grid
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TENANT DETAILS', 14, 55);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Name: ${p.tenantName}`, 14, 62);
+    doc.text(`Room: ${p.roomNumber}`, 14, 68);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYMENT INFO', 120, 55);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Date: ${p.paymentDate}`, 120, 62);
+    doc.text(`Method: ${p.paymentMethod}`, 120, 68);
+    doc.text(`Status: ${p.isCompleted ? 'Complete Payment' : 'Partial Payment'}`, 120, 74);
+
+    // Breakdown Table
+    autoTable(doc, {
+      startY: 85,
+      head: [['Description', 'Amount']],
+      body: [
+        ['Monthly Rent', `Rs. ${(p.rentAmount || 0).toLocaleString('en-IN')}`],
+        p.electricityShare > 0 ? ['Electricity Maintenance', `Rs. ${p.electricityShare.toLocaleString('en-IN')}`] : null,
+        p.penaltyAmount > 0 ? ['Late Payment Penalty', `Rs. ${p.penaltyAmount.toLocaleString('en-IN')}`] : null,
+      ].filter(Boolean),
+      foot: [['Total Expected', `Rs. ${(p.fullAmount || ( (p.rentAmount||0)+(p.electricityShare||0)+(p.penaltyAmount||0) )).toLocaleString('en-IN')}`]],
+      headStyles: { fillColor: [26, 26, 46], textColor: 255 },
+      footStyles: { fillColor: [248, 250, 252], textColor: 26, fontStyle: 'bold' },
+      theme: 'grid',
+      styles: { fontSize: 10 }
+    });
+
+    let finalY = doc.lastAutoTable.finalY + 15;
+    
+    // Summary
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`AMOUNT PAID: Rs. ${(p.amount || 0).toLocaleString('en-IN')}`, 14, finalY);
+    
+    if (p.isPartial && !p.isCompleted) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(220, 38, 38);
+        doc.text(`Remaining Balance: Rs. ${( (p.fullAmount || 0) - (p.newTotal || 0) ).toLocaleString('en-IN')}`, 14, finalY + 8);
+    }
+
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    if (p.notes) doc.text(`Notes: ${p.notes}`, 14, finalY + 22);
+
+    // --- SECURITY SECTION ---
+    const qrData = `RECEIPT VERIFICATION\nID: ${p.id}\nTenant: ${p.tenantName}\nAmount: Rs. ${p.amount}\nDate: ${p.paymentDate}\nPG: ${pgName}`;
+    try {
+      const qrUrl = await QRCode.toDataURL(qrData);
+      doc.addImage(qrUrl, 'PNG', 160, finalY - 5, 35, 35);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text('SCAN TO VERIFY', 177.5, finalY + 32, { align: 'center' });
+    } catch (e) { console.error("QR Error", e); }
+
+    doc.setTextColor(180, 180, 180);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Security Hash: ${securityHash}`, 14, 275);
+    doc.text(`Digital Signature: ${btoa(p.id || '').slice(0, 32)}`, 14, 279);
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(140, 140, 140);
+    doc.text('CAUTION: This receipt is valid only if the Receipt ID exists in the PGpilots owner dashboard.', 105, 287, { align: 'center' });
+    doc.text('© Powered by PGpilots Security Module', 105, 292, { align: 'center' });
+
+    doc.save(`Invoice_${p.tenantName?.replace(/\s+/g,'_')}_${p.paymentDate}.pdf`);
+  };
+
   const savePenaltySettings = async () => {
     try {
       await updateDoc(doc(db, 'pgOwners', effectiveOwnerId), {
@@ -348,14 +510,17 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   const filteredPayments = payments.filter(p => {
-    const ms = !search || p.tenantName?.toLowerCase().includes(search.toLowerCase()) || p.roomNumber?.includes(search);
+    const ms = !search || 
+               p.tenantName?.toLowerCase().includes(search.toLowerCase()) || 
+               p.roomNumber?.includes(search) ||
+               p.id?.toLowerCase().includes(search.toLowerCase());
     const mm = !filterMonth || p.month === filterMonth;
     const mmt = !filterMethod || p.paymentMethod === filterMethod;
     return ms && mm && mmt;
   }).sort((a, b) => {
     const at = a.recordedAt ? new Date(a.recordedAt) : new Date(a.paymentDate);
     const bt = b.recordedAt ? new Date(b.recordedAt) : new Date(b.paymentDate);
-    return bt - at;
+    return sortOrder === 'desc' ? bt - at : at - bt;
   });
 
   const TenantCard = ({ tenant, status }) => {
@@ -487,10 +652,87 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
               </div>
             ) : (
               <>
-                <Section title="🟡 Due Today" color="#d97706" items={todayTenants} status="today" />
-                <Section title="🔴 Overdue" color="#dc2626" items={lateTenants} status="late" />
-                <Section title="🟢 Upcoming" color="#4f46e5" items={upcomingTenants} status="upcoming" />
-                <Section title="✅ Paid This Month" color="#059669" items={paidTenants} status="paid" />
+                {/* --- RENT DUES TABLE --- */}
+                <div className="rent-section" style={{ marginTop: '10px' }}>
+                  <div className="rent-section-title">💰 Rent Ledger ({rentDues.length})</div>
+                  {rentDues.length === 0 ? (
+                    <div className="rent-empty" style={{ padding: '40px' }}><div className="rent-empty-icon">✅</div><p className="rent-empty-title">All rent collected!</p></div>
+                  ) : (
+                    <div className="rent-table-wrap">
+                      <table className="rent-table">
+                        <thead>
+                          <tr>
+                            <th className="rt-sortable" onClick={() => setOvSortOrder(ovSortOrder === 'desc' ? 'asc' : 'desc')}>
+                              Urgency {ovSortOrder === 'desc' ? '🔽' : '🔼'}
+                            </th>
+                            <th>Tenant & Room</th>
+                            <th>Amount Due</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rentDues.map(t => {
+                            const diff = getDaysDiff(t);
+                            const balance = getBalance(t);
+                            const color = diff < 0 ? '#dc2626' : diff === 0 ? '#d97706' : '#4f46e5';
+                            return (
+                              <tr key={t.id}>
+                                <td>
+                                  <div style={{ fontWeight: '800', color }}>
+                                    {diff < 0 ? `${Math.abs(diff)}d Overdue` : diff === 0 ? 'Due Today' : `${diff}d Left`}
+                                  </div>
+                                  <div style={{ fontSize: '10px', color: '#94a3b8' }}>Due {getDueDate(t)?.getDate()}th</div>
+                                </td>
+                                <td>
+                                  <div className="rt-name">{t.name}</div>
+                                  <div className="rt-sub">Room {t.roomNumber}</div>
+                                </td>
+                                <td className="rt-amt" style={{ color }}>
+                                  ₹{balance.toLocaleString('en-IN')}
+                                  <div style={{ fontSize: '9px', fontWeight: 'normal', marginTop: '2px' }}>
+                                    {isPartial(t) && <span style={{ color: '#059669' }}>Paid ₹{getThisMonthPaid(t.id).toLocaleString('en-IN')}</span>}
+                                    {getElecShare(t) > 0 && <span style={{ color: '#d97706', marginLeft: isPartial(t) ? '4px' : 0 }}>+ ₹{getElecShare(t)} Elec</span>}
+                                  </div>
+                                </td>
+                                <td>
+                                  <button className="rt-collect-btn" onClick={() => handleRecordPayment(t)}>Collect</button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* --- PAID SECTION --- */}
+                <div className="rent-section" style={{ marginTop: '30px', opacity: 0.8 }}>
+                    <div className="rent-section-title" style={{ color: '#059669' }}>✅ Recently Paid ({paidTenants.length})</div>
+                    <div className="rent-table-wrap">
+                        <table className="rent-table">
+                            <thead>
+                                <tr>
+                                    <th>Tenant & Room</th>
+                                    <th>Total Paid</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paidTenants.slice(0, 5).map(t => (
+                                    <tr key={t.id}>
+                                        <td>
+                                            <div className="rt-name">{t.name}</div>
+                                            <div className="rt-sub">Room {t.roomNumber}</div>
+                                        </td>
+                                        <td className="rt-amt" style={{ color: '#059669' }}>₹{getTotalDue(t).toLocaleString('en-IN')}</td>
+                                        <td><span className="rt-badge" style={{ background: '#ecfdf5', color: '#059669' }}>Complete</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
               </>
             )
           )}
@@ -532,42 +774,61 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
                   <p className="rent-empty-sub">Try clearing filters</p>
                 </div>
               ) : (
-                filteredPayments.map(p => (
-                  <div key={p.id} className="hc" style={{
-                    background: p.isCompleted ? '#f0fdf4' : p.isPartial ? '#fffbeb' : 'white',
-                    borderLeft: `4px solid ${p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#4f46e5'}`,
-                  }}>
-                    <div className="hc-top">
-                      <div className="hc-left">
-                        <div className="hc-avatar" style={{ background: p.isCompleted ? 'linear-gradient(135deg,#059669,#0891b2)' : p.isPartial ? 'linear-gradient(135deg,#d97706,#b45309)' : 'linear-gradient(135deg,#4f46e5,#0891b2)' }}>
-                          {p.tenantName?.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="hc-name">{p.tenantName}</div>
-                          <div className="hc-sub">Room {p.roomNumber} · {p.month} {p.year}</div>
-                        </div>
-                      </div>
-                      <div className="hc-right">
-                        <div className="hc-amount" style={{ color: p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#4f46e5' }}>₹{p.amount?.toLocaleString('en-IN')}</div>
-                        <div className="hc-method">{p.paymentMethod}</div>
-                      </div>
-                    </div>
-                    <div className="hc-tags">
-                      {p.isCompleted && <span className="hc-tag" style={{ background: '#dcfce7', color: '#059669' }}>✅ Complete</span>}
-                      {p.isPartial && !p.isCompleted && <span className="hc-tag" style={{ background: '#fffbeb', color: '#d97706' }}>⚠️ Partial</span>}
-                      {p.penaltyAmount > 0 && <span className="hc-tag" style={{ background: '#fef2f2', color: '#dc2626' }}>🔴 Penalty</span>}
-                      {p.electricityShare > 0 && <span className="hc-tag" style={{ background: '#ecfeff', color: '#0891b2' }}>⚡ Elec</span>}
-                    </div>
-                    <div className="hc-breakdown">
-                      🏠 Rent ₹{(p.rentAmount || 0).toLocaleString('en-IN')}
-                      {p.electricityShare > 0 && <span style={{ color: '#0891b2' }}> · ⚡ ₹{p.electricityShare.toLocaleString('en-IN')}</span>}
-                      {p.penaltyAmount > 0 && <span style={{ color: '#dc2626' }}> · 🔴 ₹{p.penaltyAmount.toLocaleString('en-IN')}</span>}
-                      {p.isPartial && <span style={{ color: '#d97706', display: 'block', marginTop: '3px' }}>Paid ₹{p.newTotal?.toLocaleString('en-IN')} of ₹{p.fullAmount?.toLocaleString('en-IN')}</span>}
-                    </div>
-                    <div className="hc-date">📅 {p.paymentDate}{p.paymentTime && <span> · 🕐 {p.paymentTime}</span>}</div>
-                    {p.notes && <div className="hc-notes">📝 {p.notes}</div>}
-                  </div>
-                ))
+                <div className="rent-table-wrap">
+                  <table className="rent-table">
+                    <thead>
+                      <tr>
+                        <th className="rt-sortable" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
+                          Date & Time {sortOrder === 'desc' ? '🔽' : '🔼'}
+                        </th>
+                        <th>Tenant & Room</th>
+                        <th>Month</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                        <th>Invoice</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPayments.map(p => (
+                        <tr key={p.id}>
+                          <td>
+                            <div style={{ fontWeight: '700' }}>{p.paymentDate}</div>
+                            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{p.paymentTime || '—'}</div>
+                          </td>
+                          <td>
+                            <div className="rt-name">{p.tenantName}</div>
+                            <div className="rt-sub">Room {p.roomNumber}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: '600', color: '#475569' }}>{p.month} {p.year}</div>
+                          </td>
+                          <td>
+                            <div className="rt-amt" style={{ color: p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#4f46e5' }}>
+                              ₹{p.amount?.toLocaleString('en-IN')}
+                            </div>
+                            {p.isPartial && <div style={{ fontSize: '9px', color: '#94a3b8' }}>of ₹{p.fullAmount?.toLocaleString('en-IN')}</div>}
+                          </td>
+                          <td>
+                            <span className="rt-method">{p.paymentMethod}</span>
+                          </td>
+                          <td>
+                            {p.isCompleted ? (
+                              <span className="rt-badge" style={{ background: '#ecfdf5', color: '#059669' }}>Complete</span>
+                            ) : (
+                              <span className="rt-badge" style={{ background: '#fffbeb', color: '#d97706' }}>Partial</span>
+                            )}
+                          </td>
+                          <td>
+                            <button className="rt-action-btn" onClick={() => generateInvoicePDF(p)} title="Generate Invoice">
+                              📄
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
