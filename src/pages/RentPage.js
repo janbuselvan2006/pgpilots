@@ -158,8 +158,13 @@ const css = `
   .hc-invoice-btn:active { transform: scale(0.96); }
 
   /* Table Style for History */
-  .rent-table-wrap { overflow-x: auto; background: white; border-radius: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
-  .rent-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+  /* Table Style for History / Ledger */
+  .rent-table-wrap { background: white; border-radius: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 20px; }
+  .rent-table { width: 100%; border-collapse: collapse; }
+  .rent-table th { background: #f8fafc; padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; }
+  .rent-table td { padding: 16px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #1e293b; vertical-align: middle; }
+  .rent-table tr:last-child td { border-bottom: none; }
+  .rent-table tr:hover { background: #fbfcfe; }
   .rent-table th { background: #f8fafc; padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; }
   .rent-table td { padding: 16px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #1e293b; vertical-align: middle; }
   .rent-table tr:last-child td { border-bottom: none; }
@@ -180,6 +185,29 @@ const css = `
   .rt-collect-btn:hover { background: #047857; transform: translateY(-1px); }
   .rt-pay-btn { padding: 8px 12px; background: #d97706; color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
   .rt-pay-btn:hover { background: #b45309; transform: translateY(-1px); }
+
+  @media (max-width: 640px) {
+    .rent-stats { grid-template-columns: repeat(2,1fr); gap: 10px; margin: -10px 12px 0; }
+    .rent-table thead { display: none; } /* Hide headers on mobile */
+    .rent-table, .rent-table tbody, .rent-table tr, .rent-table td { display: block; width: 100%; }
+    
+    .rent-table tr { 
+      margin: 12px; border: 1.5px solid #f1f5f9; border-radius: 16px; 
+      padding: 12px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .rent-table td { 
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0 !important; border: none !important; text-align: right; box-sizing: border-box;
+    }
+    .rent-table td::before {
+      content: attr(data-label);
+      float: left; font-weight: 700; font-size: 10px; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .rt-name { font-size: 14px; }
+    .rt-amt { font-size: 16px; }
+    .rt-action-btn { margin-left: auto; }
+  }
 
   @media (max-width: 640px) {
     .rent-stats { grid-template-columns: repeat(2,1fr); gap: 10px; margin: -10px 12px 0; }
@@ -695,25 +723,25 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
                             const color = diff < 0 ? '#dc2626' : diff === 0 ? '#d97706' : '#4f46e5';
                             return (
                               <tr key={t.id}>
-                                <td>
+                                <td data-label="Urgency">
                                   <div style={{ fontWeight: '800', color }}>
                                     {diff < 0 ? `${Math.abs(diff)}d Overdue` : diff === 0 ? 'Due Today' : `${diff}d Left`}
                                   </div>
-                                  <div style={{ fontSize: '10px', color: '#94a3b8' }}>Due {getDueDate(t)?.getDate()}th</div>
+                                  <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 'normal' }}>Due {getDueDate(t)?.getDate()}th</div>
                                 </td>
-                                <td>
+                                <td data-label="Tenant">
                                   <div className="rt-name">{t.name}</div>
                                   <div className="rt-sub">Room {t.roomNumber}</div>
                                 </td>
-                                <td className="rt-amt" style={{ color }}>
+                                <td data-label="Amount Due" className="rt-amt" style={{ color }}>
                                   ₹{balance.toLocaleString('en-IN')}
                                   <div style={{ fontSize: '9px', fontWeight: 'normal', marginTop: '2px' }}>
                                     {isPartial(t) && <span style={{ color: '#059669' }}>Paid ₹{getThisMonthPaid(t.id).toLocaleString('en-IN')}</span>}
                                     {getElecShare(t) > 0 && <span style={{ color: '#d97706', marginLeft: isPartial(t) ? '4px' : 0 }}>+ ₹{getElecShare(t)} Elec</span>}
                                   </div>
                                 </td>
-                                <td>
-                                  <button className="rt-collect-btn" onClick={() => handleRecordPayment(t)}>Collect</button>
+                                <td data-label="Action">
+                                  <button className="rt-collect-btn" style={{ marginLeft: 'auto' }} onClick={() => handleRecordPayment(t)}>Collect</button>
                                 </td>
                               </tr>
                             );
@@ -810,35 +838,35 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
                     <tbody>
                       {filteredPayments.map(p => (
                         <tr key={p.id}>
-                          <td>
+                          <td data-label="Date & Time">
                             <div style={{ fontWeight: '700' }}>{p.paymentDate}</div>
-                            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{p.paymentTime || '—'}</div>
+                            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 'normal' }}>{p.paymentTime || '—'}</div>
                           </td>
-                          <td>
+                          <td data-label="Tenant">
                             <div className="rt-name">{p.tenantName}</div>
                             <div className="rt-sub">Room {p.roomNumber}</div>
                           </td>
-                          <td>
+                          <td data-label="For Month">
                             <div style={{ fontWeight: '600', color: '#475569' }}>{p.month} {p.year}</div>
                           </td>
-                          <td>
+                          <td data-label="Amount">
                             <div className="rt-amt" style={{ color: p.isCompleted ? '#059669' : p.isPartial ? '#d97706' : '#4f46e5' }}>
                               ₹{p.amount?.toLocaleString('en-IN')}
                             </div>
-                            {p.isPartial && <div style={{ fontSize: '9px', color: '#94a3b8' }}>of ₹{p.fullAmount?.toLocaleString('en-IN')}</div>}
+                            {p.isPartial && <div style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 'normal' }}>of ₹{p.fullAmount?.toLocaleString('en-IN')}</div>}
                           </td>
-                          <td>
+                          <td data-label="Method">
                             <span className="rt-method">{p.paymentMethod}</span>
                           </td>
-                          <td>
+                          <td data-label="Status">
                             {p.isCompleted ? (
                               <span className="rt-badge" style={{ background: '#ecfdf5', color: '#059669' }}>Complete</span>
                             ) : (
                               <span className="rt-badge" style={{ background: '#fffbeb', color: '#d97706' }}>Partial</span>
                             )}
                           </td>
-                          <td>
-                            <button className="rt-action-btn" onClick={() => generateInvoicePDF(p)} title="Generate Invoice">
+                          <td data-label="Invoice">
+                            <button className="rt-action-btn" style={{ marginLeft: 'auto' }} onClick={() => generateInvoicePDF(p)} title="Generate Invoice">
                               📄
                             </button>
                           </td>
