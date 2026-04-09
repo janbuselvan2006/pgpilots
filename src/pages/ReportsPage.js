@@ -108,15 +108,6 @@ const css = `
   .rp-invoice-btn:active { transform: scale(0.96); }
 
   /* Table Styles */
-  .rp-table-wrap { overflow-x: auto; margin: 0 16px 20px; background: white; border-radius: 14px; border: 1px solid #e2e8f0; }
-  .rp-table { width: 100%; border-collapse: collapse; min-width: 600px; }
-  .rp-table th { background: #f8fafc; padding: 12px 16px; text-align: left; font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0; }
-  .rp-table th.sortable { cursor: pointer; user-select: none; }
-  .rp-table th.sortable:hover { background: #f1f5f9; color: #e94560; }
-  .rp-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #1e293b; vertical-align: middle; }
-  .rp-table tr:last-child td { border-bottom: none; }
-  .rp-table tr:hover { background: #fbfcfe; }
-  .rp-sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; }
   
   .rp-t-status { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
   .rp-t-amt    { font-weight: 800; }

@@ -180,6 +180,24 @@ const css = `
   .rt-collect-btn:hover { background: #047857; transform: translateY(-1px); }
   .rt-pay-btn { padding: 8px 12px; background: #d97706; color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
   .rt-pay-btn:hover { background: #b45309; transform: translateY(-1px); }
+
+  @media (max-width: 640px) {
+    .rent-stats { grid-template-columns: repeat(2,1fr); gap: 10px; margin: -10px 12px 0; }
+    .rent-stat { border-right: none; border-bottom: 1px solid #f1f5f9; }
+    .rent-stat:nth-child(even) { border-right: none; }
+    .rent-stat:nth-last-child(-n+2) { border-bottom: none; }
+
+    .rent-table { min-width: 500px; } 
+    .rt-name { font-size: 13px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rt-amt { font-size: 14px; }
+    .rt-badge { padding: 3px 6px; font-size: 9px; }
+    
+    .rent-table-wrap::after {
+      content: '↔ Scroll for more';
+      display: block; text-align: center; font-size: 10px; color: #94a3b8;
+      padding: 8px; background: #f8fafc; border-top: 1px dashed #e2e8f0;
+    }
+  }
 `;
 
 // ✅ Now accepts pgId, allPgIds, pgs, and ownerId props
