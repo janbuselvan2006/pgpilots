@@ -493,20 +493,32 @@ export default function Dashboard() {
           }
         });
 
-      // Recent activity — latest 5 tenants by check-in
-      const sorted = [...tenants].sort((a, b) => {
-        const da = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-        const db_ = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-        return db_ - da;
-      }).slice(0, 5);
-
-      setRecentActivity(sorted.map(t => ({
+      const sortedTenants = tenants.map(t => ({
+        type: 'tenant',
         icon: '👤',
         bg: '#eff6ff',
         text: `${t.name} joined — Room ${t.roomNumber || t.room || '?'}${pgId === ALL_PGS_ID ? ` · ${getPgName(t.pgId)}` : ''}`,
-        time: timeAgo(t.createdAt),
-      })));
+        date: t.createdAt?.toDate ? t.createdAt.toDate() : new Date(t.createdAt || 0),
+      }));
 
+      const sortedPayments = payments.map(p => ({
+        type: 'payment',
+        icon: '💰',
+        bg: '#ecfdf5',
+        text: `${p.tenantName} paid ₹${p.amount?.toLocaleString('en-IN')}${pgId === ALL_PGS_ID ? ` · ${getPgName(p.pgId)}` : ''}`,
+        date: p.recordedAt ? new Date(p.recordedAt) : new Date(p.paymentDate || 0),
+      }));
+
+      const nowTime = new Date().getTime();
+      const oneDay = 24 * 60 * 60 * 1000;
+
+      const combinedActivity = [...sortedTenants, ...sortedPayments]
+        .filter(item => (nowTime - item.date.getTime()) <= oneDay)
+        .sort((a, b) => b.date - a.date)
+        .slice(0, 10)
+        .map(item => ({ ...item, time: timeAgo(item.date) }));
+
+      setRecentActivity(combinedActivity);
       setPendingList(pending.slice(0, 5));
       setDashStats({
         totalTenants: tenants.length,
@@ -864,12 +876,14 @@ export default function Dashboard() {
                           <div className="db-pending-count">{pendingList.length} tenants</div>
                         </div>
                         {pendingList.map((p, i) => {
-                          const requestedToday = p.reminderRequestedAt && 
-                            (p.reminderRequestedAt.toDate ? p.reminderRequestedAt.toDate() : new Date(p.reminderRequestedAt)).toDateString() === new Date().toDateString();
+                          const remDate = p.reminderRequestedAt?.toDate ? p.reminderRequestedAt.toDate() : (p.reminderRequestedAt ? new Date(p.reminderRequestedAt) : null);
+                          const isSentThisPeriod = remDate && 
+                            remDate.getMonth() === new Date().getMonth() && 
+                            remDate.getFullYear() === new Date().getFullYear();
 
                           const handleRemindClick = async (e, tenant) => {
                             e.stopPropagation();
-                            if (requestedToday) return;
+                            if (isSentThisPeriod) return;
                             try {
                               const { updateDoc, doc: fsDoc, serverTimestamp } = await import('firebase/firestore');
                               await updateDoc(fsDoc(db, 'tenants', tenant.id), {
@@ -905,24 +919,24 @@ export default function Dashboard() {
                                 </div>
                                 <button 
                                   onClick={(e) => handleRemindClick(e, p)}
-                                  disabled={requestedToday}
+                                  disabled={isSentThisPeriod}
                                   style={{
                                     padding: '8px 12px',
                                     borderRadius: '10px',
                                     border: 'none',
-                                    background: requestedToday ? '#f1f5f9' : 'linear-gradient(135deg, #25d366, #128c7e)',
-                                    color: requestedToday ? '#94a3b8' : 'white',
+                                    background: isSentThisPeriod ? '#f1f5f9' : 'linear-gradient(135deg, #25d366, #128c7e)',
+                                    color: isSentThisPeriod ? '#94a3b8' : 'white',
                                     fontSize: '11px',
                                     fontWeight: '800',
-                                    cursor: requestedToday ? 'default' : 'pointer',
+                                    cursor: isSentThisPeriod ? 'default' : 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     minWidth: '70px',
-                                    boxShadow: requestedToday ? 'none' : '0 4px 12px rgba(37,211,102,0.2)'
+                                    boxShadow: isSentThisPeriod ? 'none' : '0 4px 12px rgba(37,211,102,0.2)'
                                   }}
                                 >
-                                  {requestedToday ? '✅ OK' : '📲 Remind'}
+                                  {isSentThisPeriod ? '✅ OK' : '📲 Remind'}
                                 </button>
                               </div>
                             </div>

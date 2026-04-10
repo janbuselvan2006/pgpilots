@@ -189,11 +189,25 @@ export default function TodayDues({ pgId }) {
     try {
       const todayDate = new Date().getDate();
 
-      const tSnap = await getDocs(query(collection(db, 'tenants'), where('pgId', '==', pgId)));
+      const [tSnap, pSnap] = await Promise.all([
+        getDocs(query(collection(db, 'tenants'), where('pgId', '==', pgId))),
+        getDocs(query(collection(db, 'payments'), 
+          where('pgId', '==', pgId),
+          where('month', '==', thisMonth),
+          where('year', '==', thisYear)
+        ))
+      ]);
+
       const allTenants = tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted');
+      const allPmts    = pSnap.docs.map(d => d.data());
 
       const dueToday = allTenants.filter(t => {
         if (!t.checkIn || !t.reminderRequestedAt) return false;
+        
+        // Hide if already paid full rent this month
+        const hasPaid = allPmts.some(p => p.tenantId === t.id && p.isCompleted);
+        if (hasPaid) return false;
+
         const reqDate = t.reminderRequestedAt.toDate ? t.reminderRequestedAt.toDate() : new Date(t.reminderRequestedAt);
         return reqDate.toDateString() === new Date().toDateString();
       });

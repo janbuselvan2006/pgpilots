@@ -234,9 +234,9 @@ const css = `
     .excel-view .rent-table-wrap { 
       overflow-x: auto; -webkit-overflow-scrolling: touch; 
       background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin: 0;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
-    .excel-view .rent-table { display: table !important; min-width: 650px; border-collapse: collapse; }
+    .excel-view .rent-table { display: table !important; min-width: 800px; border-collapse: collapse; }
     .excel-view .rent-table thead { display: table-header-group !important; }
     .excel-view .rent-table tbody { display: table-row-group !important; }
     
@@ -246,19 +246,23 @@ const css = `
     }
     
     .excel-view .rent-table th, .excel-view .rent-table td { 
-      display: table-cell !important; padding: 12px 10px !important; 
+      display: table-cell !important; padding: 16px 24px !important; 
       border-bottom: 1px solid #f1f5f9 !important; text-align: left !important;
-      font-size: 12px !important; white-space: nowrap !important;
-      width: auto !important;
+      font-size: 13px !important; white-space: nowrap !important;
+      vertical-align: middle !important;
+    }
+    .excel-view .rent-table th { 
+      background: #f8fafc; font-weight: 800; color: #64748b; font-size: 10px !important;
+      text-transform: uppercase; letter-spacing: 1px;
     }
     
     .excel-view .rent-table td::before { display: none !important; }
     
-    .excel-view .rt-name { font-size: 13px; }
-    .excel-view .rt-amt  { font-size: 13px; }
-    .excel-view .rt-sub, .excel-view .rt-badge, .excel-view .rt-method { font-size: 10px; }
-    .excel-view .rt-action-btn { width: 28px; height: 28px; font-size: 12px; }
-    .excel-view .rt-collect-btn { padding: 6px 10px; font-size: 10px; }
+    .excel-view .rt-name { font-size: 14px; font-weight: 700; }
+    .excel-view .rt-amt  { font-size: 14px; font-weight: 800; }
+    .excel-view .rt-sub, .excel-view .rt-badge, .excel-view .rt-method { font-size: 11px; }
+    .excel-view .rt-action-btn { width: 32px; height: 32px; font-size: 12px; }
+    .excel-view .rt-collect-btn { padding: 8px 14px; font-size: 12px; }
     
     .excel-view .rent-tab { padding: 8px 4px; font-size: 12px; }
     .excel-view .rent-topbar { padding: 15px 15px 22px; }

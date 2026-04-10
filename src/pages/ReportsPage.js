@@ -108,11 +108,11 @@ const css = `
   .rp-invoice-btn:active { transform: scale(0.96); }
 
   /* --- PRO TABLE / LEDGER STYLES --- */
-  .rpt-table-wrap { background: white; border-radius: 18px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-  .rpt-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .rpt-table thead th { background: #f8fafc; padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; }
-  .rpt-table td { padding: 16px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #1e293b; vertical-align: middle; }
-  .rpt-table tr:last-child td { border-bottom: none; }
+  .rp-table-wrap { background: white; border-radius: 18px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+  .rp-table { width: 100%; border-collapse: collapse; }
+  .rp-table thead th { background: #f8fafc; padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #e2e8f0; }
+  .rp-table td { padding: 16px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #1e293b; vertical-align: middle; }
+  .rp-table tr:last-child td { border-bottom: none; }
   
   .rt-name { font-weight: 800; color: #1a1a2e; font-size: 14px; }
   .rt-sub  { font-size: 10px; color: #94a3b8; margin-top: 2px; }
@@ -121,27 +121,25 @@ const css = `
 
   /* --- MOBILE ZERO-SCROLL CARDS --- */
   @media (max-width: 640px) {
-    .rpt-stats { grid-template-columns: repeat(2,1fr); gap: 10px; margin: 0 16px 16px; }
+    .rp-table-wrap { border: none; background: transparent; box-shadow: none; border-radius: 0; overflow: visible; }
+    .rp-table { display: block !important; width: 100% !important; }
+    .rp-table thead { display: none !important; } /* FORCE HIDE HEADERS */
+    .rp-table tbody { display: block !important; width: 100% !important; }
     
-    .rpt-table-wrap { border: none; background: transparent; box-shadow: none; border-radius: 0; overflow: visible; }
-    .rpt-table { display: block !important; width: 100% !important; table-layout: auto !important; }
-    .rpt-table thead { display: none !important; } /* FORCE HIDE HEADERS */
-    .rpt-table tbody { display: block !important; width: 100% !important; }
-    
-    .rpt-table tr { 
+    .rp-table tr { 
       display: block !important; width: 100% !important;
       margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 18px; 
       padding: 16px; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
       box-sizing: border-box;
     }
     
-    .rpt-table td { 
+    .rp-table td { 
       display: flex !important; justify-content: space-between !important; align-items: center !important;
       padding: 8px 0 !important; border: none !important; width: 100% !important; 
       text-align: right !important; background: transparent !important;
     }
     
-    .rpt-table td::before {
+    .rp-table td::before {
       content: attr(data-label);
       font-weight: 800; font-size: 10px; color: #94a3b8;
       text-transform: uppercase; letter-spacing: 0.6px;
@@ -160,33 +158,38 @@ const css = `
     .excel-view .rp-stat-val { font-size: 9px !important; }
     .excel-view .rp-stat-label { font-size: 6px !important; }
     
-    .excel-view .rpt-table-wrap { 
+    .excel-view .rp-table-wrap { 
       overflow-x: auto; -webkit-overflow-scrolling: touch; 
       background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin: 0;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
-    .excel-view .rpt-table { display: table !important; min-width: 600px; table-layout: auto !important; }
-    .excel-view .rpt-table thead { display: table-header-group !important; }
-    .excel-view .rpt-table tbody { display: table-row-group !important; }
+    .excel-view .rp-table { display: table !important; min-width: 850px; table-layout: auto !important; }
+    .excel-view .rp-table thead { display: table-header-group !important; }
+    .excel-view .rp-table tbody { display: table-row-group !important; }
     
-    .excel-view .rpt-table tr { 
+    .excel-view .rp-table tr { 
       display: table-row !important; border: none !important; 
       margin-bottom: 0; padding: 0; background: transparent; box-shadow: none;
     }
     
-    .excel-view .rpt-table th, .excel-view .rpt-table td { 
-      display: table-cell !important; padding: 10px 8px !important; 
+    .excel-view .rp-table th, .excel-view .rp-table td { 
+      display: table-cell !important; padding: 16px 24px !important; 
       border-bottom: 1px solid #f1f5f9 !important; text-align: left !important;
-      font-size: 11px !important; white-space: nowrap !important;
-      width: auto !important;
+      font-size: 13px !important; white-space: nowrap !important;
+      vertical-align: top !important;
+    }
+    .excel-view .rp-table th { 
+      background: #f8fafc; font-weight: 800; color: #64748b; font-size: 10px !important;
+      text-transform: uppercase; letter-spacing: 1px;
     }
     
-    .excel-view .rpt-table td::before { display: none !important; }
+    .excel-view .rp-table td::before { display: none !important; }
     
-    .excel-view .rt-name { font-size: 12px; }
-    .excel-view .rt-amt  { font-size: 12px; }
-    .excel-view .rt-sub { font-size: 9px; }
-    .excel-view .rp-invoice-btn { padding: 4px 8px; font-size: 9px; }
+    .excel-view .rt-name { font-size: 14px; font-weight: 700; }
+    .excel-view .rt-amt  { font-size: 14px; font-weight: 800; }
+    .excel-view .rt-amt  { font-size: 14px; font-weight: 800; }
+    .excel-view .rt-sub { font-size: 11px; }
+    .excel-view .rp-invoice-btn { padding: 6px 12px; font-size: 11px; }
   }
 
   .view-toggle-btn {

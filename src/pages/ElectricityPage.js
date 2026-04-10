@@ -28,6 +28,42 @@ const css = `
   .el-tab  { flex:1; padding:10px 8px; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; background:transparent; color:#94a3b8; font-family:inherit; transition:all 0.2s; -webkit-tap-highlight-color:transparent; }
   .el-tab.active { background:linear-gradient(135deg,#e94560,#0f3460); color:white; }
 
+  .ef-month-scroll { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .ef-month-scroll::-webkit-scrollbar { display:none; }
+  .ef-month-chip { white-space:nowrap; padding:8px 16px; border-radius:10px; border:1.5px solid #e2e8f0; background:white; font-size:13px; font-weight:700; color:#64748b; cursor:pointer; font-family:inherit; flex-shrink:0; transition:all 0.2s; -webkit-tap-highlight-color:transparent; }
+  .ef-month-chip.active { background:linear-gradient(135deg,#e94560,#0f3460); color:white; border-color:transparent; }
+
+  .view-toggle-btn {
+    padding: 8px 14px; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 12px; color: white; font-size: 12px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+  }
+  .view-toggle-btn.active { background: #e94560; border-color: #e94560; }
+
+  @media (max-width: 640px) {
+    .el-stats { grid-template-columns: repeat(2,1fr); gap: 10px; margin: -10px 12px 14px; }
+    .el-stat { border-right: none; border-bottom: 1px solid #f1f5f9; padding: 14px 8px; }
+    .el-stat:last-child { border-bottom: none; }
+
+    .excel-view .el-table-wrap { 
+      overflow-x: auto; -webkit-overflow-scrolling: touch; 
+      background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin: 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      width: 100%;
+    }
+    .excel-view .el-table { display: table !important; min-width: 800px; border-collapse: collapse; }
+    .excel-view .el-table th, .excel-view .el-table td { 
+      padding: 16px 24px !important; 
+      border-bottom: 1px solid #f1f5f9 !important; text-align: left !important;
+      font-size: 13px !important; white-space: nowrap !important;
+      vertical-align: middle !important;
+    }
+    .excel-view .el-table th { 
+      background: #f8fafc; font-weight: 800; color: #64748b; font-size: 10px !important;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+  }
+
   .el-info-banner { background:linear-gradient(135deg,#fffbeb,#fef3c7); border:1px solid #fde68a; border-radius:14px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:flex-start; gap:10px; }
   .el-info-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
   .el-info-text { font-size:12px; color:#92400e; font-weight:500; line-height:1.6; }
@@ -125,6 +161,21 @@ export default function ElectricityPage({ pgId, allPgIds, pgs, ownerId }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving]     = useState(false);
   const [activeTab, setActiveTab] = useState('bills');
+  const [isExcelView, setIsExcelView] = useState(() => localStorage.getItem('pgManagement_globalViewMode') === 'excel');
+
+  const toggleViewMode = () => {
+    const next = !isExcelView;
+    setIsExcelView(next);
+    localStorage.setItem('pgManagement_globalViewMode', next ? 'excel' : 'card');
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  useEffect(() => {
+    const sync = () => setIsExcelView(localStorage.getItem('pgManagement_globalViewMode') === 'excel');
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, []);
+
   const [form, setForm] = useState({
     roomNumber: '', amount: '',
     month:  new Date().toLocaleString('default', { month: 'long' }),
@@ -259,7 +310,7 @@ export default function ElectricityPage({ pgId, allPgIds, pgs, ownerId }) {
   return (
     <>
       <style>{css}</style>
-      <div className="el-root">
+      <div className={`el-root ${isExcelView ? 'excel-view' : ''}`}>
 
         <div className="el-topbar">
           <div className="el-topbar-row">
@@ -267,10 +318,15 @@ export default function ElectricityPage({ pgId, allPgIds, pgs, ownerId }) {
               <h1 className="el-page-title">Electricity</h1>
               <p className="el-page-sub">{roomsBilled}/{rooms.length} rooms billed · {currentMonth}</p>
             </div>
-            <button className="el-add-fab" onClick={() => {
-              if (pgId === '__all__') return alert('Please select a specific PG to add electricity bills.');
-              setShowForm(true);
-            }}>⚡</button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button className={`view-toggle-btn ${isExcelView ? 'active' : ''}`} onClick={toggleViewMode}>
+                {isExcelView ? '📊 Table' : '🎴 Cards'}
+              </button>
+              <button className="el-add-fab" onClick={() => {
+                if (pgId === '__all__') return alert('Please select a specific PG to add electricity bills.');
+                setShowForm(true);
+              }}>⚡</button>
+            </div>
           </div>
         </div>
 
@@ -313,6 +369,34 @@ export default function ElectricityPage({ pgId, allPgIds, pgs, ownerId }) {
                 <p className="el-empty-title">No bills for {currentMonth}</p>
                 <p className="el-empty-sub">Tap ⚡ to add room electricity charges</p>
                 <button className="el-empty-btn" onClick={() => setShowForm(true)}>⚡ Add Bill</button>
+              </div>
+            ) : isExcelView ? (
+              <div className="el-table-wrap">
+                <table className="el-table">
+                  <thead>
+                    <tr>
+                      <th>Room</th>
+                      <th>Period</th>
+                      <th>Tenants</th>
+                      <th>Reading Date</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {thisMonthBills.map(bill => {
+                      const pgInfo = pgId === '__all__' ? ` (${getPgName(bill.pgId)})` : '';
+                      return (
+                        <tr key={bill.id}>
+                          <td style={{ fontWeight: '800' }}>Room {bill.roomNumber}{pgInfo}</td>
+                          <td>{bill.month} {bill.year}</td>
+                          <td style={{ fontWeight: '700' }}>{bill.tenantCount || 0} tenants</td>
+                          <td style={{ fontSize: '12px' }}>{bill.readingDate}</td>
+                          <td style={{ fontWeight: '800', color: '#d97706' }}>₹{bill.amount?.toLocaleString('en-IN')}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             ) : (
               thisMonthBills.map(bill => {

@@ -300,12 +300,28 @@ const css = `
   .tnt-action-btn:active { transform: scale(0.9); }
 
   @media (max-width: 640px) {
-    .tn-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; margin: 0 -4px; width: calc(100% + 8px); }
-    .tn-table { min-width: 800px; }
-    .tn-table th, .tn-table td { padding: 10px 8px; font-size: 12px; }
-    .tn-stats { grid-template-columns: repeat(2,1fr); }
-    .tn-stat { border-bottom: 1px solid #f1f5f9; }
-    .tn-stat:nth-child(even) { border-right: none; }
+    .tn-stats { grid-template-columns: repeat(2,1fr); gap: 10px; margin: -10px 12px 14px; }
+    .tn-stat { border-right: none; border-bottom: 1px solid #f1f5f9; padding: 14px 8px; }
+    .tn-stat:last-child { border-bottom: none; }
+
+    /* Excel view table styling */
+    .excel-view .tn-table-wrap { 
+      overflow-x: auto; -webkit-overflow-scrolling: touch; 
+      background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin: 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      width: 100%;
+    }
+    .excel-view .tn-table { display: table !important; min-width: 850px; border-collapse: collapse; }
+    .excel-view .tn-table th, .excel-view .tn-table td { 
+      padding: 16px 24px !important; 
+      border-bottom: 1px solid #f1f5f9 !important; text-align: left !important;
+      font-size: 13px !important; white-space: nowrap !important;
+      vertical-align: middle !important;
+    }
+    .excel-view .tn-table th { 
+      background: #f8fafc; font-weight: 800; color: #64748b; font-size: 10px !important;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
   }
 `;
 
@@ -906,7 +922,60 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
                 </button>
               )}
             </div>
+          ) : isExcelView ? (
+            /* --- EXCEL TABLE VIEW --- */
+            <div className="tn-table-wrap">
+              <table className="tn-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Room & Bed</th>
+                    <th>Rent</th>
+                    <th>Deposit</th>
+                    <th>Check-In</th>
+                    <th>ID Info</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(tenant => (
+                    <tr key={tenant.id}>
+                      <td>
+                        <div style={{ fontWeight: '700', fontSize: '14px' }}>{tenant.name}</div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>📞 {tenant.phone}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: '700' }}>Room {tenant.roomNumber}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>Bed {tenant.bedNumber || 'N/A'}</div>
+                      </td>
+                      <td style={{ fontWeight: '700', color: '#4f46e5' }}>₹{(tenant.monthlyRent || 0).toLocaleString('en-IN')}</td>
+                      <td style={{ fontWeight: '700', color: '#d97706' }}>₹{(tenant.deposit || 0).toLocaleString('en-IN')}</td>
+                      <td style={{ fontSize: '12px' }}>{tenant.checkIn || tenant.dateOfJoining || 'N/A'}</td>
+                      <td>
+                        <div style={{ fontWeight: '600', fontSize: '12px' }}>{tenant.idType || 'ID'}</div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>{tenant.idNumber || '—'}</div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="tnt-action-btn" title="Admission PDF" onClick={async () => {
+                            if (tenant.onboardingPdfUrl) {
+                              window.open(tenant.onboardingPdfUrl, '_blank', 'noopener,noreferrer');
+                            } else {
+                              const docPdf = buildPdf(tenant);
+                              docPdf.save(`${tenant.admissionNumber || tenant.name}_form.pdf`);
+                            }
+                          }}>📄</button>
+                          <button className="tnt-action-btn" onClick={() => handleEdit(tenant)}>✏️</button>
+                          <button className="tnt-action-btn" style={{ color: '#dc2626' }} onClick={() => setDeleteTarget(tenant)}>🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
+            /* --- STANDARD CARD VIEW --- */
             <div className="tn-tenants-grid">
               {filtered.map(tenant => (
                 <div key={tenant.id} className="tc">
@@ -952,24 +1021,22 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
                     )}
 
                     <div className="tc-footer">
-                      {/* ── 📂 Docs button ── */}
                       <button className="tc-docs-btn" onClick={() => setDocsTenant(tenant)}>
                         📂 Docs
                       </button>
-                      {tenant.onboardingPdfUrl && (
-                        <button
-                          className="tc-pdf-btn"
-                          onClick={async () => {
-                            try {
-                              window.open(tenant.onboardingPdfUrl, '_blank', 'noopener,noreferrer');
-                            } catch (e) {
-                              alert('Failed to open PDF. Please try again.');
-                            }
-                          }}
-                        >
-                          ⬇️ PDF
-                        </button>
-                      )}
+                      <button
+                        className="tc-pdf-btn"
+                        onClick={async () => {
+                          if (tenant.onboardingPdfUrl) {
+                            window.open(tenant.onboardingPdfUrl, '_blank', 'noopener,noreferrer');
+                          } else {
+                            const docPdf = buildPdf(tenant);
+                            docPdf.save(`${tenant.admissionNumber || tenant.name}_form.pdf`);
+                          }
+                        }}
+                      >
+                        ⬇️ PDF
+                      </button>
                       <button className="tc-edit-btn" onClick={() => handleEdit(tenant)}>✏️ Edit</button>
                       <button className="tc-del-btn" onClick={() => setDeleteTarget(tenant)}>🗑️</button>
                     </div>
@@ -1256,9 +1323,22 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
                   </div>
                 </div>
 
-                <button className="fs-save-btn" onClick={handleSave} disabled={saving}>
-                  {saving ? 'Saving…' : editId ? '✏️ Update Tenant' : '💾 Save Tenant'}
-                </button>
+                <div className="fs-btn-row" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginTop: '10px' }}>
+                  <button className="fs-save-btn" onClick={handleSave} disabled={saving}>
+                    {saving ? 'Saving…' : editId ? '✏️ Update' : '💾 Save Tenant'}
+                  </button>
+                  <button className="fs-pdf-btn" style={{ 
+                    padding: '14px', borderRadius: '14px', border: '1.5px solid #e2e8f0', 
+                    background: 'white', color: '#1e293b', fontWeight: '700', fontSize: '14px',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                  }} onClick={() => {
+                    if (!form.name || !form.roomNumber) return alert('Please enter at least Name and Room Number to generate PDF.');
+                    const docPdf = buildPdf({ ...form, family });
+                    docPdf.save(`${form.name || 'Tenant'}_Admission_Form.pdf`);
+                  }}>
+                    <span>⬇️ PDF</span>
+                  </button>
+                </div>
               </div>
             </div>
           </>
