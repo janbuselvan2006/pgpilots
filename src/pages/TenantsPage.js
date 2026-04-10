@@ -280,6 +280,33 @@ const css = `
   .docs-actions   { display: flex; gap: 6px; flex-shrink: 0; }
   .docs-action-btn { padding: 6px 11px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; font-family: inherit; }
   .docs-empty { text-align: center; padding: 32px 20px; color: #94a3b8; font-size: 13px; background: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9; }
+
+  .view-toggle-btn {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px; padding: 6px 12px; color: white; font-size: 11px;
+    font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+  }
+  .view-toggle-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.2); }
+  .view-toggle-btn.active { background: #e94560; border-color: #e94560; }
+
+  .tn-table-wrap { background: white; border-radius: 18px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+  .tn-table { width: 100%; border-collapse: collapse; }
+  .tn-table th { background: #f8fafc; padding: 14px 12px; text-align: left; font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0; }
+  .tn-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #1e293b; white-space: nowrap; }
+  .tn-table tr:hover { background: #fbfcfe; }
+  
+  .tnt-action-btn { width: 30px; height: 30px; border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+  .tnt-action-btn:active { transform: scale(0.9); }
+
+  @media (max-width: 640px) {
+    .tn-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; margin: 0 -4px; width: calc(100% + 8px); }
+    .tn-table { min-width: 800px; }
+    .tn-table th, .tn-table td { padding: 10px 8px; font-size: 12px; }
+    .tn-stats { grid-template-columns: repeat(2,1fr); }
+    .tn-stat { border-bottom: 1px solid #f1f5f9; }
+    .tn-stat:nth-child(even) { border-right: none; }
+  }
 `;
 
 function getDocIcon(type) {
@@ -509,6 +536,16 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [pgData, setPgData] = useState(null);
   const [ownerData, setOwnerData] = useState(null);
+
+  const [isExcelView, setIsExcelView] = useState(() => {
+    return localStorage.getItem('pgManagement_globalViewMode') === 'excel';
+  });
+
+  const toggleViewMode = () => {
+    const next = !isExcelView;
+    setIsExcelView(next);
+    localStorage.setItem('pgManagement_globalViewMode', next ? 'excel' : 'card');
+  };
 
   // ── NEW: which tenant's docs are open ──
   const [docsTenant, setDocsTenant] = useState(null);
@@ -821,12 +858,17 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
           <div className="tn-topbar-row">
             <div>
               <h1 className="tn-page-title">Tenants</h1>
-              <p className="tn-page-sub">{tenantCount} active tenants</p>
+              <p className="tn-page-sub">{tenantCount} active tenant{tenantCount !== 1 ? 's' : ''}</p>
             </div>
-            <button className="tn-add-fab" onClick={() => {
-              if (pgId === '__all__') return alert('Please select a specific PG to add tenants.');
-              setShowQr(true);
-            }}>＋</button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button className={`view-toggle-btn ${isExcelView ? 'active' : ''}`} onClick={toggleViewMode}>
+                {isExcelView ? '📊 Table' : '🎴 Cards'}
+              </button>
+              <button className="tn-add-fab" onClick={() => {
+                if (pgId === '__all__') return alert('Please select a specific PG to add tenants.');
+                setShowForm(true);
+              }} disabled={loading}>＋</button>
+            </div>
           </div>
         </div>
 

@@ -152,6 +152,51 @@ const css = `
     .rt-amt  { font-size: 15px; }
     .rp-invoice-btn { margin-left: auto; margin-top: 0; }
   }
+
+  /* --- EXCEL VIEW STYLE --- */
+  @media (max-width: 640px) {
+    .excel-view .rp-stats-strip { grid-template-columns: repeat(5, 1fr) !important; gap: 2px !important; margin: 0 4px 10px !important; }
+    .excel-view .rp-stat-tile { padding: 8px 1px !important; }
+    .excel-view .rp-stat-val { font-size: 9px !important; }
+    .excel-view .rp-stat-label { font-size: 6px !important; }
+    
+    .excel-view .rpt-table-wrap { 
+      overflow-x: auto; -webkit-overflow-scrolling: touch; 
+      background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .excel-view .rpt-table { display: table !important; min-width: 600px; table-layout: auto !important; }
+    .excel-view .rpt-table thead { display: table-header-group !important; }
+    .excel-view .rpt-table tbody { display: table-row-group !important; }
+    
+    .excel-view .rpt-table tr { 
+      display: table-row !important; border: none !important; 
+      margin-bottom: 0; padding: 0; background: transparent; box-shadow: none;
+    }
+    
+    .excel-view .rpt-table th, .excel-view .rpt-table td { 
+      display: table-cell !important; padding: 10px 8px !important; 
+      border-bottom: 1px solid #f1f5f9 !important; text-align: left !important;
+      font-size: 11px !important; white-space: nowrap !important;
+      width: auto !important;
+    }
+    
+    .excel-view .rpt-table td::before { display: none !important; }
+    
+    .excel-view .rt-name { font-size: 12px; }
+    .excel-view .rt-amt  { font-size: 12px; }
+    .excel-view .rt-sub { font-size: 9px; }
+    .excel-view .rp-invoice-btn { padding: 4px 8px; font-size: 9px; }
+  }
+
+  .view-toggle-btn {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px; padding: 6px 12px; color: white; font-size: 11px;
+    font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+  }
+  .view-toggle-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.2); }
+  .view-toggle-btn.active { background: #e94560; border-color: #e94560; }
 `;
 
 // ✅ Now accepts pgId, allPgIds, pgs, and ownerId props
@@ -172,6 +217,16 @@ export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
   const [penaltyAmount, setPenaltyAmount]   = useState(0);
   const [gracePeriod, setGracePeriod]       = useState(0);
   const [sortOrder, setSortOrder]           = useState('desc'); // 'asc' or 'desc'
+
+  const [isExcelView, setIsExcelView] = useState(() => {
+    return localStorage.getItem('pgManagement_globalViewMode') === 'excel';
+  });
+
+  const toggleViewMode = () => {
+    const next = !isExcelView;
+    setIsExcelView(next);
+    localStorage.setItem('pgManagement_globalViewMode', next ? 'excel' : 'card');
+  };
 
   const user   = auth.currentUser;
   const effectiveOwnerId = ownerId || user?.uid;
@@ -569,13 +624,16 @@ export default function ReportsPage({ pgId, allPgIds, pgs, ownerId }) {
   return (
     <>
       <style>{css}</style>
-      <div className="rp-root">
+      <div className={`rp-root ${isExcelView ? 'excel-view' : ''}`}>
         <div className="rp-topbar">
           <div className="rp-topbar-row">
             <div>
               <h1 className="rp-page-title">Reports</h1>
               <p className="rp-page-sub">{getPeriodLabel()} · {activeType?.label}</p>
             </div>
+            <button className={`view-toggle-btn ${isExcelView ? 'active' : ''}`} onClick={toggleViewMode}>
+              {isExcelView ? '📊 Table' : '🎴 Cards'}
+            </button>
           </div>
         </div>
 

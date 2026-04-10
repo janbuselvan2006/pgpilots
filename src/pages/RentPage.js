@@ -222,6 +222,63 @@ const css = `
     .rt-amt  { font-size: 16px; }
     .rt-action-btn, .rt-collect-btn { margin-left: auto; }
   }
+
+  /* --- EXCEL VIEW STYLE --- */
+  @media (max-width: 640px) {
+    .excel-view .rent-stats { grid-template-columns: repeat(4, 1fr); gap: 4px; margin: -10px 8px 10px; padding: 0 4px; }
+    .excel-view .rent-stat { padding: 8px 2px; }
+    .excel-view .rent-stat-num { font-size: 11px; }
+    .excel-view .rent-stat-label { font-size: 7px; }
+    .excel-view .rent-content { padding: 12px 10px 80px; }
+    
+    .excel-view .rent-table-wrap { 
+      overflow-x: auto; -webkit-overflow-scrolling: touch; 
+      background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .excel-view .rent-table { display: table !important; min-width: 650px; border-collapse: collapse; }
+    .excel-view .rent-table thead { display: table-header-group !important; }
+    .excel-view .rent-table tbody { display: table-row-group !important; }
+    
+    .excel-view .rent-table tr { 
+      display: table-row !important; border: none !important; 
+      margin-bottom: 0; padding: 0; background: transparent; box-shadow: none;
+    }
+    
+    .excel-view .rent-table th, .excel-view .rent-table td { 
+      display: table-cell !important; padding: 12px 10px !important; 
+      border-bottom: 1px solid #f1f5f9 !important; text-align: left !important;
+      font-size: 12px !important; white-space: nowrap !important;
+      width: auto !important;
+    }
+    
+    .excel-view .rent-table td::before { display: none !important; }
+    
+    .excel-view .rt-name { font-size: 13px; }
+    .excel-view .rt-amt  { font-size: 13px; }
+    .excel-view .rt-sub, .excel-view .rt-badge, .excel-view .rt-method { font-size: 10px; }
+    .excel-view .rt-action-btn { width: 28px; height: 28px; font-size: 12px; }
+    .excel-view .rt-collect-btn { padding: 6px 10px; font-size: 10px; }
+    
+    .excel-view .rent-tab { padding: 8px 4px; font-size: 12px; }
+    .excel-view .rent-topbar { padding: 15px 15px 22px; }
+    .excel-view .rent-page-title { font-size: 18px; }
+
+    /* Hide the stats in excel view on very small screens to save space if needed, or keep them compact */
+    .excel-view .rent-penalty-pill { padding: 5px 10px; }
+    .excel-view .rent-penalty-pill-label { font-size: 10px; }
+    .excel-view .rp-toggle { width: 30px; height: 16px; }
+    .excel-view .rp-knob { width: 12px; height: 12px; }
+  }
+
+  .view-toggle-btn {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px; padding: 6px 12px; color: white; font-size: 11px;
+    font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+  }
+  .view-toggle-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.2); }
+  .view-toggle-btn.active { background: #e94560; border-color: #e94560; }
 `;
 
 // ✅ Now accepts pgId, allPgIds, pgs, and ownerId props
@@ -243,6 +300,16 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
   const [penaltyEnabled, setPenaltyEnabled] = useState(false);
   const [penaltyAmount, setPenaltyAmount] = useState('');
   const [gracePeriod, setGracePeriod] = useState('');
+
+  const [isExcelView, setIsExcelView] = useState(() => {
+    return localStorage.getItem('pgManagement_globalViewMode') === 'excel';
+  });
+
+  const toggleViewMode = () => {
+    const next = !isExcelView;
+    setIsExcelView(next);
+    localStorage.setItem('pgManagement_globalViewMode', next ? 'excel' : 'card');
+  };
 
   const [form, setForm] = useState({
     amount: '', paymentMethod: 'Cash',
@@ -643,7 +710,7 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
   return (
     <>
       <style>{css}</style>
-      <div className="rent-root">
+      <div className={`rent-root ${isExcelView ? 'excel-view' : ''}`}>
 
         <div className="rent-topbar">
           <div className="rent-topbar-row">
@@ -651,10 +718,15 @@ export default function RentPage({ pgId, allPgIds, pgs, ownerId }) {
               <h1 className="rent-page-title">Rent</h1>
               <p className="rent-page-sub">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
-            <div className="rent-penalty-pill" onClick={() => setShowPenaltySheet(true)}>
-              <span className="rent-penalty-pill-label">⚡ Penalty</span>
-              <div className="rp-toggle" style={{ background: penaltyEnabled ? '#e94560' : 'rgba(255,255,255,0.2)' }}>
-                <div className="rp-knob" style={{ transform: penaltyEnabled ? 'translateX(18px)' : 'translateX(2px)' }} />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button className={`view-toggle-btn ${isExcelView ? 'active' : ''}`} onClick={toggleViewMode}>
+                {isExcelView ? '📊 Table' : '🎴 Cards'}
+              </button>
+              <div className="rent-penalty-pill" onClick={() => setShowPenaltySheet(true)}>
+                <span className="rent-penalty-pill-label">⚡ Penalty</span>
+                <div className="rp-toggle" style={{ background: penaltyEnabled ? '#e94560' : 'rgba(255,255,255,0.2)' }}>
+                  <div className="rp-knob" style={{ transform: penaltyEnabled ? 'translateX(18px)' : 'translateX(2px)' }} />
+                </div>
               </div>
             </div>
           </div>
