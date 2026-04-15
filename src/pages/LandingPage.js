@@ -4,13 +4,13 @@ import { useNavigate } from 'react-router-dom';
 /* ── Unique Custom Geometric Agency Icons ── */
 const Icons = {
   logo: (
-    <svg width="24" height="24" viewBox="0 0 32 32" fill="none" style={{marginRight: '8px', transform: 'translateY(-2px)'}}>
+    <svg width="24" height="24" viewBox="0 0 32 32" fill="none" style={{ marginRight: '8px', transform: 'translateY(-2px)' }}>
       <path d="M16 11 L4 21 V30 H12 V23 H20 V30 H28 V21 Z" fill="var(--navy)" />
       <path d="M17 6 L7 14 L9.5 17 L19.5 9 Z" fill="var(--brand)" />
     </svg>
   ),
   badgeIcon: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '6px'}}>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
       <circle cx="12" cy="12" r="8" fill="var(--brand)"></circle>
       <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="var(--navy)"></path>
     </svg>
@@ -22,11 +22,11 @@ const Icons = {
   ),
   bed: (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <path d="M14 2 L18 2 L19 5 C21 5.5 22.5 6.5 24 8 L27 7 L29 10 L26 12 C26.5 13 27 14.5 27 16 C27 17.5 26.5 19 26 20 L29 22 L27 25 L24 24 C22.5 25.5 21 26.5 19 27 L18 30 L14 30 L13 27 C11 26.5 9.5 25.5 8 24 L5 25 L3 22 L6 20 C5.5 19 5 17.5 5 16 C5 14.5 5.5 13 6 12 L3 10 L5 7 L8 8 C9.5 6.5 11 5.5 13 5 Z" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" fill="none"/>
-      <circle cx="16" cy="16" r="8" stroke="var(--navy)" strokeWidth="2.5" fill="none"/>
-      <path d="M10 16.5 L16 11 L22 16.5" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      <path d="M12 15.5 V22 H20 V15.5" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" fill="none"/>
-      <path d="M14 22 V17 H18 V22" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+      <path d="M14 2 L18 2 L19 5 C21 5.5 22.5 6.5 24 8 L27 7 L29 10 L26 12 C26.5 13 27 14.5 27 16 C27 17.5 26.5 19 26 20 L29 22 L27 25 L24 24 C22.5 25.5 21 26.5 19 27 L18 30 L14 30 L13 27 C11 26.5 9.5 25.5 8 24 L5 25 L3 22 L6 20 C5.5 19 5 17.5 5 16 C5 14.5 5.5 13 6 12 L3 10 L5 7 L8 8 C9.5 6.5 11 5.5 13 5 Z" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" fill="none" />
+      <circle cx="16" cy="16" r="8" stroke="var(--navy)" strokeWidth="2.5" fill="none" />
+      <path d="M10 16.5 L16 11 L22 16.5" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M12 15.5 V22 H20 V15.5" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" fill="none" />
+      <path d="M14 22 V17 H18 V22" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" fill="none" />
     </svg>
   ),
   users: (
@@ -38,15 +38,15 @@ const Icons = {
   ),
   wallet: (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <path d="M10 4 H24 V22 H10 V4 Z" stroke="var(--navy)" strokeWidth="2.5" fill="none"/>
-      <path d="M10 4 C8 4 6 6 6 8 V24 C6 26 8 28 10 28 H24 C26 28 28 26 28 24 V22" stroke="var(--navy)" strokeWidth="2.5" fill="none"/>
-      <path d="M6 8 C6 6 8 6 10 6" stroke="var(--navy)" strokeWidth="2.5" fill="none"/>
-      <line x1="12" y1="12" x2="16" y2="12" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round"/>
-      <line x1="12" y1="16" x2="20" y2="16" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round"/>
-      <line x1="12" y1="20" x2="20" y2="20" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round"/>
-      <circle cx="23" cy="11" r="5" fill="var(--bg-main)" stroke="var(--navy)" strokeWidth="2"/>
-      <line x1="26.5" y1="14.5" x2="30" y2="18" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round"/>
-      <path d="M23 8 V14 M21.5 10 C21.5 9 22 8.5 23 8.5 C24 8.5 24.5 9 24.5 9.5 C24.5 10.5 21.5 10.5 21.5 11.5 C21.5 12.5 22 13.5 23 13.5 C24 13.5 24.5 13 24.5 12" stroke="var(--navy)" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M10 4 H24 V22 H10 V4 Z" stroke="var(--navy)" strokeWidth="2.5" fill="none" />
+      <path d="M10 4 C8 4 6 6 6 8 V24 C6 26 8 28 10 28 H24 C26 28 28 26 28 24 V22" stroke="var(--navy)" strokeWidth="2.5" fill="none" />
+      <path d="M6 8 C6 6 8 6 10 6" stroke="var(--navy)" strokeWidth="2.5" fill="none" />
+      <line x1="12" y1="12" x2="16" y2="12" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" />
+      <line x1="12" y1="16" x2="20" y2="16" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" />
+      <line x1="12" y1="20" x2="20" y2="20" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="23" cy="11" r="5" fill="var(--bg-main)" stroke="var(--navy)" strokeWidth="2" />
+      <line x1="26.5" y1="14.5" x2="30" y2="18" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M23 8 V14 M21.5 10 C21.5 9 22 8.5 23 8.5 C24 8.5 24.5 9 24.5 9.5 C24.5 10.5 21.5 10.5 21.5 11.5 C21.5 12.5 22 13.5 23 13.5 C24 13.5 24.5 13 24.5 12" stroke="var(--navy)" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   ),
   zap: (
@@ -69,17 +69,17 @@ const Icons = {
     </svg>
   ),
   star: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--brand)" stroke="var(--navy)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '2px'}}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--brand)" stroke="var(--navy)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px' }}>
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"></polygon>
     </svg>
   ),
   check: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{display: 'inline-block', verticalAlign: 'middle', marginRight: '8px', flexShrink: 0}}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px', flexShrink: 0 }}>
       <polyline points="20 6 9 17 4 12"></polyline>
     </svg>
   ),
   rocket: (
-    <svg width="22" height="22" viewBox="0 0 32 32" fill="none" style={{marginRight: '8px'}}>
+    <svg width="22" height="22" viewBox="0 0 32 32" fill="none" style={{ marginRight: '8px' }}>
       <defs>
         <mask id="stamp-mask">
           <rect x="0" y="0" width="32" height="32" fill="white" />
@@ -88,20 +88,26 @@ const Icons = {
       </defs>
       <circle cx="16" cy="16" r="12" stroke="currentColor" strokeWidth="2.5" mask="url(#stamp-mask)" />
       <circle cx="16" cy="16" r="7" stroke="currentColor" strokeWidth="1.5" mask="url(#stamp-mask)" />
-      
+
       <rect x="2" y="10" width="28" height="12" rx="2" stroke="currentColor" strokeWidth="2.5" transform="rotate(-20 16 16)" />
       <text x="16.5" y="19" fill="currentColor" fontSize="8" fontWeight="900" fontFamily="sans-serif" textAnchor="middle" transform="rotate(-20 16 16)" letterSpacing="1px">TRIAL</text>
     </svg>
   ),
   phoneCall: (
-    <svg width="18" height="18" viewBox="0 0 32 32" fill="none" style={{marginRight: '8px'}}>
+    <svg width="18" height="18" viewBox="0 0 32 32" fill="none" style={{ marginRight: '8px' }}>
       <circle cx="16" cy="16" r="10" stroke="var(--navy)" strokeWidth="2.5" />
       <path d="M13 19L19 13" stroke="var(--brand)" strokeWidth="3" strokeLinecap="round" />
       <circle cx="19" cy="13" r="2" fill="var(--navy)" />
     </svg>
   ),
+  whatsappBtn: (
+    <svg width="18" height="18" viewBox="0 0 32 32" fill="none" style={{ marginRight: '8px' }}>
+      <path d="M12 24 L8 28 L9.5 22.5 A11 11 0 1 1 12 24 Z" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 11 C13 11 12 12 13 13 C13.5 16 16 18.5 19 19 C20 19 21 18 21 17 C21 16 19 15 18.5 15 C17.5 15 17 16 16 15.5 C15 15 15 14 15.5 13 C16 12 16 11.5 16 10.5 C16 9.5 15 11 14 11 Z" fill="var(--navy)" />
+    </svg>
+  ),
   heart: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--brand)" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display: 'inline-block', verticalAlign: 'middle', margin: '0 4px'}}>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--brand)" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', margin: '0 4px' }}>
       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
     </svg>
   ),
@@ -112,7 +118,7 @@ function LandingPage() {
 
   useEffect(() => {
     // ── Intersection Observer for Scroll Reveals
-    const reveals  = document.querySelectorAll('.reveal');
+    const reveals = document.querySelectorAll('.reveal');
     const observer = new IntersectionObserver(entries => {
       entries.forEach(e => {
         if (e.isIntersecting) {
@@ -141,7 +147,7 @@ function LandingPage() {
       const step = (timestamp) => {
         if (!start) start = timestamp;
         const progress = Math.min((timestamp - start) / 2000, 1);
-        const eased    = 1 - Math.pow(1 - progress, 3);
+        const eased = 1 - Math.pow(1 - progress, 3);
         el.textContent = Math.floor(eased * target).toLocaleString() + suffix;
         if (progress < 1) requestAnimationFrame(step);
       };
@@ -152,8 +158,8 @@ function LandingPage() {
       entries.forEach(e => {
         if (e.isIntersecting) {
           const nums = e.target.querySelectorAll('.stat-num');
-          if (nums[0]) animateCounter(nums[0], 500,   '+');
-          if (nums[1]) animateCounter(nums[1], 12000, '+');
+          if (nums[0]) animateCounter(nums[0], 100, '+');
+          if (nums[1]) animateCounter(nums[1], 1000, '+');
           statsObserver.unobserve(e.target);
         }
       });
@@ -165,7 +171,7 @@ function LandingPage() {
   }, []);
 
   const goSignup = () => navigate('/signup');
-  const goLogin  = () => navigate('/login');
+  const goLogin = () => navigate('/login');
 
   return (
     <>
@@ -555,7 +561,7 @@ function LandingPage() {
       `}</style>
 
       <div className="lp-body">
-        
+
         <div className="hero-gradient-mesh"></div>
 
         {/* FLOATING NAV */}
@@ -570,8 +576,8 @@ function LandingPage() {
               <li><a href="#how">How it works</a></li>
               <li><a href="#pricing">Pricing</a></li>
             </ul>
-            <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
-              <a href="#login" style={{color: 'var(--text-muted)', fontSize: '13px', fontWeight: '600', textDecoration: 'none'}} onClick={(e) => { e.preventDefault(); goLogin(); }}>Sign In</a>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <a href="#login" style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); goLogin(); }}>Sign In</a>
               <button className="lp-nav-cta" onClick={goSignup}>Start Free Trial</button>
             </div>
           </nav>
@@ -579,7 +585,7 @@ function LandingPage() {
 
         {/* HERO */}
         <section className="lp-hero">
-          
+
           <div className="hero-badge">
             {Icons.badgeIcon} Built for Indian PG Owners
           </div>
@@ -593,7 +599,7 @@ function LandingPage() {
             Track rent by check-in date, get overdue alerts, manage rooms and tenants —
             all from your phone.
           </p>
-          
+
           <div className="hero-btns">
             <button className="btn-primary" onClick={goSignup}>{Icons.rocket} Start 14-Day Free Trial</button>
             <a href="#features" className="btn-secondary">See how it works →</a>
@@ -606,29 +612,29 @@ function LandingPage() {
                 <div className="app-header">
                   <div className="app-avatar">{Icons.users}</div>
                   <div>
-                    <div style={{fontSize:'12px', color:'var(--text-muted)'}}>Welcome back</div>
-                    <div style={{fontSize:'14px', fontWeight:'700', color:'var(--navy)'}}>Sri Sai PG</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Welcome back</div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--navy)' }}>Sri Sai PG</div>
                   </div>
                 </div>
-                
+
                 <div className="app-card">
-                  <div style={{fontSize:'12px', color:'var(--brand)', opacity: 0.9, fontWeight: '700', marginBottom: '8px'}}>Total Collected</div>
-                  <div style={{fontSize:'28px', fontWeight:'800', color:'#fff', margin:'4px 0'}}>₹42,500</div>
-                  <div style={{fontSize:'12px', color:'#fff', fontWeight: '500', opacity: 0.8}}>+12% from last month</div>
+                  <div style={{ fontSize: '12px', color: 'var(--brand)', opacity: 0.9, fontWeight: '700', marginBottom: '8px' }}>Total Collected</div>
+                  <div style={{ fontSize: '28px', fontWeight: '800', color: '#fff', margin: '4px 0' }}>₹42,500</div>
+                  <div style={{ fontSize: '12px', color: '#fff', fontWeight: '500', opacity: 0.8 }}>+12% from last month</div>
                 </div>
-                
-                <div style={{padding: '0 20px', marginTop: '24px'}}>
-                  <div style={{display:'flex', justifyContent:'space-between', marginBottom:'16px', alignItems: 'center'}}>
-                    <div style={{fontSize:'15px', fontWeight:'800', color:'var(--navy)'}}>Today's Dues</div>
-                    <div style={{fontSize:'13px', fontWeight:'700', color:'var(--brand)'}}>See all</div>
+
+                <div style={{ padding: '0 20px', marginTop: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--navy)' }}>Today's Dues</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--brand)' }}>See all</div>
                   </div>
-                  
-                  {[ {n:'Rahul K.', r:'B-102', a:'₹6,500'}, {n:'Suresh M.', r:'A-201', a:'₹5,000'}, {n:'Vikram S.', r:'C-104', a:'₹7,200'} ].map((t, i) => (
+
+                  {[{ n: 'Rahul K.', r: 'B-102', a: '₹6,500' }, { n: 'Suresh M.', r: 'A-201', a: '₹5,000' }, { n: 'Vikram S.', r: 'C-104', a: '₹7,200' }].map((t, i) => (
                     <div key={i} className="app-list-item">
                       <div className="app-list-avatar">{t.n[0]}</div>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--navy)', marginBottom: '2px'}}>{t.n}</div>
-                        <div style={{fontSize:'12px', color:'var(--text-muted)'}}>Room {t.r}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--navy)', marginBottom: '2px' }}>{t.n}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Room {t.r}</div>
                       </div>
                       <div className="app-list-btn">Remind</div>
                     </div>
@@ -636,33 +642,33 @@ function LandingPage() {
                 </div>
               </div>
             </div>
-            
+
             {/* The Floating UI Cards */}
             <div className="float-card-left">
-              <div style={{display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px'}}>
-                <div style={{width: '36px', height: '36px', borderRadius: '50%', background: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand)'}}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-                <div style={{fontWeight: '700', fontSize: '16px', color: 'var(--navy)'}}>Ravi collected</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand)' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div>
+                <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--navy)' }}>Ravi collected</div>
               </div>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div>
-                  <div style={{fontSize: '14px', fontWeight: '700'}}>Room B5 Paid</div>
-                  <div style={{fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600'}}>Just now</div>
+                  <div style={{ fontSize: '14px', fontWeight: '700' }}>Room B5 Paid</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Just now</div>
                 </div>
-                <div style={{color: 'var(--brand)', fontWeight: '800', fontSize: '15px'}}>+₹6,500</div>
+                <div style={{ color: 'var(--brand)', fontWeight: '800', fontSize: '15px' }}>+₹6,500</div>
               </div>
             </div>
 
             <div className="float-card-right">
-              <div style={{display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px'}}>
-                <div style={{width: '36px', height: '36px', borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--navy)'}}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-                <div style={{fontWeight: '700', fontSize: '16px', color: 'var(--navy)'}}>Alerts</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--navy)' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg></div>
+                <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--navy)' }}>Alerts</div>
               </div>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{fontSize: '14px', fontWeight: '700'}}>Rent Reminders</div>
-                  <div style={{fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600'}}>Automatically</div>
+                  <div style={{ fontSize: '14px', fontWeight: '700' }}>Rent Reminders</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Automatically</div>
                 </div>
-                <div style={{fontWeight: '800', fontSize: '15px', color: 'var(--brand)'}}>3 sent</div>
+                <div style={{ fontWeight: '800', fontSize: '15px', color: 'var(--brand)' }}>3 sent</div>
               </div>
             </div>
 
@@ -670,14 +676,14 @@ function LandingPage() {
               Vacant bed filled {Icons.cursor}
             </div>
           </div>
-          
+
         </section>
 
         {/* TRUSTED STATS */}
         <section className="trusted-section">
           <div className="trusted-text">Trusted by leading property owners</div>
           <div className="trusted-logos">
-            {[['500+','PG Owners'],['12,000+','Tenants Managed'],['₹2Cr+','Rent Collected'],['4.9/5','Owner Rating']].map(([num,label]) => (
+            {[['100+', 'PG Owners'], ['1000+', 'Tenants Managed'], ['₹1Cr+', 'Rent Collected'], ['4.9/5', 'Owner Rating']].map(([num, label]) => (
               <div className="stat-item" key={label}>
                 <span className="stat-num">{num}</span>
                 <div className="stat-label">{label}</div>
@@ -694,12 +700,12 @@ function LandingPage() {
             <p className="section-sub">We talked to 200+ PG owners across Tamil Nadu. These are their exact words.</p>
             <div className="pain-grid reveal">
               {[
-                ['01','I forgot who paid and who didn\'t. My <strong>notebook got lost</strong> and I lost ₹40,000.','PGpilots tracks every rupee, automatically'],
-                ['02','Tenant says he paid but I have <strong>no proof.</strong> No receipt. Nothing.','Digital receipts with date, time & method recorded'],
-                ['03','I have 20 tenants. I don\'t know whose <strong>rent is due today</strong> without calling everyone.','Auto-sorted: Today Due → Overdue → Upcoming'],
-                ['04','Tenant left without paying last month. I lost <strong>₹6,500 just like that.</strong>','Exit checklist shows all pending dues before leaving'],
-                ['05','I call every tenant for rent. It\'s <strong>embarrassing</strong> and they get irritated.','One-click WhatsApp reminder — professional & automatic'],
-                ['06','I don\'t know which room is empty <strong>right now.</strong> I might have missed a new tenant.','Live room occupancy — see vacant beds instantly'],
+                ['01', 'I forgot who paid and who didn\'t. My <strong>notebook got lost</strong> and I lost ₹40,000.', 'PGpilots tracks every rupee, automatically'],
+                ['02', 'Tenant says he paid but I have <strong>no proof.</strong> No receipt. Nothing.', 'Digital receipts with date, time & method recorded'],
+                ['03', 'I have 20 tenants. I don\'t know whose <strong>rent is due today</strong> without calling everyone.', 'Auto-sorted: Today Due → Overdue → Upcoming'],
+                ['04', 'Tenant left without paying last month. I lost <strong>₹6,500 just like that.</strong>', 'Exit checklist shows all pending dues before leaving'],
+                ['05', 'I call every tenant for rent. It\'s <strong>embarrassing</strong> and they get irritated.', 'One-click WhatsApp reminder — professional & automatic'],
+                ['06', 'I don\'t know which room is empty <strong>right now.</strong> I might have missed a new tenant.', 'Live room occupancy — see vacant beds instantly'],
               ].map(([num, quote, solution]) => (
                 <div className="pain-item" key={num}>
                   <div className="pain-num">{num}</div>
@@ -712,19 +718,19 @@ function LandingPage() {
         </section>
 
         {/* FEATURES */}
-        <section id="features" style={{background: 'var(--bg-surface)'}}>
+        <section id="features" style={{ background: 'var(--bg-surface)' }}>
           <div className="lp-section">
             <div className="section-tag">Features</div>
-            <h2 className="section-title">Everything you need.<br/>Nothing you don't.</h2>
+            <h2 className="section-title">Everything you need.<br />Nothing you don't.</h2>
             <p className="section-sub">Simple enough to use on first day. Powerful enough to run your entire PG business.</p>
             <div className="features-grid reveal">
               {[
-                [Icons.bed, 'Smart Room Management','Add rooms with bed count, floor, type and rent. See live occupancy bars. Know exactly which beds are vacant at any moment.'],
-                [Icons.users, 'Tenant Profiles','Complete tenant records with ID proof, emergency contact, check-in date and room assignment. Find any tenant in seconds.'],
-                [Icons.wallet, 'Intelligent Rent Tracking','Rent due dates based on check-in date. Automatic overdue detection. Partial payment tracking. Balance auto-calculates.'],
-                [Icons.zap, 'Electricity Bill Split','Enter room-wise electricity bills. Each tenant sees their rent + electricity as one total. Collect everything together.'],
-                [Icons.chart, 'Reports & PDF Export','Monthly rent reports, electricity reports, occupancy stats and vacant room analysis. Download as professional PDF anytime.'],
-                [Icons.message, 'WhatsApp Reminders','One click sends professional rent reminder to tenant on WhatsApp. No awkward calls. No embarrassment. Just results.'],
+                [Icons.bed, 'Smart Room Management', 'Add rooms with bed count, floor, type and rent. See live occupancy bars. Know exactly which beds are vacant at any moment.'],
+                [Icons.users, 'Tenant Profiles', 'Complete tenant records with ID proof, emergency contact, check-in date and room assignment. Find any tenant in seconds.'],
+                [Icons.wallet, 'Intelligent Rent Tracking', 'Rent due dates based on check-in date. Automatic overdue detection. Partial payment tracking. Balance auto-calculates.'],
+                [Icons.zap, 'Electricity Bill Split', 'Enter room-wise electricity bills. Each tenant sees their rent + electricity as one total. Collect everything together.'],
+                [Icons.chart, 'Reports & PDF Export', 'Monthly rent reports, electricity reports, occupancy stats and vacant room analysis. Download as professional PDF anytime.'],
+                [Icons.message, 'WhatsApp Reminders', 'One click sends professional rent reminder to tenant on WhatsApp. No awkward calls. No embarrassment. Just results.'],
               ].map(([icon, title, desc]) => (
                 <div className="feature-card" key={title}>
                   <div className="feature-icon">{icon}</div>
@@ -743,10 +749,10 @@ function LandingPage() {
             <h2 className="section-title">Setup in 5 minutes.<br />Manage forever.</h2>
             <div className="steps-row reveal">
               {[
-                ['1','Sign Up Free','Create your account in 60 seconds. No credit card. No complicated setup.'],
-                ['2','Add Your Rooms','Add rooms with beds, floor and rent per bed. Takes 2 minutes for 10 rooms.'],
-                ['3','Add Tenants','Add tenant details and assign rooms. Due dates are set automatically from check-in.'],
-                ['4','Collect & Track','See who\'s due today. Collect rent with one tap. Everything is tracked automatically.'],
+                ['1', 'Sign Up Free', 'Create your account in 60 seconds. No credit card. No complicated setup.'],
+                ['2', 'Add Your Rooms', 'Add rooms with beds, floor and rent per bed. Takes 2 minutes for 10 rooms.'],
+                ['3', 'Add Tenants', 'Add tenant details and assign rooms. Due dates are set automatically from check-in.'],
+                ['4', 'Collect & Track', 'See who\'s due today. Collect rent with one tap. Everything is tracked automatically.'],
               ].map(([num, title, desc]) => (
                 <div className="step-item" key={num}>
                   <div className="step-num">{num}</div>
@@ -761,24 +767,24 @@ function LandingPage() {
         {/* PRICING */}
         <section id="pricing" className="pricing-section">
           <div className="lp-section">
-            <div className="section-tag" style={{ justifyContent:'center', margin: '0 auto 24px', display: 'flex', width: 'fit-content' }}>Pricing</div>
-            <h2 className="section-title" style={{ textAlign:'center' }}>Usage-based pricing<br />that scales with you.</h2>
-            <p className="section-sub" style={{ margin:'0 auto', textAlign:'center' }}>Simple, usage-based billing. Pay only for the beds you use each month.</p>
-            
+            <div className="section-tag" style={{ justifyContent: 'center', margin: '0 auto 24px', display: 'flex', width: 'fit-content' }}>Pricing</div>
+            <h2 className="section-title" style={{ textAlign: 'center' }}>Usage-based pricing<br />that scales with you.</h2>
+            <p className="section-sub" style={{ margin: '0 auto', textAlign: 'center' }}>Simple, usage-based billing. Pay only for the beds you use each month.</p>
+
             <div className="pricing-card reveal">
               <div className="price-plan">Pay-as-you-go</div>
               <div className="price-amount">₹ per bed <span>/mo</span></div>
               <div className="price-period">Billed monthly on peak beds</div>
               <ul className="price-features">
-                {['Unlimited PGs & rooms','All features included','Pay only for beds used','Peak-bed billing'].map(f => (
+                {['Unlimited PGs & rooms', 'All features included', 'Pay only for beds used', 'Peak-bed billing'].map(f => (
                   <li key={f}>{Icons.check} {f}</li>
                 ))}
               </ul>
-              <button className="btn-large" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={goSignup}>{Icons.rocket} Start Free Trial</button>
+              <button className="btn-large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={goSignup}>{Icons.rocket} Start Free Trial</button>
             </div>
-            
-            <div className="price-note reveal" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--navy)', fontWeight: '700', marginTop: '24px'}}>
-              <span style={{color: 'var(--brand)', fontSize: '20px'}}>✔</span> No setup fees · Pay only for beds used · Cancel anytime
+
+            <div className="price-note reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--navy)', fontWeight: '700', marginTop: '24px' }}>
+              <span style={{ color: 'var(--brand)', fontSize: '20px' }}>✔</span> No setup fees · Pay only for beds used · Cancel anytime
             </div>
           </div>
         </section>
@@ -791,13 +797,13 @@ function LandingPage() {
             <p className="section-sub">Real feedback from real owners across Tamil Nadu.</p>
             <div className="testi-grid reveal">
               {[
-                ['R','Ravi Kumar','Sri Sai PG — 18 tenants','Before PGpilots, I used to forget who paid. Now I open the app and I know exactly who\'s late, who paid today and who\'s coming up. It\'s like having an accountant in my pocket.'],
-                ['S','Suresh Babu','Lakshmi PG — 32 tenants','The WhatsApp reminder feature is gold. I don\'t have to call tenants anymore. I just click and they get a professional message. My collection improved 40% in first month.'],
-                ['M','Meena Devi','Royal Ladies PG — 24 tenants','₹499 for all this? I was paying ₹2,800/month for another software that was 10x more complicated. This is simple, works on my phone and does everything I need.'],
+                ['R', 'Ravi Kumar', 'Sri Sai PG — 18 tenants', 'Before PGpilots, I used to forget who paid. Now I open the app and I know exactly who\'s late, who paid today and who\'s coming up. It\'s like having an accountant in my pocket.'],
+                ['S', 'Suresh Babu', 'Lakshmi PG — 32 tenants', 'The WhatsApp reminder feature is gold. I don\'t have to call tenants anymore. I just click and they get a professional message. My collection improved 40% in first month.'],
+                ['M', 'Meena Devi', 'Royal Ladies PG — 24 tenants', '₹499 for all this? I was paying ₹2,800/month for another software that was 10x more complicated. This is simple, works on my phone and does everything I need.'],
               ].map(([initial, name, loc, text]) => (
                 <div className="testi-card" key={name}>
                   <div className="testi-stars">
-                    {[1,2,3,4,5].map(i => <span key={i}>{Icons.star}</span>)}
+                    {[1, 2, 3, 4, 5].map(i => <span key={i}>{Icons.star}</span>)}
                   </div>
                   <p className="testi-text">"{text}"</p>
                   <div className="testi-author">
@@ -815,12 +821,12 @@ function LandingPage() {
 
         {/* CTA */}
         <section className="cta-wrapper">
-          <div style={{maxWidth: '800px', margin: '0 auto'}}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <h2>Ready to never lose<br />rent money again?</h2>
             <p>Join 500+ PG owners who manage smarter with PGpilots.<br />Free for 14 days. No card needed.</p>
-            <div className="hero-btns" style={{justifyContent: 'center'}}>
+            <div className="hero-btns" style={{ justifyContent: 'center' }}>
               <button className="btn-primary" onClick={goSignup}>{Icons.rocket} Start Free Trial — It's Free</button>
-              <a href="https://wa.me/919876543210" target="_blank" rel="noreferrer" className="btn-secondary">{Icons.phoneCall} Talk to Us on WhatsApp</a>
+              <a href="https://wa.me/916382143599" target="_blank" rel="noreferrer" className="btn-secondary">{Icons.whatsappBtn} Talk to Us on WhatsApp</a>
             </div>
           </div>
         </section>
@@ -831,8 +837,8 @@ function LandingPage() {
           <div className="footer-links">
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
-            <a href="#privacy" onClick={(e) => e.preventDefault()}>Privacy Policy</a>
-            <a href="mailto:hello@pgpilots.com">Contact</a>
+            <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+            <a href="mailto:support@pgpilots.com">Contact</a>
           </div>
           <div className="footer-copy">© 2026 PGpilots. Built with {Icons.heart} for Indian PG Owners.</div>
         </footer>
