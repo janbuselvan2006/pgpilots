@@ -4,10 +4,9 @@ import { useNavigate } from 'react-router-dom';
 /* ── Unique Custom Geometric Agency Icons ── */
 const Icons = {
   logo: (
-    <svg width="24" height="24" viewBox="0 0 32 32" fill="none" style={{marginRight: '8px'}}>
-      <path d="M16 2L2 12V30H30V12L16 2Z" fill="var(--brand)" />
-      <path d="M10 30V16H22V30" fill="var(--bg-main)" />
-      <circle cx="16" cy="10" r="2" fill="var(--navy)" />
+    <svg width="24" height="24" viewBox="0 0 32 32" fill="none" style={{marginRight: '8px', transform: 'translateY(-2px)'}}>
+      <path d="M16 11 L4 21 V30 H12 V23 H20 V30 H28 V21 Z" fill="var(--navy)" />
+      <path d="M17 6 L7 14 L9.5 17 L19.5 9 Z" fill="var(--brand)" />
     </svg>
   ),
   badgeIcon: (
@@ -23,49 +22,50 @@ const Icons = {
   ),
   bed: (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <rect x="4" y="4" width="15" height="15" rx="3" stroke="var(--navy)" strokeWidth="2.5" />
-      <rect x="14" y="14" width="14" height="14" rx="3" fill="var(--brand)" />
-      <path d="M11 18H4v6h6" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M14 2 L18 2 L19 5 C21 5.5 22.5 6.5 24 8 L27 7 L29 10 L26 12 C26.5 13 27 14.5 27 16 C27 17.5 26.5 19 26 20 L29 22 L27 25 L24 24 C22.5 25.5 21 26.5 19 27 L18 30 L14 30 L13 27 C11 26.5 9.5 25.5 8 24 L5 25 L3 22 L6 20 C5.5 19 5 17.5 5 16 C5 14.5 5.5 13 6 12 L3 10 L5 7 L8 8 C9.5 6.5 11 5.5 13 5 Z" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" fill="none"/>
+      <circle cx="16" cy="16" r="8" stroke="var(--navy)" strokeWidth="2.5" fill="none"/>
+      <path d="M10 16.5 L16 11 L22 16.5" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <path d="M12 15.5 V22 H20 V15.5" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" fill="none"/>
+      <path d="M14 22 V17 H18 V22" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" fill="none"/>
     </svg>
   ),
   users: (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <circle cx="16" cy="10" r="5" fill="var(--brand)" />
-      <path d="M7 28c0-5 4-9 9-9h0c2 0 3.5.5 5 1.5" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" />
-      <rect x="20" y="18" width="10" height="12" rx="2" stroke="var(--navy)" strokeWidth="2.5" />
-      <line x1="23" y1="22" x2="27" y2="22" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" />
-      <line x1="23" y1="25" x2="25" y2="25" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="16" cy="16" r="14" stroke="var(--navy)" strokeWidth="2.5" />
+      <circle cx="16" cy="12" r="5" fill="var(--navy)" />
+      <path d="M7 26.5 C7 21 11 18 16 18 C21 18 25 21 25 26.5 Z" fill="var(--navy)" />
     </svg>
   ),
   wallet: (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <rect x="6" y="8" width="20" height="16" rx="4" stroke="var(--navy)" strokeWidth="2.5" />
-      <path d="M16 8v16" stroke="var(--navy)" strokeWidth="2.5" />
-      <circle cx="16" cy="16" r="5" fill="var(--brand)" />
-      <path d="M10 16h3" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M10 4 H24 V22 H10 V4 Z" stroke="var(--navy)" strokeWidth="2.5" fill="none"/>
+      <path d="M10 4 C8 4 6 6 6 8 V24 C6 26 8 28 10 28 H24 C26 28 28 26 28 24 V22" stroke="var(--navy)" strokeWidth="2.5" fill="none"/>
+      <path d="M6 8 C6 6 8 6 10 6" stroke="var(--navy)" strokeWidth="2.5" fill="none"/>
+      <line x1="12" y1="12" x2="16" y2="12" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="12" y1="16" x2="20" y2="16" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="12" y1="20" x2="20" y2="20" stroke="var(--navy)" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="23" cy="11" r="5" fill="var(--bg-main)" stroke="var(--navy)" strokeWidth="2"/>
+      <line x1="26.5" y1="14.5" x2="30" y2="18" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round"/>
+      <path d="M23 8 V14 M21.5 10 C21.5 9 22 8.5 23 8.5 C24 8.5 24.5 9 24.5 9.5 C24.5 10.5 21.5 10.5 21.5 11.5 C21.5 12.5 22 13.5 23 13.5 C24 13.5 24.5 13 24.5 12" stroke="var(--navy)" strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
   ),
   zap: (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <path d="M16 4v10" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M10 18a6 6 0 1012 0H10z" fill="var(--brand)" />
-      <path d="M16 24v4" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M8 8l4 6M24 8l-4 6" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M16 2 L30 28 H2 Z" fill="#FFCF00" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M18 9 L12 17 H16.5 L15 21 L13 21 L16 25 L19 21 L17 21 L18.5 17 H14 L18 9 Z" fill="var(--navy)" />
     </svg>
   ),
   chart: (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <path d="M16 4a12 12 0 11-12 12" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M16 4a12 12 0 00-12 12" stroke="var(--brand)" strokeWidth="4" strokeLinecap="round" />
-      <rect x="14" y="14" width="8" height="8" rx="2" fill="var(--navy)" />
-      <circle cx="24" cy="8" r="3" fill="var(--brand)" />
+      <path d="M13 3 H24 A3 3 0 0 1 27 6 V26 A3 3 0 0 1 24 29 H8 A3 3 0 0 1 5 26 V11 Z" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M5 11 H10 A3 3 0 0 0 13 8 V3" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" fill="none" />
+      <path d="M14 13 H18 V18 H21 L16 23 L11 18 H14 V13 Z" fill="var(--navy)" />
     </svg>
   ),
   message: (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <path d="M4 16L28 4L16 28L13 19L4 16Z" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" />
-      <path d="M28 4L13 19" stroke="var(--navy)" strokeWidth="2.5" strokeLinejoin="round" />
-      <circle cx="18" cy="14" r="4" fill="var(--brand)" />
+      <path d="M12 24 L8 28 L9.5 22.5 A11 11 0 1 1 12 24 Z" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 11 C13 11 12 12 13 13 C13.5 16 16 18.5 19 19 C20 19 21 18 21 17 C21 16 19 15 18.5 15 C17.5 15 17 16 16 15.5 C15 15 15 14 15.5 13 C16 12 16 11.5 16 10.5 C16 9.5 15 11 14 11 Z" fill="var(--navy)" />
     </svg>
   ),
   star: (
@@ -79,10 +79,18 @@ const Icons = {
     </svg>
   ),
   rocket: (
-    <svg width="18" height="18" viewBox="0 0 32 32" fill="none" style={{marginRight: '8px'}}>
-      <path d="M16 4L26 14L16 24L6 14L16 4Z" fill="var(--brand)" />
-      <path d="M16 4V24" stroke="var(--navy)" strokeWidth="2.5" />
-      <circle cx="16" cy="14" r="3" fill="var(--bg-main)" />
+    <svg width="22" height="22" viewBox="0 0 32 32" fill="none" style={{marginRight: '8px'}}>
+      <defs>
+        <mask id="stamp-mask">
+          <rect x="0" y="0" width="32" height="32" fill="white" />
+          <rect x="2" y="10" width="28" height="12" rx="2" fill="black" transform="rotate(-20 16 16)" />
+        </mask>
+      </defs>
+      <circle cx="16" cy="16" r="12" stroke="currentColor" strokeWidth="2.5" mask="url(#stamp-mask)" />
+      <circle cx="16" cy="16" r="7" stroke="currentColor" strokeWidth="1.5" mask="url(#stamp-mask)" />
+      
+      <rect x="2" y="10" width="28" height="12" rx="2" stroke="currentColor" strokeWidth="2.5" transform="rotate(-20 16 16)" />
+      <text x="16.5" y="19" fill="currentColor" fontSize="8" fontWeight="900" fontFamily="sans-serif" textAnchor="middle" transform="rotate(-20 16 16)" letterSpacing="1px">TRIAL</text>
     </svg>
   ),
   phoneCall: (
@@ -321,18 +329,31 @@ function LandingPage() {
         .phone-notch {
           position: absolute; top: 0; left: 50%; transform: translateX(-50%);
           width: 120px; height: 30px;
-          background: var(--navy); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
+          background: var(--navy); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; z-index: 20;
         }
-        .phone-inner-circle {
-          position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-          width: 140px; height: 140px; border-radius: 50%;
-          border: 2px dashed rgba(0, 229, 153, 0.5);
-          display: flex; align-items: center; justify-content: center;
+        .app-preview { width: 100%; height: 100%; background: var(--bg-surface); padding-top: 50px; }
+        .app-header { display: flex; align-items: center; gap: 12px; padding: 0 20px 20px; }
+        .app-avatar {
+          width: 40px; height: 40px; border-radius: 50%; background: var(--brand-light); 
+          border: 2px solid var(--navy); display:flex; align-items:center; justify-content:center;
         }
-        .inner-brand-icon {
-          width: 80px; height: 80px; background: var(--brand); border-radius: 24px;
-          border: 4px solid var(--navy);
-          box-shadow: 0 12px 24px rgba(0, 229, 153, 0.4);
+        .app-avatar svg { width: 22px; height: 22px; }
+        .app-avatar svg path { stroke-width: 1.5; }
+        .app-card {
+          margin: 0 20px; background: var(--navy); border-radius: 20px; padding: 20px;
+          border: 2px solid var(--navy); box-shadow: 0 12px 24px rgba(10,25,48,0.15);
+        }
+        .app-list-item {
+          background: white; border: 2px solid var(--border-subtle); border-radius: 16px;
+          padding: 12px; display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+        }
+        .app-list-avatar {
+          width: 36px; height: 36px; border-radius: 12px; background: var(--brand); border: 2px solid var(--navy);
+          display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--navy); font-size:14px;
+        }
+        .app-list-btn {
+          background: var(--brand-light); color: var(--navy); padding: 6px 12px; border-radius: 100px;
+          font-size: 11px; font-weight: 700; border: 2px solid var(--navy);
         }
 
         .float-card-left {
@@ -581,8 +602,38 @@ function LandingPage() {
           <div className="hero-visual">
             <div className="phone-frame">
               <div className="phone-notch"></div>
-              <div className="phone-inner-circle">
-                <div className="inner-brand-icon"></div>
+              <div className="app-preview">
+                <div className="app-header">
+                  <div className="app-avatar">{Icons.users}</div>
+                  <div>
+                    <div style={{fontSize:'12px', color:'var(--text-muted)'}}>Welcome back</div>
+                    <div style={{fontSize:'14px', fontWeight:'700', color:'var(--navy)'}}>Sri Sai PG</div>
+                  </div>
+                </div>
+                
+                <div className="app-card">
+                  <div style={{fontSize:'12px', color:'var(--brand)', opacity: 0.9, fontWeight: '700', marginBottom: '8px'}}>Total Collected</div>
+                  <div style={{fontSize:'28px', fontWeight:'800', color:'#fff', margin:'4px 0'}}>₹42,500</div>
+                  <div style={{fontSize:'12px', color:'#fff', fontWeight: '500', opacity: 0.8}}>+12% from last month</div>
+                </div>
+                
+                <div style={{padding: '0 20px', marginTop: '24px'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', marginBottom:'16px', alignItems: 'center'}}>
+                    <div style={{fontSize:'15px', fontWeight:'800', color:'var(--navy)'}}>Today's Dues</div>
+                    <div style={{fontSize:'13px', fontWeight:'700', color:'var(--brand)'}}>See all</div>
+                  </div>
+                  
+                  {[ {n:'Rahul K.', r:'B-102', a:'₹6,500'}, {n:'Suresh M.', r:'A-201', a:'₹5,000'}, {n:'Vikram S.', r:'C-104', a:'₹7,200'} ].map((t, i) => (
+                    <div key={i} className="app-list-item">
+                      <div className="app-list-avatar">{t.n[0]}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--navy)', marginBottom: '2px'}}>{t.n}</div>
+                        <div style={{fontSize:'12px', color:'var(--text-muted)'}}>Room {t.r}</div>
+                      </div>
+                      <div className="app-list-btn">Remind</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
             
@@ -723,7 +774,7 @@ function LandingPage() {
                   <li key={f}>{Icons.check} {f}</li>
                 ))}
               </ul>
-              <button className="btn-large" onClick={goSignup}>Start Free Trial</button>
+              <button className="btn-large" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={goSignup}>{Icons.rocket} Start Free Trial</button>
             </div>
             
             <div className="price-note reveal" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--navy)', fontWeight: '700', marginTop: '24px'}}>
