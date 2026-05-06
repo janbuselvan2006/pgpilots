@@ -7,6 +7,7 @@ import {
   collection, addDoc, getDocs,
   doc, query, where, updateDoc, getDoc, arrayUnion, arrayRemove
 } from 'firebase/firestore';
+import AppIcon from '../components/AppIcon';
 
 // ── Cloudinary config ──
 const CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'dc6pf89va';
@@ -326,9 +327,9 @@ const css = `
 `;
 
 function getDocIcon(type) {
-  if (type === 'application/pdf') return { emoji: '📄', bg: '#fff3e0' };
-  if (type?.startsWith('image/')) return { emoji: '🖼️', bg: '#e8f5e9' };
-  return { emoji: '📁', bg: '#f3e5f5' };
+  if (type === 'application/pdf') return { name: 'file', bg: '#fff3e0' };
+  if (type?.startsWith('image/')) return { name: 'image', bg: '#e8f5e9' };
+  return { name: 'folder', bg: '#f3e5f5' };
 }
 function formatDate(iso) {
   if (!iso) return '';
@@ -445,7 +446,7 @@ function TenantDocsSheet({ tenant, onClose }) {
       <div className="bs">
         <div className="bs-handle" />
         <div className="bs-header">
-          <h2 className="bs-title">📂 {tenant.name}'s Docs</h2>
+          <h2 className="bs-title">Documents for {tenant.name}</h2>
           <button className="bs-close" onClick={onClose}>✕</button>
         </div>
         <div className="bs-body">
@@ -458,12 +459,12 @@ function TenantDocsSheet({ tenant, onClose }) {
                 {DOC_LABELS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
               <label className="docs-file-label">
-                📎 {selectedFile ? selectedFile.name : 'Choose file'}
+                Select file: {selectedFile ? selectedFile.name : 'Choose file'}
                 <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.pdf"
                   style={{ display: 'none' }} onChange={handleFileSelect} disabled={uploading} />
               </label>
               <button className="docs-upload-btn" onClick={handleUpload} disabled={uploading}>
-                {uploading ? 'Uploading…' : '⬆ Upload'}
+                {uploading ? 'Uploading...' : 'Upload'}
               </button>
             </div>
             {progress > 0 && (
@@ -488,7 +489,7 @@ function TenantDocsSheet({ tenant, onClose }) {
                 const icon = getDocIcon(docItem.type);
                 return (
                   <div key={i} className="docs-card">
-                    <div className="docs-icon" style={{ background: icon.bg }}>{icon.emoji}</div>
+                    <div className="docs-icon" style={{ background: icon.bg }}><AppIcon name={icon.name} size={20} /></div>
                     <div className="docs-info">
                       <div className="docs-doc-label">{docItem.label}</div>
                       <div className="docs-doc-name">{docItem.name}</div>
@@ -497,13 +498,13 @@ function TenantDocsSheet({ tenant, onClose }) {
                     <div className="docs-actions">
                       <button className="docs-action-btn"
                         style={{ background: '#eef2ff', color: '#4f46e5' }}
-                        onClick={() => window.open(docItem.url, '_blank')}>👁</button>
+                        onClick={() => window.open(docItem.url, '_blank')}>View</button>
                       <button className="docs-action-btn"
                         style={{ background: '#e8f5e9', color: '#2e7d32' }}
-                        onClick={() => handleDownload(docItem)}>⬇</button>
+                        onClick={() => handleDownload(docItem)}>Download</button>
                       <button className="docs-action-btn"
                         style={{ background: '#fce4ec', color: '#c62828' }}
-                        onClick={() => handleDelete(docItem)}>🗑</button>
+                        onClick={() => handleDelete(docItem)}>Delete</button>
                     </div>
                   </div>
                 );
@@ -856,7 +857,7 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
       <>
         <style>{css}</style>
         <div className="tn-no-pg">
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏠</div>
+          <div style={{ fontSize: '40px', marginBottom: '12px', display: 'flex', justifyContent: 'center' }}><AppIcon name="pg" size={40} /></div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>No PG Selected</div>
           <div style={{ fontSize: '13px', color: '#94a3b8' }}>Please select a PG from the dashboard.</div>
         </div>
@@ -878,7 +879,7 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button className={`view-toggle-btn ${isExcelView ? 'active' : ''}`} onClick={toggleViewMode}>
-                {isExcelView ? '📊 Table' : '🎴 Cards'}
+                {isExcelView ? 'Table' : 'Cards'}
               </button>
               <button className="tn-add-fab" onClick={() => {
                 if (pgId === '__all__') return alert('Please select a specific PG to add tenants.');
@@ -906,19 +907,19 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
         {/* Content */}
         <div className="tn-content">
           <input className="tn-search" type="text"
-            placeholder="🔍 Search by name, phone or room…"
+            placeholder="Search by name, phone or room..."
             value={search} onChange={e => setSearch(e.target.value)} />
 
           {loading ? (
             <div className="tn-loading"><div className="tn-spinner" />Loading tenants…</div>
           ) : filtered.length === 0 ? (
             <div className="tn-empty">
-              <div className="tn-empty-icon">👥</div>
+              <div className="tn-empty-icon"><AppIcon name="tenants" size={40} /></div>
               <p className="tn-empty-title">{search ? 'No tenants found' : 'No tenants yet'}</p>
               <p className="tn-empty-sub">{search ? 'Try a different search' : 'Add your first tenant to get started'}</p>
               {!search && (
                 <button className="tn-empty-btn" onClick={() => { resetForm(); setShowForm(true); }}>
-                  ➕ Add First Tenant
+                  Add First Tenant
                 </button>
               )}
             </div>
@@ -942,7 +943,7 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
                     <tr key={tenant.id}>
                       <td>
                         <div style={{ fontWeight: '700', fontSize: '14px' }}>{tenant.name}</div>
-                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>📞 {tenant.phone}</div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>{tenant.phone}</div>
                       </td>
                       <td>
                         <div style={{ fontWeight: '700' }}>Room {tenant.roomNumber}</div>
@@ -964,9 +965,9 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
                               const docPdf = buildPdf(tenant);
                               docPdf.save(`${tenant.admissionNumber || tenant.name}_form.pdf`);
                             }
-                          }}>📄</button>
-                          <button className="tnt-action-btn" onClick={() => handleEdit(tenant)}>✏️</button>
-                          <button className="tnt-action-btn" style={{ color: '#dc2626' }} onClick={() => setDeleteTarget(tenant)}>🗑️</button>
+                          }}>PDF</button>
+                          <button className="tnt-action-btn" onClick={() => handleEdit(tenant)}>Edit</button>
+                          <button className="tnt-action-btn" style={{ color: '#dc2626' }} onClick={() => setDeleteTarget(tenant)}>Delete</button>
                         </div>
                       </td>
                     </tr>
@@ -986,12 +987,12 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
                       <div style={{ flex: 1 }}>
                         <div className="tc-name">{tenant.name}</div>
                         <div className="tc-phone">
-                          📞 {tenant.phone}
+                          {tenant.phone}
                           <button className="tc-copy-phone" onClick={(e) => {
                             e.stopPropagation();
                             navigator.clipboard.writeText(tenant.phone);
                             alert('Phone number copied!');
-                          }}>📋 Copy</button>
+                          }}>Copy</button>
                         </div>
                       </div>
                       <div className="tc-status-badge">{tenant.status}</div>
@@ -999,12 +1000,12 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
 
                     <div className="tc-details">
                       {[
-                        ['🛏️ Room', `Room ${tenant.roomNumber}`],
-                        ['🪑 Bed', `Bed ${tenant.bedNumber || 'N/A'}`],
+                        ['Room', `Room ${tenant.roomNumber}`],
+                        ['Bed', `Bed ${tenant.bedNumber || 'N/A'}`],
                         ['💰 Rent', `₹${(tenant.monthlyRent || 0).toLocaleString('en-IN')}/mo`],
                         ['💵 Deposit', `₹${(tenant.deposit || 0).toLocaleString('en-IN')}`],
-                        ['📅 Check-in', tenant.checkIn || tenant.dateOfJoining || 'N/A'],
-                        ['🪪 ID', tenant.idType],
+                        ['Check-in', tenant.checkIn || tenant.dateOfJoining || 'N/A'],
+                        ['ID', tenant.idType],
                       ].map(([k, v]) => (
                         <div key={k} className="tc-detail-item">
                           <span className="tc-detail-key">{k}</span>
@@ -1014,15 +1015,15 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
                     </div>
 
                     {(tenant.company || tenant.organizationName) && (
-                      <div className="tc-company">🏢 {tenant.organizationName || tenant.company}</div>
+                      <div className="tc-company">{tenant.organizationName || tenant.company}</div>
                     )}
                     {pgId === '__all__' && (
-                      <div className="tc-company" style={{ color: '#0f3460', fontWeight: '700' }}>🏠 {getPgName(tenant.pgId)}</div>
+                      <div className="tc-company" style={{ color: '#0f3460', fontWeight: '700' }}>{getPgName(tenant.pgId)}</div>
                     )}
 
                     <div className="tc-footer">
                       <button className="tc-docs-btn" onClick={() => setDocsTenant(tenant)}>
-                        📂 Docs
+                        Documents
                       </button>
                       <button
                         className="tc-pdf-btn"
@@ -1035,10 +1036,10 @@ export default function Tenants({ pgId, allPgIds, pgs, ownerId }) {
                           }
                         }}
                       >
-                        ⬇️ PDF
+                        PDF
                       </button>
-                      <button className="tc-edit-btn" onClick={() => handleEdit(tenant)}>✏️ Edit</button>
-                      <button className="tc-del-btn" onClick={() => setDeleteTarget(tenant)}>🗑️</button>
+                      <button className="tc-edit-btn" onClick={() => handleEdit(tenant)}>Edit</button>
+                      <button className="tc-del-btn" onClick={() => setDeleteTarget(tenant)}>Delete</button>
                     </div>
                   </div>
                 </div>

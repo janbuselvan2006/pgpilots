@@ -223,46 +223,67 @@ const css = `
     margin-bottom: 16px;
   }
   .lg-remember input {
-    width: 16px; height: 16px;
-    cursor: pointer; accent-color: #e94560; flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    accent-color: #e94560;
+    margin: 0;
+    flex-shrink: 0;
   }
   .lg-remember label {
-    font-size: 13px; color: #475569;
-    cursor: pointer; font-weight: 500;
-  }
-
-  /* Sign in button */
-  .lg-btn {
-    width: 100%; padding: 15px;
-    background: linear-gradient(135deg, #e94560 0%, #c1253f 100%);
-    color: white; border: none; border-radius: 14px;
-    font-size: 15px; font-weight: 700; font-family: inherit;
+    font-size: 16px;
+    color: #0f172a;
+    line-height: 1.35;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(233,69,96,0.35);
-    -webkit-tap-highlight-color: transparent;
-    transition: opacity 0.2s, transform 0.1s;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
   }
-  .lg-btn:active { transform: scale(0.98); opacity: 0.92; }
-  .lg-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
+  .lg-btn {
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    padding: 13px 16px;
+    background: linear-gradient(135deg, #e94560 0%, #d63652 100%);
+    color: white;
+    font-size: 15px;
+    font-weight: 800;
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    box-shadow: 0 8px 18px rgba(233,69,96,0.28);
+  }
+  .lg-btn:hover { filter: brightness(1.03); }
+  .lg-btn:active { transform: translateY(1px); }
+  .lg-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
   .lg-switch {
-    text-align: center; margin-top: 20px;
-    color: #94a3b8; font-size: 13px;
+    text-align: center;
+    margin: 2px 0 14px;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.4;
   }
-  .lg-switch a { color: #e94560; font-weight: 700; text-decoration: none; }
-
+  .lg-switch a {
+    color: #e94560;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .lg-switch a:hover { text-decoration: underline; }
   .lg-back {
-    display: inline-block; margin-top: 16px;
-    font-size: 13px; color: #e94560;
-    font-weight: 700; cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
+    margin-top: 12px;
+    color: #e94560;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
-
-  /* Staff Login button */
   .lg-staff-divider {
-    display: flex; align-items: center; gap: 10px;
-    margin-top: 20px; margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0 10px;
   }
   
   .lg-google-btn {
@@ -604,9 +625,9 @@ export default function Login() {
       {/* Tabs */}
       <div className="lg-tabs">
         {[
-          {id:'pgcode', label:'🔑 PG Code'},
-          {id:'mobile', label:'📱 Mobile'},
-          {id:'email',  label:'📧 Email'},
+          {id:'pgcode', label:'PG Code'},
+          {id:'mobile', label:'Mobile'},
+          {id:'email',  label:'Email'},
         ].map(({id,label}) => (
           <button key={id}
             className={`lg-tab${loginType===id?' active':''}`}
@@ -732,22 +753,30 @@ export default function Login() {
         {/* ── Hero / Left panel ── */}
         <div className="lg-hero">
           <div className="lg-hero-inner">
-            <div className="lg-hero-brand">🏠 PGpilots</div>
+            <div className="lg-hero-brand">
+              <svg width="22" height="22" viewBox="0 0 32 32" fill="none" style={{ marginRight: '8px' }}>
+                <path d="M7 15 L7 27 C7 28.1 7.9 29 9 29 L13 29 L13 22 C13 20.9 13.9 20 15 20 L17 20 C18.1 20 19 20.9 19 22 L19 29 L23 29 C24.1 29 25 28.1 25 27 L25 15 L16 8 Z" fill="white" />
+                <rect x="2" y="14" width="18" height="4" rx="2" fill="#00E599" transform="rotate(-40 2 14)" />
+                <rect x="16" y="3" width="18" height="4" rx="2" fill="#00E599" transform="rotate(40 16 3)" />
+              </svg>
+              PGpilots
+            </div>
             <h1 className="lg-hero-title">Manage your PG<br/>like a Pro</h1>
 
-            {/* Desktop features list */}
             <p className="lg-hero-sub">
               All-in-one platform for PG owners to manage tenants, rooms, rent and more.
             </p>
             <div className="lg-hero-features">
-              {['✅ Tenant Management','✅ Rent Tracking','✅ Electricity Bills','✅ Automated Reminders'].map(f=>(
-                <div key={f} className="lg-hero-feature">{f}</div>
+              {['Tenant Management','Rent Tracking','Electricity Bills','Automated Reminders'].map(f => (
+                <div key={f} className="lg-hero-feature" style={{ display: 'flex', alignItems: 'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00E599" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>
+                  {f}
+                </div>
               ))}
             </div>
 
-            {/* Mobile stats strip */}
             <div className="lg-stats">
-              {[['500+','PG Owners'],['10k+','Tenants'],['₹1Cr+','Collected']].map(([num,label])=>(
+              {[['500+','PG Owners'],['10k+','Tenants'],['₹1Cr+','Collected']].map(([num,label]) => (
                 <div key={label} className="lg-stat">
                   <div className="lg-stat-num">{num}</div>
                   <div className="lg-stat-label">{label}</div>
@@ -768,3 +797,4 @@ export default function Login() {
     </>
   );
 }
+

@@ -495,7 +495,7 @@ export default function Dashboard() {
 
       const sortedTenants = tenants.map(t => ({
         type: 'tenant',
-        icon: '👤',
+        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>,
         bg: '#eff6ff',
         text: `${t.name} joined — Room ${t.roomNumber || t.room || '?'}${pgId === ALL_PGS_ID ? ` · ${getPgName(t.pgId)}` : ''}`,
         date: t.createdAt?.toDate ? t.createdAt.toDate() : new Date(t.createdAt || 0),
@@ -503,7 +503,7 @@ export default function Dashboard() {
 
       const sortedPayments = payments.map(p => ({
         type: 'payment',
-        icon: '💰',
+        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>,
         bg: '#ecfdf5',
         text: `${p.tenantName} paid ₹${p.amount?.toLocaleString('en-IN')}${pgId === ALL_PGS_ID ? ` · ${getPgName(p.pgId)}` : ''}`,
         date: p.recordedAt ? new Date(p.recordedAt) : new Date(p.paymentDate || 0),
@@ -655,30 +655,30 @@ export default function Dashboard() {
   };
 
   const menuItems = [
-    { icon: '📊', label: 'Dashboard' },
-    { icon: '🛏️', label: 'Rooms' },
-    { icon: '👥', label: 'Tenants' },
-    { icon: '💰', label: 'Rent' },
-    { icon: '⚡', label: 'Electricity' },
-    { icon: '🍽️', label: 'Food Menu' },
-    { icon: '📄', label: 'ID Proofs' },
-    { icon: '📈', label: 'Reports' },
-    { icon: '🔔', label: 'Notifications' },
-    { icon: '⚙️', label: 'Settings' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>, label: 'Dashboard' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 20v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8" /><path d="M5 10V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4" /><path d="M2 20h20" /><path d="M12 4v16" /></svg>, label: 'Rooms' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>, label: 'Tenants' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>, label: 'Rent' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>, label: 'Electricity' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>, label: 'Food Menu' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>, label: 'ID Proofs' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>, label: 'Reports' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>, label: 'Notifications' },
+    { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>, label: 'Settings' },
   ];
 
   const statTiles = [
-    { icon: '👥', label: 'Tenants', value: statsLoading ? '…' : dashStats.totalTenants, color: '#4f46e5', menu: 'Tenants' },
-    { icon: '🛏️', label: 'Vacant', value: statsLoading ? '…' : dashStats.vacantBeds, color: '#059669', menu: 'Rooms' },
-    { icon: '💰', label: 'Revenue', value: statsLoading ? '…' : `₹${dashStats.monthlyRevenue.toLocaleString('en-IN')}`, color: '#d97706', menu: 'Rent' },
-    { icon: '⏳', label: 'Pending', value: statsLoading ? '…' : dashStats.pendingRents, color: '#dc2626', menu: 'Rent' },
+    { icon: (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>), label: 'Tenants', value: statsLoading ? '…' : dashStats.totalTenants, color: '#4f46e5', menu: 'Tenants' },
+    { icon: (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 20v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8"/><path d="M5 10V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4"/><line x1="2" y1="20" x2="22" y2="20"/></svg>), label: 'Vacant', value: statsLoading ? '…' : dashStats.vacantBeds, color: '#059669', menu: 'Rooms' },
+    { icon: (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9.5a3.5 3.5 0 0 0-5 0v5a3.5 3.5 0 0 0 5 0"/><line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/></svg>), label: 'Revenue', value: statsLoading ? '…' : `₹${dashStats.monthlyRevenue.toLocaleString('en-IN')}`, color: '#d97706', menu: 'Rent' },
+    { icon: (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>), label: 'Pending', value: statsLoading ? '…' : dashStats.pendingRents, color: '#dc2626', menu: 'Rent' },
   ];
 
   const quickActions = [
-    { icon: '➕', label: 'Add Tenant', menu: 'Tenants', accent: '#4f46e5' },
-    { icon: '🛏️', label: 'Add Room', menu: 'Rooms', accent: '#059669' },
-    { icon: '💰', label: 'Record Payment', menu: 'Rent', accent: '#d97706' },
-    { icon: '⚡', label: 'Electricity', menu: 'Electricity', accent: '#dc2626' },
+    { icon: (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>), label: 'Add Tenant', menu: 'Tenants', accent: '#4f46e5' },
+    { icon: (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="10" width="18" height="11" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>), label: 'Add Room', menu: 'Rooms', accent: '#059669' },
+    { icon: (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>), label: 'Record Payment', menu: 'Rent', accent: '#d97706' },
+    { icon: (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>), label: 'Electricity', menu: 'Electricity', accent: '#dc2626' },
   ];
 
   const knownPages = ['Dashboard', 'Rooms', 'Tenants', 'Rent', 'Electricity', 'Reports', 'Settings'];
@@ -708,10 +708,20 @@ export default function Dashboard() {
         {/* ── Mobile Header ── */}
         <div className="db-mobile-header">
           <button className="db-hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
-            {sidebarOpen ? '✕' : '☰'}
+            {sidebarOpen
+              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            }
           </button>
           <div style={{ textAlign: 'center' }}>
-            <div className="db-mobile-logo">🏠 PGpilots</div>
+            <div className="db-mobile-logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+                <path d="M7 15 L7 27 C7 28.1 7.9 29 9 29 L13 29 L13 22 C13 20.9 13.9 20 15 20 L17 20 C18.1 20 19 20.9 19 22 L19 29 L23 29 C24.1 29 25 28.1 25 27 L25 15 L16 8 Z" fill="#1a1a2e" />
+                <rect x="2" y="14" width="18" height="4" rx="2" fill="#00E599" transform="rotate(-40 2 14)" />
+                <rect x="16" y="3" width="18" height="4" rx="2" fill="#00E599" transform="rotate(40 16 3)" />
+              </svg>
+              PGpilots
+            </div>
             <div className="db-mobile-pg-name">{isAllSelected ? 'All PGs' : (selectedPg?.pgName || '')}</div>
           </div>
           <div className="db-plan-badge">Usage Billing</div>
@@ -723,7 +733,14 @@ export default function Dashboard() {
         {/* ── Sidebar ── */}
         <div className={`db-sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="db-sidebar-top">
-            <div className="db-sidebar-logo">🏠 PGpilots</div>
+            <div className="db-sidebar-logo">
+              <svg width="24" height="24" viewBox="0 0 32 32" fill="none" style={{ marginRight: '8px' }}>
+                <path d="M7 15 L7 27 C7 28.1 7.9 29 9 29 L13 29 L13 22 C13 20.9 13.9 20 15 20 L17 20 C18.1 20 19 20.9 19 22 L19 29 L23 29 C24.1 29 25 28.1 25 27 L25 15 L16 8 Z" fill="white" />
+                <rect x="2" y="14" width="18" height="4" rx="2" fill="#00E599" transform="rotate(-40 2 14)" />
+                <rect x="16" y="3" width="18" height="4" rx="2" fill="#00E599" transform="rotate(40 16 3)" />
+              </svg>
+              PGpilots
+            </div>
             {pgOwner && (
               <div className="db-owner-box">
                 <div className="db-owner-avatar">
@@ -740,7 +757,15 @@ export default function Dashboard() {
           {/* ✅ Multi-PG switcher in sidebar */}
           {pgs.length > 0 && (
             <div className="db-pg-switcher">
-              <div className="db-pg-switcher-label">🏠 Active PG</div>
+              <div className="db-pg-switcher-label">
+                <svg width="10" height="10" viewBox="0 0 32 32" fill="none" style={{ marginRight: '4px', verticalAlign: 'middle' }}>
+                  <rect x="4" y="4" width="10" height="8" rx="3" fill="currentColor" opacity="0.6" />
+                  <rect x="18" y="4" width="10" height="14" rx="3" fill="currentColor" />
+                  <rect x="4" y="16" width="10" height="12" rx="3" fill="currentColor" />
+                  <rect x="18" y="22" width="10" height="6" rx="3" fill="currentColor" opacity="0.6" />
+                </svg>
+                Active PG
+              </div>
               <PgSwitcherSelect className="db-pg-select" />
             </div>
           )}
@@ -760,7 +785,10 @@ export default function Dashboard() {
               </div>
             ))}
           </nav>
-          <button className="db-logout-btn" onClick={handleLogout}>🚪 Logout</button>
+          <button className="db-logout-btn" onClick={handleLogout}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'6px',verticalAlign:'middle'}}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Logout
+          </button>
         </div>
 
         {/* ── Main ── */}
@@ -829,7 +857,7 @@ export default function Dashboard() {
                 {/* Mobile hero */}
                 <div className="db-dash-topbar">
                   <div className="db-dash-greeting">
-                    👋 {pgOwner ? `Hey, ${(pgOwner.ownerName || pgOwner.name || '').split(' ')[0]}!` : 'Welcome back!'}
+                    {pgOwner ? `Hey, ${(pgOwner.ownerName || pgOwner.name || '').split(' ')[0]}!` : 'Welcome back!'}
                   </div>
                   <div className="db-dash-sub">
                     {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -872,7 +900,10 @@ export default function Dashboard() {
                       <div className="db-section-title">Pending Payments</div>
                       <div className="db-pending-card">
                         <div className="db-pending-header">
-                          <div className="db-pending-title">⏳ Rent Due</div>
+                          <div className="db-pending-title" style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            Rent Due
+                          </div>
                           <div className="db-pending-count">{pendingList.length} tenants</div>
                         </div>
                         {pendingList.map((p, i) => {
@@ -906,7 +937,9 @@ export default function Dashboard() {
                                     navigator.clipboard.writeText(p.phone);
                                     alert('Phone number copied!');
                                   }}>
-                                    📞 {p.phone} 📋
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'4px',verticalAlign:'middle'}}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                    {p.phone}
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:'6px',verticalAlign:'middle'}}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                   </div>
                                 )}
                               </div>
@@ -936,7 +969,9 @@ export default function Dashboard() {
                                     boxShadow: isSentThisPeriod ? 'none' : '0 4px 12px rgba(37,211,102,0.2)'
                                   }}
                                 >
-                                  {isSentThisPeriod ? '✅ OK' : '📲 Remind'}
+                                  {isSentThisPeriod
+                                    ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'4px',verticalAlign:'middle'}}><polyline points="20 6 9 17 4 12"/></svg>Sent</>
+                                    : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'4px',verticalAlign:'middle'}}><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Remind</>}
                                 </button>
                               </div>
                             </div>

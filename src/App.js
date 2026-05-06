@@ -27,8 +27,13 @@ function LoadingScreen() {
         animation: 'appspin 0.7s linear infinite',
       }} />
       <style>{`@keyframes appspin { to { transform: rotate(360deg); } }`}</style>
-      <div style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '600' }}>
-        🏠 PGpilots
+      <div style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+          <path d="M7 15 L7 27 C7 28.1 7.9 29 9 29 L13 29 L13 22 C13 20.9 13.9 20 15 20 L17 20 C18.1 20 19 20.9 19 22 L19 29 L23 29 C24.1 29 25 28.1 25 27 L25 15 L16 8 Z" fill="#1a1a2e" />
+          <rect x="2" y="14" width="18" height="4" rx="2" fill="#00E599" transform="rotate(-40 2 14)" />
+          <rect x="16" y="3" width="18" height="4" rx="2" fill="#00E599" transform="rotate(40 16 3)" />
+        </svg>
+        PGpilots
       </div>
     </div>
   );

@@ -210,9 +210,18 @@ export default function StaffLogin() {
       <div className="sl-root">
         <div className="sl-card">
           <div className="sl-brand">
-            <div className="sl-brand-logo">🏠</div>
+            <div className="sl-brand-logo" style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+              <svg width="42" height="42" viewBox="0 0 32 32" fill="none">
+                <path d="M7 15 L7 27 C7 28.1 7.9 29 9 29 L13 29 L13 22 C13 20.9 13.9 20 15 20 L17 20 C18.1 20 19 20.9 19 22 L19 29 L23 29 C24.1 29 25 28.1 25 27 L25 15 L16 8 Z" fill="#1a1a2e" />
+                <rect x="2" y="14" width="18" height="4" rx="2" fill="#00E599" transform="rotate(-40 2 14)" />
+                <rect x="16" y="3" width="18" height="4" rx="2" fill="#00E599" transform="rotate(40 16 3)" />
+              </svg>
+            </div>
             <div className="sl-brand-name">PGpilots</div>
-            <div className="sl-brand-tag">👥 STAFF LOGIN</div>
+            <div className="sl-brand-tag">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'5px',verticalAlign:'middle'}}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              STAFF LOGIN
+            </div>
           </div>
 
           <h2 className="sl-title">Staff Sign In</h2>

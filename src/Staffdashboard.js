@@ -11,6 +11,7 @@ import TenantsPage     from './pages/TenantsPage';
 import RentPage        from './pages/RentPage';
 import ElectricityPage from './pages/ElectricityPage';
 import ReportsPage     from './pages/ReportsPage';
+import AppIcon from './components/AppIcon';
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -59,7 +60,10 @@ const css = `
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
     border-radius: 14px; padding: 12px 16px; margin-top: 14px; position: relative; z-index: 1;
   }
-  .sd-pg-icon { font-size: 24px; }
+  .sd-pg-icon {
+    width: 24px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
   .sd-pg-name { font-size: 15px; font-weight: 800; color: white; }
   .sd-pg-code { font-size: 11px; color: rgba(233,69,96,0.9); font-weight: 800; margin-top: 2px; letter-spacing: 1px; }
   .sd-pg-role { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
@@ -73,7 +77,10 @@ const css = `
   }
   .sd-stat-tile { padding: 12px 6px; text-align: center; border-right: 1px solid #f1f5f9; }
   .sd-stat-tile:last-child { border-right: none; }
-  .sd-stat-icon  { font-size: 16px; margin-bottom: 3px; }
+  .sd-stat-icon  {
+    width: 18px; height: 18px; margin: 0 auto 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
   .sd-stat-val   { font-size: 15px; font-weight: 800; line-height: 1; }
   .sd-stat-label { font-size: 8px; color: #94a3b8; font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
 
@@ -89,7 +96,10 @@ const css = `
     transition: transform 0.15s; -webkit-tap-highlight-color: transparent;
   }
   .sd-quick-btn:active { transform: scale(0.97); }
-  .sd-quick-icon  { font-size: 24px; }
+  .sd-quick-icon  {
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+  }
   .sd-quick-label { font-size: 11px; font-weight: 700; text-align: center; }
 
   /* Recent tenants */
@@ -118,12 +128,18 @@ const css = `
     background: #fef2f2; border: 1.5px solid #fecaca;
     border-radius: 16px; padding: 28px 20px; text-align: center; margin: 20px 16px;
   }
-  .sd-error-icon { font-size: 40px; margin-bottom: 10px; }
+  .sd-error-icon {
+    width: 40px; height: 40px; margin: 0 auto 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
   .sd-error-text { font-size: 15px; font-weight: 700; color: #dc2626; margin-bottom: 6px; }
   .sd-error-sub  { font-size: 13px; color: #94a3b8; }
 
   .sd-empty { text-align: center; padding: 40px 20px; background: white; border-radius: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
-  .sd-empty-icon { font-size: 40px; margin-bottom: 10px; }
+  .sd-empty-icon {
+    width: 40px; height: 40px; margin: 0 auto 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
 
   /* ── Bottom Nav ── */
   .sd-bottom-nav {
@@ -139,7 +155,10 @@ const css = `
     -webkit-tap-highlight-color: transparent; transition: color 0.15s;
   }
   .sd-nav-btn.active { color: #667eea; }
-  .sd-nav-icon  { font-size: 20px; }
+  .sd-nav-icon  {
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+  }
   .sd-nav-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
 `;
 
@@ -248,7 +267,7 @@ export default function StaffDashboard() {
   })();
 
   const menuItems = [
-    { icon:'📊', label:'Dashboard'   },
+    { icon: <svg width="16" height="16" viewBox="0 0 32 32" fill="none" style={{ display: 'inline-block', verticalAlign: 'middle' }}><rect x="4" y="4" width="10" height="8" rx="3" fill="currentColor" opacity="0.8" /><rect x="18" y="4" width="10" height="14" rx="3" fill="currentColor" /><rect x="4" y="16" width="10" height="12" rx="3" fill="currentColor" /><rect x="18" y="22" width="10" height="6" rx="3" fill="currentColor" opacity="0.8" /></svg>, label:'Dashboard'   },
     { icon:'🛏️', label:'Rooms'       },
     { icon:'👥', label:'Tenants'     },
     { icon:'💰', label:'Rent'        },
@@ -261,6 +280,22 @@ export default function StaffDashboard() {
     { icon:'🛏️', label:'Add Room',     menu:'Rooms',       accent:'#059669' },
     { icon:'💰', label:'Collect Rent', menu:'Rent',        accent:'#d97706' },
     { icon:'⚡', label:'Electricity',  menu:'Electricity', accent:'#dc2626' },
+  ];
+
+  const refinedMenuItems = [
+    { icon: <AppIcon name="dashboard" size={16} />, label: 'Dashboard' },
+    { icon: <AppIcon name="rooms" size={18} />, label: 'Rooms' },
+    { icon: <AppIcon name="tenants" size={18} />, label: 'Tenants' },
+    { icon: <AppIcon name="rent" size={18} />, label: 'Rent' },
+    { icon: <AppIcon name="electricity" size={18} />, label: 'Electricity' },
+    { icon: <AppIcon name="reports" size={18} />, label: 'Reports' },
+  ];
+
+  const refinedQuickActions = [
+    { icon: <AppIcon name="add" size={22} />, label: 'Add Tenant', menu: 'Tenants', accent: '#4f46e5' },
+    { icon: <AppIcon name="rooms" size={22} />, label: 'Add Room', menu: 'Rooms', accent: '#059669' },
+    { icon: <AppIcon name="rent" size={22} />, label: 'Collect Rent', menu: 'Rent', accent: '#d97706' },
+    { icon: <AppIcon name="electricity" size={22} />, label: 'Electricity', menu: 'Electricity', accent: '#dc2626' },
   ];
 
   if (loading) {
@@ -298,10 +333,18 @@ export default function StaffDashboard() {
 
         {/* ── Mobile Header ── */}
         <div className="sd-mobile-header">
-          <div className="sd-mobile-logo">🏠 {staffInfo?.pgName || 'PGpilots'}</div>
+          <div className="sd-mobile-logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
+              <rect x="4" y="4" width="10" height="8" rx="3" fill="#00E599" />
+              <rect x="18" y="4" width="10" height="14" rx="3" fill="#fff" />
+              <rect x="4" y="16" width="10" height="12" rx="3" fill="#fff" />
+              <rect x="18" y="22" width="10" height="6" rx="3" fill="#00E599" />
+            </svg>
+            {staffInfo?.pgName || 'PGpilots'}
+          </div>
           <div className="sd-mobile-right">
             <span className="sd-staff-badge">STAFF</span>
-            <button className="sd-logout-btn" onClick={handleLogout}>🚪</button>
+            <button className="sd-logout-btn" onClick={handleLogout}><AppIcon name="logout" size={16} /></button>
           </div>
         </div>
 
@@ -319,13 +362,20 @@ export default function StaffDashboard() {
           {activeMenu === 'Dashboard' && (
             <>
               <div className="sd-dash-topbar">
-                <div className="sd-greeting">👋 Hey, {staffInfo?.name || 'Staff'}!</div>
+                <div className="sd-greeting">Welcome, {staffInfo?.name || 'Staff'}</div>
                 <div className="sd-date">{today}</div>
                 <div className="sd-pg-chip">
-                  <span className="sd-pg-icon">🏠</span>
+                  <span className="sd-pg-icon">
+                    <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+                      <rect x="4" y="4" width="10" height="8" rx="3" fill="#00E599" />
+                      <rect x="18" y="4" width="10" height="14" rx="3" fill="#fff" />
+                      <rect x="4" y="16" width="10" height="12" rx="3" fill="#fff" />
+                      <rect x="18" y="22" width="10" height="6" rx="3" fill="#00E599" />
+                    </svg>
+                  </span>
                   <div>
                     <div className="sd-pg-name">{staffInfo?.pgName || '—'}</div>
-                    {staffInfo?.pgCode && <div className="sd-pg-code">🔑 {staffInfo.pgCode}</div>}
+                    {staffInfo?.pgCode && <div className="sd-pg-code" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><AppIcon name="key" size={12} /> {staffInfo.pgCode}</div>}
                     <div className="sd-pg-role">Staff Access</div>
                   </div>
                 </div>
@@ -334,10 +384,10 @@ export default function StaffDashboard() {
               {/* Stats strip */}
               <div className="sd-stats-strip">
                 {[
-                  { icon:'👥', label:'Tenants',   val: tenants.length,                          color:'#4f46e5' },
-                  { icon:'🛏️', label:'Vacant',    val: vacantBeds,                              color:'#059669' },
+                  { icon: <AppIcon name="tenants" size={18} />, label:'Tenants',   val: tenants.length,                         color:'#4f46e5' },
+                  { icon: <AppIcon name="rooms" size={18} />, label:'Vacant',    val: vacantBeds,                             color:'#059669' },
                   { icon:'💰', label:'Collected', val:`₹${monthlyRevenue.toLocaleString('en-IN')}`,  color:'#d97706' },
-                  { icon:'⏳', label:'Pending',   val: pendingCount,                            color:'#dc2626' },
+                  { icon: <AppIcon name="pending" size={18} />, label:'Pending',   val: pendingCount,                           color:'#dc2626' },
                 ].map(({ icon, label, val, color }) => (
                   <div key={label} className="sd-stat-tile">
                     <div className="sd-stat-icon">{icon}</div>
@@ -351,7 +401,7 @@ export default function StaffDashboard() {
                 {/* Quick Actions */}
                 <div className="sd-section-title">Quick Actions</div>
                 <div className="sd-quick-grid">
-                  {quickActions.map(({ icon, label, menu, accent }) => (
+                  {refinedQuickActions.map(({ icon, label, menu, accent }) => (
                     <button key={label} className="sd-quick-btn" onClick={() => handleMenu(menu)}>
                       <div className="sd-quick-icon">{icon}</div>
                       <div className="sd-quick-label" style={{ color: accent }}>{label}</div>
@@ -363,7 +413,7 @@ export default function StaffDashboard() {
                 <div className="sd-section-title">Recent Tenants</div>
                 {tenants.length === 0 ? (
                   <div className="sd-empty">
-                    <div className="sd-empty-icon">👥</div>
+                    <div className="sd-empty-icon"><AppIcon name="tenants" size={40} /></div>
                     <div style={{ fontSize:'14px', fontWeight:'600', color:'#64748b' }}>No tenants yet</div>
                   </div>
                 ) : tenants.slice(0, 5).map(t => {
@@ -383,7 +433,7 @@ export default function StaffDashboard() {
                         background: isPaid ? '#ecfdf5' : '#fef2f2',
                         color:      isPaid ? '#059669' : '#dc2626',
                       }}>
-                        {isPaid ? '✅ Paid' : '⏳ Due'}
+                        {isPaid ? 'Paid' : 'Due'}
                       </span>
                     </div>
                   );
@@ -395,7 +445,7 @@ export default function StaffDashboard() {
 
         {/* ── Bottom Nav ── */}
         <div className="sd-bottom-nav">
-          {menuItems.slice(0, 4).map(({ icon, label }) => (
+          {refinedMenuItems.slice(0, 4).map(({ icon, label }) => (
             <button key={label}
               className={`sd-nav-btn${activeMenu === label ? ' active' : ''}`}
               onClick={() => handleMenu(label)}>
@@ -410,7 +460,7 @@ export default function StaffDashboard() {
               else handleMenu('Electricity');
             }}>
             <span className="sd-nav-icon">
-              {activeMenu === 'Reports' ? '📈' : '⚡'}
+              {activeMenu === 'Reports' ? <AppIcon name="reports" size={18} /> : <AppIcon name="electricity" size={18} />}
             </span>
             <span className="sd-nav-label">
               {activeMenu === 'Reports' ? 'Reports' : 'More'}
@@ -422,3 +472,4 @@ export default function StaffDashboard() {
     </>
   );
 }
+

@@ -352,7 +352,7 @@ export default function Rooms({ pgId, allPgIds, pgs, ownerId }) {
       <>
         <style>{css}</style>
         <div className="rooms-no-pg">
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏠</div>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>PG</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>No PG Selected</div>
           <div style={{ fontSize: '13px', color: '#94a3b8' }}>Please select a PG from the dashboard to manage rooms.</div>
         </div>
@@ -396,13 +396,13 @@ export default function Rooms({ pgId, allPgIds, pgs, ownerId }) {
             <div className="rooms-loading"><div className="rooms-spinner" />Loading rooms…</div>
           ) : rooms.length === 0 ? (
             <div className="rooms-empty">
-              <div className="rooms-empty-icon">🛏️</div>
+              <div className="rooms-empty-icon">RM</div>
               <p className="rooms-empty-title">No rooms yet</p>
               <p className="rooms-empty-sub">Add your first room to get started</p>
               <button className="rooms-empty-btn" onClick={() => { 
                 if (pgId === '__all__') return alert('Please select a specific PG to add rooms.');
                 resetForm(); setShowForm(true); 
-              }}>➕ Add First Room</button>
+              }}>Add First Room</button>
             </div>
           ) : (
             <div className="rooms-grid">
@@ -416,22 +416,22 @@ export default function Rooms({ pgId, allPgIds, pgs, ownerId }) {
                     <div className="room-card-header">
                       <div className="room-num-badge">Room {room.roomNumber}</div>
                       <div className="room-status-badge" style={{ background: isFull ? '#fef2f2' : '#ecfdf5', color: isFull ? '#dc2626' : '#059669' }}>
-                        {isFull ? '🔴 Full' : `🟢 ${vacant} Free`}
+                        {isFull ? 'Full' : `${vacant} Available`}
                       </div>
                     </div>
                     <div className="room-chips">
-                      {room.floor && <span className="room-chip">📍 {room.floor} Floor</span>}
+                      {room.floor && <span className="room-chip">{room.floor} Floor</span>}
                       <span className="room-chip">{room.roomType}</span>
                       <span className="room-chip">{room.bathType}</span>
                       <span className="room-chip">{room.acType}</span>
                     </div>
                     {pgId === '__all__' && (
                       <div style={{ padding: '0 16px 14px', fontSize: '11px', fontWeight: '800', color: '#0f3460' }}>
-                        🏠 {getPgName(room.pgId)}
+                        {getPgName(room.pgId)}
                       </div>
                     )}
                     <div className="bed-section">
-                      <div className="bed-section-title">🛏️ Bed Status</div>
+                      <div className="bed-section-title">Bed Status</div>
                       <div className="bed-grid">
                         {Array.from({ length: room.totalBeds }, (_, i) => {
                           const bNum = i + 1;
