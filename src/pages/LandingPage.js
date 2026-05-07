@@ -245,9 +245,9 @@ function LandingPage() {
           display:flex; align-items:center; cursor:pointer; letter-spacing: -0.04em;
         }
         .lp-nav-logo span { color: var(--text-muted); font-weight: 500; }
-        .lp-nav-links { display:flex; align-items:center; gap:24px; list-style:none; margin:0; padding:0; position: absolute; left: 50%; transform: translateX(-50%); }
-        @media(max-width: 900px) { .lp-nav-links { display: none; } }
-        .lp-nav-links a { color:var(--text-muted); text-decoration:none; font-size:14px; font-weight:600; transition:color 0.2s; cursor:pointer; }
+        .lp-nav-links { display:flex; align-items:center; gap:24px; list-style:none; margin:0; padding:0; }
+        @media(max-width: 1100px) { .lp-nav-links { display: none; } }
+        .lp-nav-links a { color:var(--text-muted); text-decoration:none; font-size:14px; font-weight:600; transition:color 0.2s; cursor:pointer; white-space: nowrap; }
         .lp-nav-links a:hover { color:var(--navy); }
         .lp-nav-cta { 
           background: var(--navy); color: var(--brand); /* Navy Background, Mint Text for ultimate pop */
@@ -255,6 +255,12 @@ function LandingPage() {
           transition: all 0.2s; border:none; cursor:pointer; font-size:14px; 
         }
         .lp-nav-cta:hover { background: var(--navy-light); box-shadow: 0 4px 12px rgba(10, 25, 48, 0.3); transform: translateY(-1px); }
+        .lp-nav-cta-outline {
+          background: transparent; color: var(--navy); border: 2px solid var(--navy);
+          padding: 10px 24px; border-radius: 100px; font-weight: 700;
+          transition: all 0.2s; cursor: pointer; font-size: 14px;
+        }
+        .lp-nav-cta-outline:hover { background: var(--navy); color: var(--brand); transform: translateY(-1px); }
 
         /* ── HERO SECTION ── */
         .lp-hero { 
@@ -316,7 +322,38 @@ function LandingPage() {
           display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-family: inherit; 
         }
         .btn-secondary:hover { border-color: var(--navy); background: var(--bg-surface); }
-        .hero-btns { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; animation:fadeUp 0.6s 0.3s ease both; position: relative; z-index: 10; margin-bottom: 32px;}
+        .btn-accent { 
+          position: relative;
+          background: #fff; color: var(--navy); padding: 14px 28px; 
+          border-radius: 100px; text-decoration: none; font-weight: 800; font-size: 15px; 
+          border: 2px solid transparent; transition: all 0.3s; 
+          display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-family: inherit; 
+          z-index: 1;
+          background-clip: padding-box;
+        }
+        
+        .btn-accent::before {
+          content: '';
+          position: absolute;
+          inset: -3px;
+          background: repeating-conic-gradient(var(--navy) 0% 2%, transparent 2% 4%);
+          border-radius: 100px;
+          animation: escalator 15s linear infinite;
+          z-index: -1;
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+        }
+
+        .btn-accent:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(10, 25, 48, 0.1); }
+        .btn-accent strong { color: var(--navy); text-decoration: underline; }
+
+        @keyframes escalator {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        .hero-btns { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; animation:fadeUp 0.6s 0.3s ease both; position: relative; z-index: 10; margin-bottom: 24px;}
 
         /* ── HERO MOCKUPS (Abstracted Phone & Cards) ── */
         .hero-visual {
@@ -578,7 +615,9 @@ function LandingPage() {
               <li><a href="#how">How it works</a></li>
               <li><a href="#pricing">Pricing</a></li>
             </ul>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+              <span style={{ color: 'var(--navy)', fontSize: '13px', fontWeight: '700', cursor: 'pointer', borderBottom: '2px solid var(--brand)' }} onClick={() => navigate('/find-pg')}>For Tenants</span>
+              <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)' }} />
               <a href="#login" style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); goLogin(); }}>Sign In</a>
               <button className="lp-nav-cta" onClick={goSignup}>Start Free Trial</button>
             </div>
@@ -605,6 +644,12 @@ function LandingPage() {
           <div className="hero-btns">
             <button className="btn-primary" onClick={goSignup}>{Icons.rocket} Start 14-Day Free Trial</button>
             <a href="#features" className="btn-secondary">See how it works →</a>
+          </div>
+          
+          <div className="hero-tenant-prompt" style={{ animation: 'fadeUp 0.6s 0.4s ease both', position: 'relative', zIndex: 10, marginTop: '16px' }}>
+            <button className="btn-accent" onClick={() => navigate('/find-pg')}>
+              Are you looking for PG Hostel? <strong>Find now →</strong>
+            </button>
           </div>
 
           <div className="hero-visual">

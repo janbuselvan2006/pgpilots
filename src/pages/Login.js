@@ -20,69 +20,133 @@ const css = `
   .lg-root {
     min-height: 100dvh;
     font-family: 'Plus Jakarta Sans', sans-serif;
-    background: #f5f6fa;
+    background: #ffffff;
     display: flex;
     flex-direction: column;
   }
-
-  /* ─── HERO (mobile: compact banner, desktop: left sidebar) ─── */
-  .lg-hero {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 55%, #0f3460 100%);
-    padding: 28px 24px 32px;
-    position: relative; overflow: hidden;
-    flex-shrink: 0;
+  .lg-topbar {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid #e8edf5;
+    background: #ffffff;
+    position: sticky; top: 0; z-index: 100;
   }
-  .lg-hero::after {
-    content: ''; position: absolute;
-    width: 260px; height: 260px; border-radius: 50%;
-    background: rgba(233,69,96,0.12);
-    top: -70px; right: -50px; pointer-events: none;
+  .lg-brand {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 22px; font-weight: 800; color: #e94560;
+    letter-spacing: -0.3px;
+  }
+  .lg-trust {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: #475569; font-weight: 600;
+  }
+  .lg-main {
+    flex: 1; display: flex; flex-direction: column;
+  }
+
+  /* ── LEFT HERO PANEL ── */
+  .lg-hero {
+    background: #ffffff;
+    padding: 32px 24px 28px;
+    position: relative; overflow: hidden;
   }
   .lg-hero-inner { position: relative; z-index: 1; }
-  .lg-hero-brand {
-    font-size: 15px; font-weight: 800; color: #e94560;
-    margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
-  }
   .lg-hero-title {
-    font-size: clamp(22px, 6vw, 30px);
-    font-weight: 800; color: white;
-    line-height: 1.25; margin-bottom: 14px;
+    font-size: clamp(28px, 6vw, 48px);
+    font-weight: 800; color: #0f172a;
+    line-height: 1.1; margin-bottom: 14px;
+    letter-spacing: -1px;
   }
-  /* Features visible on mobile too */
+  .lg-hero-title em { color: #e94560; font-style: normal; }
   .lg-hero-sub {
-    color: rgba(255,255,255,0.6); font-size: 13px;
-    line-height: 1.6; margin-bottom: 14px;
+    color: #64748b; font-size: 15px;
+    line-height: 1.65; margin-bottom: 28px;
   }
-  .lg-hero-features { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-  .lg-hero-feature  { color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 500; }
-  /* Stats strip — mobile only */
-  .lg-stats {
-    display: flex; gap: 0;
-    border-radius: 14px; overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.1);
+  /* Feature rows */
+  .lg-features { display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px; }
+  .lg-feature-item { display: flex; align-items: flex-start; gap: 14px; }
+  .lg-feature-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 18px;
   }
-  .lg-stat {
-    flex: 1; text-align: center;
-    padding: 12px 6px;
-    background: rgba(255,255,255,0.05);
-    border-right: 1px solid rgba(255,255,255,0.08);
+  .lg-feature-icon.red   { background: #fff1f3; }
+  .lg-feature-icon.green { background: #f0fdf4; }
+  .lg-feature-icon.blue  { background: #eff6ff; }
+  .lg-feature-icon.amber { background: #fffbeb; }
+  .lg-feature-text h4 { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
+  .lg-feature-text p  { font-size: 12px; color: #64748b; line-height: 1.45; }
+  /* Building visual card */
+  .lg-building-wrap {
+    position: relative; margin-bottom: 20px;
+    border-radius: 20px; overflow: hidden;
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%);
+    height: 180px; display: flex; align-items: flex-end;
   }
-  .lg-stat:last-child { border-right: none; }
-  .lg-stat-num   { font-size: 15px; font-weight: 800; color: #e94560; line-height: 1; }
-  .lg-stat-label { font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+  .lg-building-img {
+    width: 100%; height: 100%; object-fit: cover;
+    opacity: 0.75; position: absolute; inset: 0;
+  }
+  .lg-building-badge {
+    position: absolute; top: 14px; right: 14px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 12px; padding: 8px 14px;
+    font-size: 12px; font-weight: 800; color: #0f172a;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    text-align: center; line-height: 1.3;
+  }
+  .lg-building-badge span { color: #e94560; display: block; font-size: 18px; }
+  .lg-collected-card {
+    position: absolute; bottom: 14px; left: 14px; right: 14px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 12px; padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  }
+  .lg-collected-label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .lg-collected-val   { font-size: 20px; font-weight: 800; color: #0f172a; }
+  .lg-collected-trend { font-size: 11px; color: #16a34a; font-weight: 700; }
+  /* Reviews strip */
+  .lg-reviews {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .lg-avatars { display: flex; }
+  .lg-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 2px solid #fff; margin-left: -8px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: white;
+    flex-shrink: 0;
+  }
+  .lg-avatars .lg-avatar:first-child { margin-left: 0; }
+  .lg-review-text { flex: 1; }
+  .lg-stars { color: #f59e0b; font-size: 13px; letter-spacing: 1px; }
+  .lg-review-caption { font-size: 11px; color: #64748b; font-weight: 600; margin-top: 2px; }
 
-  /* ─── CARD (slides up from hero on mobile) ─── */
+  /* Mobile stat strip */
+  .lg-stats {
+    display: none;
+  }
+
+  /* ── RIGHT FORM PANEL ── */
+  .lg-card-panel {
+    background: #f8fafc;
+    padding: 28px 20px 40px;
+    display: flex; flex-direction: column; align-items: center;
+  }
   .lg-card {
     background: white;
-    border-radius: 24px 24px 0 0;
-    flex: 1;
-    padding: 28px 24px 48px;
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.07);
-    margin-top: -10px;
-    position: relative; z-index: 1;
+    border-radius: 20px;
+    width: 100%; max-width: 400px;
+    padding: 28px 24px 32px;
+    box-shadow: 0 8px 32px rgba(2,6,23,0.1);
   }
 
-  /* ─── TABS ─── */
+  /* ── TABS ── */
   .lg-tabs {
     display: flex; background: #f1f5f9;
     border-radius: 12px; padding: 4px; gap: 3px;
@@ -94,8 +158,7 @@ const css = `
     font-size: 12px; font-weight: 700;
     cursor: pointer; background: transparent;
     color: #94a3b8; font-family: inherit;
-    transition: all 0.2s;
-    -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent;
     white-space: nowrap;
   }
   .lg-tab.active {
@@ -103,270 +166,143 @@ const css = `
     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
   }
 
-  /* ─── ALERTS ─── */
-  .lg-error {
-    background: #fff5f5; color: #c53030;
-    border: 1px solid #fed7d7; border-radius: 10px;
-    padding: 11px 14px; font-size: 13px;
-    margin-bottom: 16px; font-weight: 500;
-  }
-  .lg-success {
-    background: #f0fdf4; color: #15803d;
-    border: 1px solid #bbf7d0; border-radius: 10px;
-    padding: 11px 14px; font-size: 13px;
-    margin-bottom: 16px; font-weight: 600;
-  }
+  /* ── ALERTS ── */
+  .lg-error   { background:#fff5f5; color:#c53030; border:1px solid #fed7d7; border-radius:10px; padding:11px 14px; font-size:13px; margin-bottom:16px; font-weight:500; }
+  .lg-success { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; border-radius:10px; padding:11px 14px; font-size:13px; margin-bottom:16px; font-weight:600; }
 
-  /* ─── FORM ELEMENTS ─── */
-  .lg-title { font-size: 22px; font-weight: 800; color: #1a1a2e; margin-bottom: 6px; }
+  /* ── FORM ELEMENTS ── */
+  .lg-title { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
   .lg-sub   { font-size: 13px; color: #94a3b8; margin-bottom: 22px; line-height: 1.5; }
-
   .lg-field { margin-bottom: 14px; }
-  .lg-label {
-    display: block; font-size: 12px; font-weight: 700;
-    color: #475569; margin-bottom: 6px;
-    text-transform: uppercase; letter-spacing: 0.4px;
-  }
+  .lg-label { display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.4px; }
   .lg-input {
-    width: 100%; padding: 13px 16px;
-    border: 1.5px solid #e2e8f0; border-radius: 12px;
-    font-size: 15px; font-family: inherit;
-    color: #1a1a2e; background: #fafbff;
-    outline: none; box-sizing: border-box;
-    -webkit-appearance: none;
+    width:100%; padding:13px 16px;
+    border:1.5px solid #e2e8f0; border-radius:12px;
+    font-size:15px; font-family:inherit;
+    color:#0f172a; background:#fafbff;
+    outline:none; box-sizing:border-box; -webkit-appearance:none;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .lg-input:focus {
-    border-color: #e94560;
-    box-shadow: 0 0 0 3px rgba(233,69,96,0.1);
-    background: #fff;
-  }
-
-  /* PG Code special styling */
+  .lg-input:focus { border-color:#e94560; box-shadow:0 0 0 3px rgba(233,69,96,0.1); background:#fff; }
   .lg-pgcode-input {
-    width: 100%; padding: 13px 16px;
-    border: 1.5px solid #e2e8f0; border-radius: 12px;
-    font-size: 22px; font-weight: 800;
-    letter-spacing: 8px; text-align: center;
-    font-family: inherit; color: #1a1a2e;
-    background: #fafbff; outline: none;
-    box-sizing: border-box; -webkit-appearance: none;
+    width:100%; padding:13px 16px;
+    border:1.5px solid #e2e8f0; border-radius:12px;
+    font-size:22px; font-weight:800; letter-spacing:8px; text-align:center;
+    font-family:inherit; color:#0f172a; background:#fafbff;
+    outline:none; box-sizing:border-box; -webkit-appearance:none;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .lg-pgcode-input:focus {
-    border-color: #e94560;
-    box-shadow: 0 0 0 3px rgba(233,69,96,0.1);
-    background: #fff;
-  }
-
-  /* Phone row — FIXED: no dynamic state changes that cause re-render focus loss */
-  .lg-phone-row {
-    display: flex; gap: 8px; align-items: stretch;
-  }
+  .lg-pgcode-input:focus { border-color:#e94560; box-shadow:0 0 0 3px rgba(233,69,96,0.1); background:#fff; }
+  .lg-phone-row { display:flex; gap:8px; align-items:stretch; }
   .lg-prefix {
-    width: 60px; flex-shrink: 0;
-    padding: 13px 0; border: 1.5px solid #e2e8f0;
-    border-radius: 12px; font-size: 15px; font-weight: 700;
-    color: #475569; background: #f8fafc; text-align: center;
+    width:72px; flex-shrink:0; padding:13px 0;
+    border:1.5px solid #e2e8f0; border-radius:12px;
+    font-size:15px; font-weight:700; color:#475569;
+    background:#f8fafc; text-align:center;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
   }
   .lg-phone-input {
-    flex: 1; padding: 13px 16px;
-    border: 1.5px solid #e2e8f0; border-radius: 12px;
-    font-size: 15px; font-family: inherit;
-    color: #1a1a2e; background: #fafbff;
-    outline: none; box-sizing: border-box;
-    -webkit-appearance: none;
+    flex:1; padding:13px 16px;
+    border:1.5px solid #e2e8f0; border-radius:12px;
+    font-size:15px; font-family:inherit;
+    color:#0f172a; background:#fafbff;
+    outline:none; box-sizing:border-box; -webkit-appearance:none;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .lg-phone-input:focus {
-    border-color: #e94560;
-    box-shadow: 0 0 0 3px rgba(233,69,96,0.1);
-    background: #fff;
-  }
-
-  /* Password wrapper */
-  .lg-pass-wrap { position: relative; }
+  .lg-phone-input:focus { border-color:#e94560; box-shadow:0 0 0 3px rgba(233,69,96,0.1); background:#fff; }
+  .lg-pass-wrap { position:relative; }
   .lg-pass-input {
-    width: 100%; padding: 13px 48px 13px 16px;
-    border: 1.5px solid #e2e8f0; border-radius: 12px;
-    font-size: 15px; font-family: inherit;
-    color: #1a1a2e; background: #fafbff;
-    outline: none; box-sizing: border-box;
-    -webkit-appearance: none;
+    width:100%; padding:13px 48px 13px 16px;
+    border:1.5px solid #e2e8f0; border-radius:12px;
+    font-size:15px; font-family:inherit;
+    color:#0f172a; background:#fafbff;
+    outline:none; box-sizing:border-box; -webkit-appearance:none;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .lg-pass-input:focus {
-    border-color: #e94560;
-    box-shadow: 0 0 0 3px rgba(233,69,96,0.1);
-    background: #fff;
-  }
-  .lg-eye {
-    position: absolute; right: 14px; top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer; font-size: 18px;
-    user-select: none; -webkit-tap-highlight-color: transparent;
-  }
-
-  /* Forgot row */
-  .lg-forgot-row {
-    display: flex; justify-content: space-between;
-    align-items: center; margin-bottom: 6px;
-  }
-  .lg-forgot {
-    font-size: 12px; color: #e94560; font-weight: 700;
-    cursor: pointer; -webkit-tap-highlight-color: transparent;
-  }
-
-  /* Remember me */
-  .lg-remember {
-    display: flex; align-items: center; gap: 8px;
-    margin-bottom: 16px;
-  }
-  .lg-remember input {
-    width: 18px;
-    height: 18px;
-    accent-color: #e94560;
-    margin: 0;
-    flex-shrink: 0;
-  }
-  .lg-remember label {
-    font-size: 16px;
-    color: #0f172a;
-    line-height: 1.35;
-    cursor: pointer;
-  }
+  .lg-pass-input:focus { border-color:#e94560; box-shadow:0 0 0 3px rgba(233,69,96,0.1); background:#fff; }
+  .lg-eye { position:absolute; right:14px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:18px; user-select:none; -webkit-tap-highlight-color:transparent; }
+  .lg-forgot-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .lg-forgot { font-size:12px; color:#e94560; font-weight:700; cursor:pointer; }
+  .lg-remember { display:flex; align-items:center; gap:8px; margin-bottom:16px; }
+  .lg-remember input { width:14px; height:14px; accent-color:#e94560; margin:0; flex-shrink:0; }
+  .lg-remember label { font-size:13px; color:#334155; line-height:1.25; cursor:pointer; }
   .lg-btn {
-    width: 100%;
-    border: none;
-    border-radius: 12px;
-    padding: 13px 16px;
-    background: linear-gradient(135deg, #e94560 0%, #d63652 100%);
-    color: white;
-    font-size: 15px;
-    font-weight: 800;
-    font-family: inherit;
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
-    box-shadow: 0 8px 18px rgba(233,69,96,0.28);
-  }
-  .lg-btn:hover { filter: brightness(1.03); }
-  .lg-btn:active { transform: translateY(1px); }
-  .lg-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-  .lg-switch {
-    text-align: center;
-    margin: 2px 0 14px;
-    color: #64748b;
-    font-size: 14px;
-    line-height: 1.4;
-  }
-  .lg-switch a {
-    color: #e94560;
-    font-weight: 700;
-    text-decoration: none;
-  }
-  .lg-switch a:hover { text-decoration: underline; }
-  .lg-back {
-    margin-top: 12px;
-    color: #e94560;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .lg-staff-divider {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 16px 0 10px;
-  }
-  
-  .lg-google-btn {
-    width: 100%; padding: 14px; background: white; color: #1a1a2e; border: 1.5px solid #e2e8f0;
-    border-radius: 14px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.03); -webkit-tap-highlight-color: transparent;
-    transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px;
-    margin-bottom: 16px; margin-top: 10px;
-  }
-  .lg-google-btn:hover { border-color: #cbd5e0; background: #f8fafc; }
-  .lg-google-btn:active { transform: scale(0.98); }
-  .lg-google-icon { width: 18px; height: 18px; }
-  .lg-staff-divider span {
-    flex: 1; height: 1px; background: #e2e8f0;
-  }
-  .lg-staff-divider p {
-    font-size: 11px; color: #cbd5e1; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    white-space: nowrap;
-  }
-  .lg-staff-btn {
-    width: 100%; padding: 12px 16px;
-    background: transparent;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    font-size: 13px; font-weight: 700;
-    font-family: inherit;
-    color: #475569;
-    cursor: pointer;
+    width:100%; border:none; border-radius:14px;
+    padding:14px 16px;
+    background: linear-gradient(135deg, #e94560 0%, #c1253f 100%);
+    color:white; font-size:16px; font-weight:800;
+    font-family:inherit; cursor:pointer;
+    transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
+    box-shadow: 0 6px 20px rgba(233,69,96,0.35);
     display: flex; align-items: center; justify-content: center; gap: 8px;
-    transition: border-color 0.2s, background 0.2s, color 0.2s, box-shadow 0.2s;
-    -webkit-tap-highlight-color: transparent;
-    text-decoration: none;
   }
-  .lg-staff-btn:hover {
-    border-color: #6366f1;
-    color: #6366f1;
-    background: #f5f3ff;
-    box-shadow: 0 2px 8px rgba(99,102,241,0.12);
+  .lg-btn:hover { filter:brightness(1.05); }
+  .lg-btn:active { transform:translateY(1px); }
+  .lg-btn:disabled { opacity:0.65; cursor:not-allowed; box-shadow:none; }
+  .lg-switch { text-align:center; margin:16px 0 12px; color:#64748b; font-size:14px; line-height:1.4; }
+  .lg-switch a { color:#e94560; font-weight:700; text-decoration:none; }
+  .lg-switch a:hover { text-decoration:underline; }
+  .lg-back { margin-top:12px; color:#e94560; font-size:14px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .lg-staff-divider { display:flex; align-items:center; gap:10px; margin:16px 0 10px; }
+  .lg-staff-divider span { flex:1; height:1px; background:#e2e8f0; }
+  .lg-staff-divider p { font-size:11px; color:#cbd5e1; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
+  .lg-staff-btn {
+    width:100%; padding:12px 16px;
+    background:transparent; border:1.5px solid #e2e8f0; border-radius:12px;
+    font-size:13px; font-weight:700; font-family:inherit; color:#475569;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+    transition: border-color 0.2s, background 0.2s, color 0.2s;
+    -webkit-tap-highlight-color:transparent; text-decoration:none;
   }
-  .lg-staff-btn:active { transform: scale(0.98); }
+  .lg-staff-btn:hover { border-color:#6366f1; color:#6366f1; background:#f5f3ff; }
+  .lg-staff-btn:active { transform:scale(0.98); }
+  .lg-bottom-strip {
+    background: #0f172a; color: #94a3b8;
+    padding: 14px 24px;
+    display: grid; grid-template-columns: repeat(2,1fr);
+    gap: 10px;
+  }
+  .lg-bottom-item { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .lg-google-btn {
+    width:100%; padding:13px; background:white; color:#0f172a; border:1.5px solid #e2e8f0;
+    border-radius:12px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
+    transition: all 0.2s; display:flex; align-items:center; justify-content:center; gap:10px;
+    margin-bottom:14px; margin-top:8px;
+  }
+  .lg-google-icon { width:18px; height:18px; }
 
-  /* ─── DESKTOP: sidebar layout ─── */
+  /* ── DESKTOP ── */
   @media (min-width: 769px) {
-    .lg-root {
-      flex-direction: row;
-      background: #fff;
-    }
-    /* Left hero sidebar */
+    .lg-topbar { padding: 0 48px; height: 72px; }
+    .lg-brand { font-size: 24px; }
+    .lg-trust { font-size: 14px; }
+    .lg-main { flex-direction: row; flex: 1; }
+    /* Left hero */
     .lg-hero {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 60px;
+      flex: 1.2; display: flex; align-items: center; justify-content: center;
+      padding: 60px 56px; border-right: 1px solid #e8edf5;
+      min-height: 0;
     }
-    .lg-hero-inner { max-width: 440px; width: 100%; }
-    .lg-hero-title { font-size: 40px; margin-bottom: 20px; }
-    .lg-hero-brand { font-size: 20px; margin-bottom: 40px; }
-    .lg-hero-sub {
-      color: rgba(255,255,255,0.6);
-      font-size: 16px; line-height: 1.7; margin-bottom: 32px;
-    }
-    .lg-hero-features { gap: 12px; margin-bottom: 0; }
-    .lg-hero-feature  { font-size: 15px; }
-    /* Hide mobile stats on desktop */
-    .lg-stats { display: none; }
-
+    .lg-hero-inner { max-width: 460px; width: 100%; }
+    .lg-hero-title { font-size: 44px; margin-bottom: 16px; }
+    .lg-hero-sub { font-size: 16px; margin-bottom: 32px; }
+    .lg-features { gap: 16px; margin-bottom: 32px; }
+    .lg-building-wrap { height: 220px; margin-bottom: 24px; }
     /* Right form panel */
     .lg-card-panel {
-      width: 500px; flex-shrink: 0;
-      background: #f8f9ff;
+      width: 480px; flex-shrink: 0;
+      background: linear-gradient(160deg, #1a2540 0%, #0f172a 100%);
       display: flex; align-items: center; justify-content: center;
-      padding: 40px; overflow-y: auto;
+      padding: 48px 40px; overflow-y: auto;
     }
     .lg-card {
-      border-radius: 20px;
-      margin-top: 0;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.08);
-      width: 100%; max-width: 400px;
+      border-radius: 24px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+      width: 100%; max-width: 380px;
       padding: 36px 32px 40px;
-      flex: none;
     }
+    .lg-bottom-strip { grid-template-columns: repeat(4,1fr); padding: 16px 48px; gap: 20px; }
+    .lg-bottom-item { font-size: 13px; }
   }
 `;
 
@@ -745,56 +681,117 @@ export default function Login() {
     </>
   );
 
+  const features = [
+    { icon: '🏠', color: 'red',   title: 'Easy PG Management',       desc: 'Add rooms, tenants and manage everything from one dashboard.' },
+    { icon: '₹',  color: 'green', title: 'Automated Rent Collection', desc: 'Collect rent on time and track payments without any hassle.' },
+    { icon: '📊', color: 'blue',  title: 'Reports & Analytics',       desc: 'Get insights and reports to make better decisions every day.' },
+    { icon: '🎧', color: 'amber', title: '24/7 Support',              desc: 'We are always here to help you whenever you need.' },
+  ];
+
   return (
     <>
       <style>{css}</style>
       <div className="lg-root">
+        {/* Top bar */}
+        <div className="lg-topbar">
+          <div className="lg-brand">
+            <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+              <path d="M7 15L7 27C7 28.1 7.9 29 9 29H13V22C13 20.9 13.9 20 15 20H17C18.1 20 19 20.9 19 22V29H23C24.1 29 25 28.1 25 27V15L16 8Z" fill="#e94560"/>
+              <rect x="2" y="14" width="18" height="4" rx="2" fill="#e94560" transform="rotate(-40 2 14)"/>
+              <rect x="16" y="3" width="18" height="4" rx="2" fill="#e94560" transform="rotate(40 16 3)"/>
+            </svg>
+            PGpilots
+          </div>
+          <div className="lg-trust">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Trusted by 10,000+ PG Owners
+          </div>
+        </div>
 
-        {/* ── Hero / Left panel ── */}
-        <div className="lg-hero">
-          <div className="lg-hero-inner">
-            <div className="lg-hero-brand">
-              <svg width="22" height="22" viewBox="0 0 32 32" fill="none" style={{ marginRight: '8px' }}>
-                <path d="M7 15 L7 27 C7 28.1 7.9 29 9 29 L13 29 L13 22 C13 20.9 13.9 20 15 20 L17 20 C18.1 20 19 20.9 19 22 L19 29 L23 29 C24.1 29 25 28.1 25 27 L25 15 L16 8 Z" fill="white" />
-                <rect x="2" y="14" width="18" height="4" rx="2" fill="#00E599" transform="rotate(-40 2 14)" />
-                <rect x="16" y="3" width="18" height="4" rx="2" fill="#00E599" transform="rotate(40 16 3)" />
-              </svg>
-              PGpilots
-            </div>
-            <h1 className="lg-hero-title">Manage your PG<br/>like a Pro</h1>
+        <div className="lg-main">
+          {/* ── Left Hero ── */}
+          <div className="lg-hero">
+            <div className="lg-hero-inner">
+              <h1 className="lg-hero-title">Manage Your PG.<br/>Grow Your <em>Income.</em></h1>
+              <p className="lg-hero-sub">All-in-one platform to manage rooms, tenants, payments and maintenance – easily and efficiently.</p>
 
-            <p className="lg-hero-sub">
-              All-in-one platform for PG owners to manage tenants, rooms, rent and more.
-            </p>
-            <div className="lg-hero-features">
-              {['Tenant Management','Rent Tracking','Electricity Bills','Automated Reminders'].map(f => (
-                <div key={f} className="lg-hero-feature" style={{ display: 'flex', alignItems: 'center' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00E599" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>
-                  {f}
+              <div className="lg-features">
+                {features.map(f => (
+                  <div key={f.title} className="lg-feature-item">
+                    <div className={`lg-feature-icon ${f.color}`}>{f.icon}</div>
+                    <div className="lg-feature-text">
+                      <h4>{f.title}</h4>
+                      <p>{f.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Building card */}
+              <div className="lg-building-wrap">
+                <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg,#1a3a5c,#0d2137)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <svg width="80" height="80" viewBox="0 0 80 80" fill="none" opacity="0.3">
+                    <rect x="10" y="30" width="60" height="45" rx="4" fill="white"/>
+                    <rect x="20" y="15" width="40" height="20" rx="2" fill="white"/>
+                    <polygon points="40,5 5,30 75,30" fill="white"/>
+                    <rect x="30" y="50" width="20" height="25" rx="2" fill="#1a3a5c"/>
+                    <rect x="15" y="40" width="12" height="10" rx="1" fill="#1a3a5c"/>
+                    <rect x="53" y="40" width="12" height="10" rx="1" fill="#1a3a5c"/>
+                  </svg>
                 </div>
-              ))}
-            </div>
-
-            <div className="lg-stats">
-              {[['500+','PG Owners'],['10k+','Tenants'],['₹1Cr+','Collected']].map(([num,label]) => (
-                <div key={label} className="lg-stat">
-                  <div className="lg-stat-num">{num}</div>
-                  <div className="lg-stat-label">{label}</div>
+                <div className="lg-building-badge">
+                  <span>500+</span>PG Owners
                 </div>
-              ))}
+                <div className="lg-collected-card">
+                  <div>
+                    <div className="lg-collected-label">Total Collected</div>
+                    <div className="lg-collected-val">₹1.2 Cr+</div>
+                  </div>
+                  <div className="lg-collected-trend">↑ 24% ↗</div>
+                </div>
+              </div>
+
+              {/* Reviews */}
+              <div className="lg-reviews">
+                <div className="lg-avatars">
+                  {[['R','#e94560'],['S','#6366f1'],['A','#f59e0b'],['M','#10b981']].map(([l,c]) => (
+                    <div key={l} className="lg-avatar" style={{ background: c }}>{l}</div>
+                  ))}
+                </div>
+                <div className="lg-review-text">
+                  <div className="lg-stars">★★★★★</div>
+                  <div className="lg-review-caption">4.8/5 from 1000+ reviews · PG owners love PGpilots</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Right Form Panel ── */}
+          <div className="lg-card-panel">
+            <div className="lg-card">
+              {formContent}
             </div>
           </div>
         </div>
 
-        {/* ── Form card ── */}
-        <div className="lg-card-panel">
-          <div className="lg-card">
-            {formContent}
-          </div>
+        {/* Bottom strip */}
+        <div className="lg-bottom-strip">
+          {[
+            { icon: '🛡️', label: 'Secure & Reliable',  sub: 'Your data is 100% safe with us' },
+            { icon: '🔒', label: 'Privacy First',       sub: 'We respect your privacy' },
+            { icon: '☁️', label: 'Cloud Based',         sub: 'Access your data from anywhere' },
+            { icon: '🎧', label: 'Always Here',         sub: '24/7 support for you' },
+          ].map(({ icon, label, sub }) => (
+            <div key={label} className="lg-bottom-item">
+              <span>{icon}</span>
+              <div>
+                <div style={{ color: '#e2e8f0', fontWeight: 700 }}>{label}</div>
+                <div style={{ fontSize: '11px', marginTop: '1px' }}>{sub}</div>
+              </div>
+            </div>
+          ))}
         </div>
-
       </div>
     </>
   );
 }
-

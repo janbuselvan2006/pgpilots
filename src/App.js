@@ -11,6 +11,8 @@ import AdminRoute from './AdminRoute';
 import StaffLogin from './Stafflogin';
 import StaffDashboard from './Staffdashboard';
 import TenantOnboard from './pages/TenantOnboard';
+import FindPG from './pages/FindPG';
+import ListProperty from './pages/ListProperty';
 
 function LoadingScreen() {
   return (
@@ -115,6 +117,12 @@ function App() {
 
         <Route path="/tenant-onboard"
           element={<TenantOnboard />} />
+
+        <Route path="/find-pg"
+          element={<FindPG />} />
+
+        <Route path="/list-property"
+          element={<ProtectedRoute><ListProperty /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
