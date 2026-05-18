@@ -76,7 +76,13 @@ export default function ListProperty() {
     price: '',
     description: '',
     photos: [],
-    isPublic: false
+    isPublic: false,
+    area: '',
+    landmark: '',
+    googleMapLink: '',
+    address: '',
+    city: '',
+    state: ''
   });
 
   const user = auth.currentUser;
@@ -99,7 +105,13 @@ export default function ListProperty() {
           price: main.listingPrice || '',
           description: main.description || '',
           photos: main.photos || [],
-          isPublic: main.isPublic || false
+          isPublic: main.isPublic || false,
+          area: main.area || '',
+          landmark: main.landmark || '',
+          googleMapLink: main.googleMapLink || '',
+          address: main.address || '',
+          city: main.city || '',
+          state: main.state || ''
         });
       }
     } catch (e) { console.error(e); }
@@ -115,7 +127,13 @@ export default function ListProperty() {
         price: pg.listingPrice || '',
         description: pg.description || '',
         photos: pg.photos || [],
-        isPublic: pg.isPublic || false
+        isPublic: pg.isPublic || false,
+        area: pg.area || '',
+        landmark: pg.landmark || '',
+        googleMapLink: pg.googleMapLink || '',
+        address: pg.address || '',
+        city: pg.city || '',
+        state: pg.state || ''
       });
     }
   };
@@ -170,6 +188,12 @@ export default function ListProperty() {
         listingPrice: form.price,
         description: form.description,
         isPublic: form.isPublic,
+        area: form.area || '',
+        landmark: form.landmark || '',
+        googleMapLink: form.googleMapLink || '',
+        address: form.address || '',
+        city: form.city || '',
+        state: form.state || '',
         updatedAt: serverTimestamp()
       });
       setStatus({ type: 'success', msg: 'Listing updated successfully!' });
@@ -234,6 +258,37 @@ export default function ListProperty() {
           <div className="lp-field">
             <label className="lp-label">Starting Price (₹ / month)</label>
             <input className="lp-input" type="number" placeholder="e.g. 7500" value={form.price} onChange={e => setForm(f => ({...f, price: e.target.value}))} />
+          </div>
+
+          <div className="lp-field">
+            <label className="lp-label">PG Physical Address</label>
+            <input className="lp-input" type="text" placeholder="e.g. No. 12, Main Street" value={form.address} onChange={e => setForm(f => ({...f, address: e.target.value}))} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="lp-field">
+              <label className="lp-label">City</label>
+              <input className="lp-input" type="text" placeholder="e.g. Chennai" value={form.city} onChange={e => setForm(f => ({...f, city: e.target.value}))} />
+            </div>
+            <div className="lp-field">
+              <label className="lp-label">State</label>
+              <input className="lp-input" type="text" placeholder="e.g. Tamil Nadu" value={form.state} onChange={e => setForm(f => ({...f, state: e.target.value}))} />
+            </div>
+          </div>
+
+          <div className="lp-field">
+            <label className="lp-label">PG Area / Locality</label>
+            <input className="lp-input" type="text" placeholder="e.g. Anna Nagar, T. Nagar" value={form.area} onChange={e => setForm(f => ({...f, area: e.target.value}))} />
+          </div>
+
+          <div className="lp-field">
+            <label className="lp-label">Nearest Landmark</label>
+            <input className="lp-input" type="text" placeholder="e.g. Near Central Metro Station" value={form.landmark} onChange={e => setForm(f => ({...f, landmark: e.target.value}))} />
+          </div>
+
+          <div className="lp-field">
+            <label className="lp-label">Google Map Location Link</label>
+            <input className="lp-input" type="url" placeholder="e.g. https://maps.app.goo.gl/..." value={form.googleMapLink} onChange={e => setForm(f => ({...f, googleMapLink: e.target.value}))} />
           </div>
 
           <div className="lp-field">

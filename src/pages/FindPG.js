@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collectionGroup, query, where, getDocs } from 'firebase/firestore';
+import { collectionGroup, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -83,6 +83,27 @@ const css = `
     background: rgba(10, 25, 48, 0.9); color: #00e599;
     padding: 5px 12px; border-radius: 100px; font-size: 12px; font-weight: 800;
   }
+  
+  .fp-carousel-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    background: rgba(0,0,0,0.5); color: white; border: none;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 20px; z-index: 2; transition: background 0.2s;
+  }
+  .fp-carousel-btn:hover { background: rgba(0,0,0,0.8); }
+  .fp-carousel-btn.left { left: 10px; }
+  .fp-carousel-btn.right { right: 10px; }
+  .fp-carousel-dots {
+    position: absolute; bottom: 12px; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 6px; z-index: 2;
+  }
+  .fp-carousel-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,0.5); transition: background 0.2s;
+  }
+  .fp-carousel-dot.active { background: white; }
+
   .fp-card-content { padding: 24px; }
   .fp-card-title { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
   .fp-card-loc { font-size: 14px; color: #64748b; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
@@ -103,18 +124,80 @@ const css = `
   }
 `;
 
+const ImageCarousel = ({ photos, className, style, children }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const handleNext = (e) => {
+    if (e) e.stopPropagation();
+    setCurrentIndex((prev) => (prev + 1) % photos.length);
+  };
+
+  const handlePrev = (e) => {
+    if (e) e.stopPropagation();
+    setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
+  };
+
+  const hasPhotos = photos && photos.length > 0;
+
+  return (
+    <div className={className} style={{ ...style, position: 'relative', background: hasPhotos ? `#cbd5e1 url(${photos[currentIndex]}) center/contain no-repeat` : '#cbd5e1' }}>
+      {!hasPhotos && (
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', opacity:0.2 }}>
+          <svg width="60" height="60" viewBox="0 0 24 24" fill="white"><path d="M3 21V7L12 3L21 7V21H15V15H9V21H3Z"/></svg>
+        </div>
+      )}
+      {children}
+      {hasPhotos && photos.length > 1 && (
+        <>
+          <button onClick={handlePrev} className="fp-carousel-btn left">
+            &#8249;
+          </button>
+          <button onClick={handleNext} className="fp-carousel-btn right">
+            &#8250;
+          </button>
+          <div className="fp-carousel-dots">
+            {photos.map((_, i) => (
+              <div key={i} className={`fp-carousel-dot ${i === currentIndex ? 'active' : ''}`} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export default function FindPG() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('All');
   const [pgs, setPgs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewingPg, setViewingPg] = useState(null);
+  const [viewingPgOwner, setViewingPgOwner] = useState(null);
+  const [unlockedPgs, setUnlockedPgs] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchListings();
   }, []);
+
+  useEffect(() => {
+    if (!viewingPg) {
+      setViewingPgOwner(null);
+      return;
+    }
+    const fetchOwner = async () => {
+      try {
+        const ownerSnap = await getDoc(doc(db, 'pgOwners', viewingPg.ownerId));
+        if (ownerSnap.exists()) {
+          setViewingPgOwner(ownerSnap.data());
+        }
+      } catch (e) {
+        console.error("Error fetching owner details:", e);
+      }
+    };
+    fetchOwner();
+  }, [viewingPg]);
 
   const fetchListings = async () => {
     try {
@@ -137,7 +220,7 @@ export default function FindPG() {
   const filteredPgs = pgs.filter(pg => {
     const matchesFilter = filter === 'All' || pg.type === filter;
     const matchesSearch = !searchTerm || 
-      (pg.pgName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (pg.pgCode?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (pg.city?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (pg.address?.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesFilter && matchesSearch;
@@ -190,26 +273,21 @@ export default function FindPG() {
           </div>
         ) : error ? (
           <div style={{gridColumn:'1/-1', textAlign:'center', padding:'40px', color:'#ef4444'}}>
-            <div style={{fontSize:'40px', marginBottom:'16px'}}>⚠️</div>
-            {error}
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginBottom:'16px', display:'inline-block'}}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div>{error}</div>
           </div>
         ) : filteredPgs.length === 0 ? (
           <div style={{gridColumn:'1/-1', textAlign:'center', padding:'40px', color:'#64748b'}}>
-            <div style={{fontSize:'40px', marginBottom:'16px'}}>🏠</div>
-            No PGs found matching your criteria.
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginBottom:'16px', display:'inline-block'}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <div>No PGs found matching your criteria.</div>
           </div>
         ) : filteredPgs.map(pg => (
           <div key={pg.id} className="fp-card">
-            <div className="fp-card-img" style={{ background: pg.photos?.[0] ? `url(${pg.photos[0]}) center/cover` : '#cbd5e1' }}>
-              {!pg.photos?.[0] && (
-                <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', opacity:0.2 }}>
-                  <svg width="60" height="60" viewBox="0 0 24 24" fill="white"><path d="M3 21V7L12 3L21 7V21H15V15H9V21H3Z"/></svg>
-                </div>
-              )}
+            <ImageCarousel photos={pg.photos} className="fp-card-img">
               <div className="fp-card-badge">{pg.type}</div>
-            </div>
+            </ImageCarousel>
             <div className="fp-card-content">
-              <div className="fp-card-title">{pg.pgName}</div>
+              <div className="fp-card-title">{pg.pgCode || `PG-${pg.id.toUpperCase().slice(0, 4)}`}</div>
               <div className="fp-card-loc">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                 {pg.city}, {pg.state}
@@ -235,19 +313,15 @@ export default function FindPG() {
               ✕
             </button>
             
-            <div style={{ display:'grid', gridTemplateColumns: viewingPg.photos?.length > 1 ? 'repeat(2, 1fr)' : '1fr', gap:'4px', background:'#f1f5f9' }}>
-              {(viewingPg.photos || []).slice(0, 4).map((url, i) => (
-                <img key={i} src={url} alt="pg" style={{ width:'100%', height:'300px', objectFit:'cover' }} />
-              ))}
-              {(!viewingPg.photos || viewingPg.photos.length === 0) && (
-                <div style={{ height:'300px', background:'#cbd5e1', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'40px' }}>🏠</div>
-              )}
-            </div>
+            <ImageCarousel 
+              photos={viewingPg.photos} 
+              style={{ width: '100%', height: '350px', borderRadius: '24px 24px 0 0' }} 
+            />
 
             <div style={{ padding:'32px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'24px' }}>
                 <div>
-                  <h2 style={{ fontSize:'28px', fontWeight:'800', marginBottom:'8px' }}>{viewingPg.pgName}</h2>
+                  <h2 style={{ fontSize:'28px', fontWeight:'800', marginBottom:'8px' }}>{viewingPg.pgCode || `PG-${viewingPg.id.toUpperCase().slice(0, 4)}`}</h2>
                   <div style={{ color:'#64748b', display:'flex', alignItems:'center', gap:'8px', fontSize:'16px' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                     {viewingPg.address}, {viewingPg.city}, {viewingPg.state}
@@ -269,11 +343,79 @@ export default function FindPG() {
                 {viewingPg.description || 'No description provided.'}
               </p>
 
-              <button 
-                onClick={() => alert('Booking feature coming soon! Contact the owner directly for now.')}
-                style={{ width:'100%', padding:'18px', background:'#00e599', color:'#0a1930', border:'none', borderRadius:'16px', fontSize:'18px', fontWeight:'800', cursor:'pointer' }}>
-                Contact & Book Now
-              </button>
+              {/* Masked Owner & Property Details */}
+              <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px', marginBottom: '32px', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px', color: '#0a1930' }}>Property & Owner Details</h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px' }}>
+                  {/* Owner Section */}
+                  <div>
+                    <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Owner Details</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#0a1930', color: '#00e599', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold' }}>
+                        {(viewingPgOwner?.ownerName || 'O')[0]}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: '700', fontSize: '15px' }}>{viewingPgOwner?.ownerName || 'Property Owner'}</div>
+                        <div style={{ color: '#64748b', fontSize: '13px', fontFamily: 'monospace', letterSpacing: '0.5px', marginTop: '2px' }}>
+                          {unlockedPgs[viewingPg.id] 
+                            ? (viewingPgOwner?.phone ? `+91 ${viewingPgOwner.phone.slice(0, 5)} ${viewingPgOwner.phone.slice(5)}` : '+91 98765 43210')
+                            : (viewingPgOwner?.phone ? `+91 ******${viewingPgOwner.phone.slice(-4)}` : '+91 ******3210')
+                          }
+                        </div>
+                      </div>
+                    </div>
+                    {!unlockedPgs[viewingPg.id] && (
+                      <button 
+                        onClick={() => setUnlockedPgs(prev => ({...prev, [viewingPg.id]: true}))}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', background: '#0a1930', color: '#00e599', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', marginTop: '12px' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5l-3-3"/></svg>
+                        Unlock Number
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Location Details Section */}
+                  <div>
+                    <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Location Details</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div>
+                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>Area / Locality</span>
+                        <span style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b' }}>{viewingPg.area || viewingPg.city || '—'}</span>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>Nearest Landmark</span>
+                        <span style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b' }}>{viewingPg.landmark || '—'}</span>
+                      </div>
+                      <div style={{ marginTop: '4px' }}>
+                        <a 
+                          href={viewingPg.googleMapLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${viewingPg.address || ''} ${viewingPg.area || ''} ${viewingPg.city || ''}`)}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none', background: '#e2fcf3', color: '#0f766e', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', border: '1px solid #ccfbf1' }}
+                        >
+                          <svg viewBox="0 0 24 24" width="18" height="18" style={{marginRight:'4px', verticalAlign:'middle'}}><defs><linearGradient id="gglMapsGrad" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stopColor="#34a853" /><stop offset="30%" stopColor="#fbbc05" /><stop offset="55%" stopColor="#ea4335" /><stop offset="80%" stopColor="#a855f7" /><stop offset="100%" stopColor="#4285f4" /></linearGradient></defs><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="url(#gglMapsGrad)" /></svg>
+                          View on Google Maps
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {unlockedPgs[viewingPg.id] ? (
+                <button 
+                  onClick={() => alert(`Contacting Owner: ${viewingPgOwner?.phone || '98765 43210'}`)}
+                  style={{ width:'100%', padding:'18px', background:'#00e599', color:'#0a1930', border:'none', borderRadius:'16px', fontSize:'18px', fontWeight:'800', cursor:'pointer' }}>
+                  Contact & Book Now
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setUnlockedPgs(prev => ({...prev, [viewingPg.id]: true}))}
+                  style={{ width:'100%', padding:'18px', background:'#0a1930', color:'#00e599', border:'none', borderRadius:'16px', fontSize:'18px', fontWeight:'800', cursor:'pointer' }}>
+                  Pay ₹99 to Unlock Contact Number
+                </button>
+              )}
             </div>
           </div>
         </div>
