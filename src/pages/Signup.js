@@ -284,11 +284,18 @@ const css = `
     .pg-topbar { padding:0 48px; height:72px; }
     .pg-main { flex-direction:row; flex:1; }
     .pg-hero { flex:1.2; display:flex; align-items:center; justify-content:center; padding:60px 56px; border-right:1px solid #e8edf5; min-height:0; }
-    .pg-hero-inner { max-width:460px; width:100%; }
+    .pg-hero-inner { display: flex; align-items: center; gap: 48px; max-width: 900px; width: 100%; justify-content: space-between; }
+    .pg-hero-left { max-width: 440px; flex: 1; }
+    .pg-hero-right { flex: 1; display: flex; justify-content: flex-end; position: relative; }
     .pg-hero-title { font-size:44px; margin-bottom:16px; }
     .pg-hero-sub { font-size:16px; margin-bottom:32px; }
     .pg-features { gap:16px; margin-bottom:32px; }
-    .pg-building-wrap { height:220px; margin-bottom:24px; }
+    .pg-building-wrap { height: 420px; width: 320px; margin-bottom: 0; border-radius: 24px; }
+    .pg-building-badge { top: 40px; right: -20px; padding: 12px 18px; font-size: 14px; }
+    .pg-building-badge span { font-size: 24px; }
+    .pg-collected-card { bottom: 40px; left: -30px; right: auto; padding: 14px 18px; min-width: 200px; }
+    .pg-collected-label { font-size: 11px; }
+    .pg-collected-val { font-size: 24px; }
     .pg-card-wrap { width:480px; flex-shrink:0; background:linear-gradient(160deg,#1a2540 0%,#0f172a 100%); display:flex; align-items:center; justify-content:center; padding:48px 40px; overflow-y:auto; }
     .pg-card { border-radius:24px; box-shadow:0 24px 64px rgba(0,0,0,0.4); width:100%; max-width:380px; padding:36px 32px 40px; margin-top:0; }
     .pg-bottom-strip { grid-template-columns:repeat(4,1fr); padding:16px 48px; gap:20px; }
@@ -661,55 +668,50 @@ export default function Signup() {
           {/* Left Hero Panel */}
           <div className="pg-hero">
             <div className="pg-hero-inner">
-              <h1 className="pg-hero-title">Manage Your PG.<br/>Grow Your <em>Income.</em></h1>
-              <p className="pg-hero-sub">All-in-one platform to manage rooms, tenants, payments and maintenance – easily and efficiently.</p>
+              <div className="pg-hero-left">
+                <h1 className="pg-hero-title">Manage Your PG.<br/>Grow Your <em>Income.</em></h1>
+                <p className="pg-hero-sub">All-in-one platform to manage rooms, tenants, payments and maintenance – easily and efficiently.</p>
 
-              <div className="pg-features">
-                {features.map(f => (
-                  <div key={f.title} className="pg-feature-item">
-                    <div className={`pg-feature-icon ${f.color}`}>{f.icon}</div>
-                    <div className="pg-feature-text">
-                      <h4>{f.title}</h4>
-                      <p>{f.desc}</p>
+                <div className="pg-features">
+                  {features.map(f => (
+                    <div key={f.title} className="pg-feature-item">
+                      <div className={`pg-feature-icon ${f.color}`}>{f.icon}</div>
+                      <div className="pg-feature-text">
+                        <h4>{f.title}</h4>
+                        <p>{f.desc}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Building card */}
-              <div className="pg-building-wrap">
-                <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg,#1a3a5c,#0d2137)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <svg width="80" height="80" viewBox="0 0 80 80" fill="none" opacity="0.3">
-                    <rect x="10" y="30" width="60" height="45" rx="4" fill="white"/>
-                    <rect x="20" y="15" width="40" height="20" rx="2" fill="white"/>
-                    <polygon points="40,5 5,30 75,30" fill="white"/>
-                    <rect x="30" y="50" width="20" height="25" rx="2" fill="#1a3a5c"/>
-                    <rect x="15" y="40" width="12" height="10" rx="1" fill="#1a3a5c"/>
-                    <rect x="53" y="40" width="12" height="10" rx="1" fill="#1a3a5c"/>
-                  </svg>
-                </div>
-                <div className="pg-building-badge">
-                  <span>500+</span>PG Owners
-                </div>
-                <div className="pg-collected-card">
-                  <div>
-                    <div className="pg-collected-label">Total Collected</div>
-                    <div className="pg-collected-val">₹1.2 Cr+</div>
-                  </div>
-                  <div className="pg-collected-trend">↑ 24% ↗</div>
-                </div>
-              </div>
-
-              {/* Reviews */}
-              <div className="pg-reviews">
-                <div className="pg-avatars">
-                  {[['R','#e94560'],['S','#6366f1'],['A','#f59e0b'],['M','#10b981']].map(([l,c]) => (
-                    <div key={l} className="pg-avatar" style={{ background: c }}>{l}</div>
                   ))}
                 </div>
-                <div className="pg-review-text">
-                  <div className="pg-stars">★★★★★</div>
-                  <div className="pg-review-caption">4.8/5 from 1000+ reviews · PG owners love PGpilots</div>
+
+                {/* Reviews */}
+                <div className="pg-reviews">
+                  <div className="pg-avatars">
+                    {[['R','#e94560'],['S','#6366f1'],['A','#f59e0b'],['M','#10b981']].map(([l,c]) => (
+                      <div key={l} className="pg-avatar" style={{ background: c }}>{l}</div>
+                    ))}
+                  </div>
+                  <div className="pg-review-text">
+                    <div className="pg-stars">★★★★★</div>
+                    <div className="pg-review-caption">4.8/5 from 1000+ reviews · PG owners love PGpilots</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pg-hero-right">
+                {/* Building card */}
+                <div className="pg-building-wrap">
+                  <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80" alt="Building" className="lg-building-img" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.75, position: 'absolute', inset: 0 }} />
+                  <div className="pg-building-badge">
+                    <span>500+</span>PG Owners
+                  </div>
+                  <div className="pg-collected-card">
+                    <div>
+                      <div className="pg-collected-label">Total Collected</div>
+                      <div className="pg-collected-val">₹1.2 Cr+</div>
+                    </div>
+                    <div className="pg-collected-trend">↑ 24% ↗</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -914,13 +916,13 @@ export default function Signup() {
         {/* Bottom strip */}
         <div className="pg-bottom-strip">
           {[
-            { icon: '🛡️', label: 'Secure & Reliable', sub: 'Your data is 100% safe with us' },
-            { icon: '🔒', label: 'Privacy First',      sub: 'We respect your privacy' },
-            { icon: '☁️', label: 'Cloud Based',        sub: 'Access your data from anywhere' },
-            { icon: '🎧', label: 'Always Here',        sub: '24/7 support for you' },
+            { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>, label: 'Secure & Reliable', sub: 'Your data is 100% safe with us' },
+            { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>, label: 'Privacy First',      sub: 'We respect your privacy' },
+            { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>, label: 'Cloud Based',        sub: 'Access your data from anywhere' },
+            { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>, label: 'Always Here',        sub: '24/7 support for you' },
           ].map(({ icon, label, sub }) => (
             <div key={label} className="pg-bottom-item">
-              <span>{icon}</span>
+              <span style={{ display: 'flex', alignItems: 'center' }}>{icon}</span>
               <div>
                 <div style={{ color: '#e2e8f0', fontWeight: 700 }}>{label}</div>
                 <div style={{ fontSize: '11px', marginTop: '1px' }}>{sub}</div>
